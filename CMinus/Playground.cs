@@ -11,9 +11,9 @@ namespace CMinus
         String Value { get; set; }
     }
 
-    public interface LoggingVariableImplementation<T> : Implementation<Variable<T>>
+    public interface LoggingVariableImplementation<T> : Implementation<Property<T>>
     {
-        Variable<T> Nested { get; }
+        Property<T> Nested { get; }
 
         void Log(String text);
 
@@ -32,32 +32,32 @@ namespace CMinus
         }
     }
 
-    public interface WebClientProvider : Provider<WebClient>
-    {
-        new WebClient Get() => new WebClient();
-    }
+    //public interface WebClientProvider : Provider<WebClient>
+    //{
+    //    new WebClient Get() => new WebClient();
+    //}
 
 
-    public interface DefaultConstructingProvider<T> : Provider<T>
-        where T : class, new()
-    {
-        new T Get() => new T();
-    }
+    //public interface DefaultConstructingProvider<T> : Provider<T>
+    //    where T : class, new()
+    //{
+    //    new T Get() => new T();
+    //}
 
 
 
-    public interface Requests : Requires<WebClient>
-    {
-        Task<String> DownloadString(Url url)
-            => GetService().DownloadStringTaskAsync(url.Value);
-    }
+    //public interface Requests : Requires<WebClient>
+    //{
+    //    Task<String> DownloadString(Url url)
+    //        => GetService().DownloadStringTaskAsync(url.Value);
+    //}
 
     public interface PlaygroundSecrets
     {
 
     }
 
-    public interface Playground : Requests, Requires<PlaygroundSecrets>
+    public interface Playground
     {
         //String GetSomeString();
 
@@ -65,9 +65,11 @@ namespace CMinus
 
         //String GetTruth();
 
-        IPreacher Preacher { get; }
+        String Name { get; set; }
 
-        void MethodWithImplementation() => Console.WriteLine("Action: " + Preacher.Truth);
+        //IPreacher Preacher { get; }
+
+        void MethodWithImplementation() => Console.WriteLine($"My name is {Name}");
     }
 
     public interface IPreacher

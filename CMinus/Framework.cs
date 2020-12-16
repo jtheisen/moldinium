@@ -61,8 +61,21 @@ namespace CMinus
         }
     }
 
-    public interface Variable<T>
+
+    public interface IPropertyImplementation<Value, Container, MixIn>
     {
-        public T Value { get; set; }
+        Value Get(Container self, MixIn mixIn);
+
+        void Set(Container self, MixIn mixIn, Value value);
+    }
+
+    public interface ReadonlyProperty<T>
+    {
+        T Value { get; }
+    }
+
+    public interface Property<T>
+    {
+        T Value { get; set; }
     }
 }
