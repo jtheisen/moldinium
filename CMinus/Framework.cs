@@ -1,17 +1,31 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace CMinus
 {
+    public interface Constructor<T>
+    {
+        T Construct();
+        T Construct(Expression<Predicate<T>> expression);
+    }
+
     public interface Requires<T>
     {
         T GetService();
         T GetService<S>() where S : T;
     }
+
+    public interface RequiresConstructor<T> : Requires<Constructor<T>>
+    {
+        T Construct<S>() where S : T
+            => GetService<Constructor<T>>().Construct();
+    }
+
 
     public interface Requires<D, R> : Requires<D>
         where R : Resolver
@@ -35,6 +49,8 @@ namespace CMinus
     {
         IEnumerable<DependencyRecord> GetRecords();
     }
+
+
 
     //public interface AssemblyTypeResolver<TypeInAssembly> : Resolver
     //{
@@ -62,17 +78,17 @@ namespace CMinus
     }
 
 
-    public interface IPropertyImplementation<Value, Container, MixIn>
-    {
-        Value Get(Container self, MixIn mixIn);
+    //public interface IPropertyImplementation<Value, Container, MixIn>
+    //{
+    //    Value Get(Container self, MixIn mixIn);
 
-        void Set(Container self, MixIn mixIn, Value value);
-    }
+    //    void Set(Container self, MixIn mixIn, Value value);
+    //}
 
-    public interface ReadonlyProperty<T>
-    {
-        T Value { get; }
-    }
+    //public interface ReadonlyProperty<T>
+    //{
+    //    T Value { get; }
+    //}
 
     public interface Property<T>
     {

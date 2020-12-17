@@ -55,5 +55,4 @@ namespace CMinus.Construction
     {
         public T Value { get; set; }
     }
-
 }
