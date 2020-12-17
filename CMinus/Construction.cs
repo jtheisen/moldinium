@@ -6,12 +6,12 @@ using System.Threading.Tasks;
 
 namespace CMinus.Construction
 {
-    public interface IPropertyImplementation
+    public interface IComplexPropertyImplementation
             <ValueInterface, ContainerInterface, Value, Container, MixIn, Accessor>
             where Value : ValueInterface
             where Container : ContainerInterface
             where MixIn : struct
-            where Accessor : IAccessor<Value, Container>
+            where Accessor : IMysteriousAccessor<Value, Container>
     {
         Value Get(
             Container self,
@@ -25,7 +25,7 @@ namespace CMinus.Construction
             );
     }
 
-    public interface IAccessor<Value, Container>
+    public interface IMysteriousAccessor<Value, Container>
     {
         String GetPropertyName();
         Int32 GetIndex();
@@ -37,7 +37,7 @@ namespace CMinus.Construction
 
     public struct EmptyMixIn { }
 
-    public struct GenericPropertyImplementation<Value, Container> : IPropertyImplementation<Value, Container, Value, Container, EmptyMixIn, IAccessor<Value, Container>>
+    public struct GenericComplexPropertyImplementation<Value, Container> : IComplexPropertyImplementation<Value, Container, Value, Container, EmptyMixIn, IMysteriousAccessor<Value, Container>>
     {
         Value value;
 
@@ -46,13 +46,56 @@ namespace CMinus.Construction
         public void Set(Container self, ref EmptyMixIn mixIn, Value value) => this.value = value;
     }
 
-    public interface ISimplePropertyImplementation<T>
+    public interface IPropertyImplementation<T>
     {
         T Value { get; set; }
     }
 
-    public struct GenericSimplePropertyImplementation<T>
+    public struct GenericPropertyImplementation<T>
     {
         public T Value { get; set; }
+    }
+
+
+
+    public interface IReadonlyProperty<T>
+    {
+        T Value { get; }
+    }
+
+    public interface IWrappedReadonlyProperty<T, B> : IReadonlyProperty<T>
+        where B : struct
+    {
+    }
+
+    public interface ICachingReadonlyProperty<T, B> : IWrappedReadonlyProperty<T, B>
+        where B : struct
+    {
+        void Invalidate();
+    }
+
+    public struct CachedReadonlyProperty<T, B> : ICachingReadonlyProperty<T, B>
+        where B : struct, IReadonlyProperty<T>
+    {
+        T cached;
+        Boolean isCached;
+        B nested;
+
+        public void Invalidate() => isCached = false;
+
+        public T Value
+        {
+            get
+            {
+                if (!isCached)
+                {
+                    cached = nested.Value;
+
+                    isCached = true;
+                }
+
+                return cached;
+            }
+        }
     }
 }

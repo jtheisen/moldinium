@@ -203,7 +203,7 @@ namespace CMinus
 
         Type GetPropertyImplementationType(Type propertyType)
         {
-            return typeof(Construction.GenericSimplePropertyImplementation<>).MakeGenericType(propertyType);
+            return typeof(Construction.GenericPropertyImplementation<>).MakeGenericType(propertyType);
         }
     }
 
