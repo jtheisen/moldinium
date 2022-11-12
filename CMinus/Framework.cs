@@ -16,21 +16,19 @@ namespace CMinus
 
     public interface Requires<T>
     {
-        T GetService();
-        T GetService<S>() where S : T;
+        T Resolve<S>() where S : T;
     }
 
     public interface RequiresConstructor<T> : Requires<Constructor<T>>
     {
         T Construct<S>() where S : T
-            => GetService<Constructor<T>>().Construct();
+            => Resolve<Constructor<T>>().Construct();
     }
 
 
-    public interface Requires<D, R> : Requires<D>
-        where R : Resolver
+    public interface Requires<T, P>
     {
-
+        T Resolve<S>(P arg) where S : T;
     }
 
     public interface Implementation<T>
@@ -60,13 +58,6 @@ namespace CMinus
     //    }
     //}
 
-    public interface MappingResolver<Interface, Implementation> : Resolver, Requires<Implementation>
-    {
-        new IEnumerable<DependencyRecord> GetRecords()
-        {
-            yield return new DependencyRecord(typeof(Interface), typeof(Implementation), () => GetService());
-        }
-    }
 
     public interface DefaultConstructingResolver<T> : Resolver
         where T : class, new()
