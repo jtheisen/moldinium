@@ -2,78 +2,78 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace CMinus.Examples
+namespace CMinus.Examples.Selectors;
+
+public interface Selector<T>
 {
-    public interface SelectorRequirements<T>
+    IEnumerable<T> ItemsSource { get; init; }
+
+    T SelectedItem { get; set; }
+
+    IEnumerable<SelectorItem<T>> SelectorItems { get; }
+
+    SelectorItem<T> SelectedSelectorItem { get; set; }
+}
+
+public interface SelectorItem<T>
+{
+    Boolean IsSelected { get; set; }
+
+    T Value { get; }
+}
+
+public interface SelectorImplementation<T> : Selector<T>
+{
+    Func<T, SelectorItem<T>> CreateItem { get; init; }
+
+    new IEnumerable<SelectorItem<T>> SelectorItems => ItemsSource.Select(i => CreateItem(i));
+
+    new T SelectedItem { set => SelectedSelectorItem = SelectorItems.Single(i => i.Value.Equals(value)); }
+
+    new SelectorItem<T> SelectedSelectorItem
     {
-        IEnumerable<T> Items { get; }
-    }
-
-    public interface Selector<T> : SelectorRequirements<T>
-    {
-        T SelectedItem { get; set; }
-
-        IEnumerable<SelectorItem<T>> SelectorItems { get; }
-
-        SelectorItem<T> SelectedSelectorItem { get; set; }
-    }
-
-    public interface SelectorItem<T>
-    {
-        Boolean IsSelected { get; set; }
-
-        T Value { get; }
-    }
-
-    public interface SelectorImplementation<T> : Implementation<Selector<T>>, Selector<T>, Requires<SelectorItem<T>, T>
-    {
-        new IEnumerable<SelectorItem<T>> SelectorItems => Items.Select(i => Resolve<SelectorItem<T>>(i));
-
-        new T SelectedItem { set => SelectedSelectorItem = SelectorItems.Single(i => i.Value.Equals(value)); }
-
-        new SelectorItem<T> SelectedSelectorItem
+        set
         {
-            set
+            var selector = this as Selector<T>;
+
+            foreach (var item in SelectorItems)
             {
-                var selector = this as Selector<T>;
+                if (item.Equals(value)) continue;
 
-                foreach (var item in SelectorItems)
-                {
-                    if (item.Equals(value)) continue;
+                item.IsSelected = false;
+            }
 
-                    item.IsSelected = false;
-                }
+            if (value != null)
+            {
+                value.IsSelected = true;
 
-                if (value != null)
-                {
-                    value.IsSelected = true;
-
-                    selector.SelectedItem = value.Value;
-                }
-                else
-                {
-                    selector.SelectedItem = default;
-                }
+                selector.SelectedItem = value.Value;
+            }
+            else
+            {
+                selector.SelectedItem = default;
             }
         }
     }
+}
 
-    public interface SelectorItemImplementation<T> : Implementation<SelectorItem<T>>, SelectorItem<T>, Requires<Selector<T>>
+public interface SelectorItemImplementation<T> : SelectorItem<T>
+{
+    Selector<T> Selector { get; init; }
+
+    new Boolean IsSelected
     {
-        new Boolean IsSelected
+        set
         {
-            set
-            {
-                var selector = Resolve<Selector<T>>();
+            var selector = Selector;
 
-                if (value)
-                {
-                    selector.SelectedSelectorItem = this;
-                }
-                else if (this.Equals(selector.SelectedSelectorItem))
-                {
-                    selector.SelectedSelectorItem = null;
-                }
+            if (value)
+            {
+                selector.SelectedSelectorItem = this;
+            }
+            else if (this.Equals(selector.SelectedSelectorItem))
+            {
+                selector.SelectedSelectorItem = null;
             }
         }
     }
