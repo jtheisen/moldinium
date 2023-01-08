@@ -70,6 +70,8 @@ namespace CMinus
                         generator.Emit(OpCodes.Ldflda, fieldBuilder);
                         generator.Emit(OpCodes.Call, backingGetMethod);
                         generator.Emit(OpCodes.Ret);
+
+                        propertyBuilder.SetGetMethod(getMethodBuilder);
                     }
                     {
                         var setMethodBuilder = Create(typeBuilder, setMethod, isAbstract: false);
@@ -79,6 +81,8 @@ namespace CMinus
                         generator.Emit(OpCodes.Ldarg_1);
                         generator.Emit(OpCodes.Call, backingSetMethod);
                         generator.Emit(OpCodes.Ret);
+
+                        propertyBuilder.SetSetMethod(setMethodBuilder);
                     }
                 }
                 else if (getMethod != null)
@@ -107,7 +111,19 @@ namespace CMinus
 
             if (!isAbstract) attributes &= ~MethodAttributes.Abstract;
 
-            var methodBuilder = typeBuilder.DefineMethod(methodTemplate.Name, attributes, methodTemplate.ReturnType, methodTemplate.GetParameters().Select(p => p.ParameterType).ToArray());
+            var parameters = methodTemplate.GetParameters();
+
+            var methodBuilder = typeBuilder.DefineMethod(
+                methodTemplate.Name,
+                attributes,
+                methodTemplate.CallingConvention,
+                methodTemplate.ReturnType,
+                methodTemplate.ReturnParameter.GetRequiredCustomModifiers(),
+                methodTemplate.ReturnParameter.GetOptionalCustomModifiers(),
+                parameters.Select(p => p.ParameterType).ToArray(),
+                parameters.Select(p => p.GetRequiredCustomModifiers()).ToArray(),
+                parameters.Select(p => p.GetOptionalCustomModifiers()).ToArray()
+            );
 
             return methodBuilder;
         }
