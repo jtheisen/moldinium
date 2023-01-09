@@ -74,6 +74,13 @@ public static class DelegateCreation
 
         il.Emit(OpCodes.Ret);
 
-        return proxy.CreateDelegate(delegateType, implementation.Target);
+        if (hasTarget)
+        {
+            return proxy.CreateDelegate(delegateType, implementation.Target);
+        }
+        else
+        {
+            return proxy.CreateDelegate(delegateType);
+        }
     }
 }

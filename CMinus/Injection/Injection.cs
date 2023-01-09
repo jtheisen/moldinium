@@ -97,6 +97,7 @@ public interface IDependencyProvider
     DependencyResolution? Query(Dependency type);
 }
 
+
 public class BakeryDependencyProvider : IDependencyProvider
 {
     private readonly Bakery bakery;
@@ -223,6 +224,34 @@ public class InitSetterDependencyProvider : IDependencyProvider
 
 public class FactoryDependencyProvider : IDependencyProvider
 {
+    class FactoryArgumentsDependencyProvider : IDependencyProvider
+    {
+        HashSet<Dependency> dependencies;
+
+        public Dictionary<Dependency, Object>? Arguments { get; set; }
+
+        public FactoryArgumentsDependencyProvider(Type[] types)
+        {
+            dependencies = types.Select(t => new Dependency(t, DependencyRuntimeMaturity.Finished)).ToHashSet();
+        }
+
+        public DependencyResolution? Query(Dependency dependency)
+        {
+            if (!dependencies.Contains(dependency)) return null;
+
+            return new DependencyResolution(
+                this,
+                dependency,
+                Get: _ =>
+                {
+                    if (Arguments is null) throw new Exception($"{nameof(FactoryArgumentsDependencyProvider)} was not provided with arguments yet");
+
+                    return Arguments[dependency];
+                }
+            );
+        }
+    }
+
     public DependencyResolution? Query(Dependency dep)
     {
         if (dep.Type.BaseType != typeof(Delegate) && dep.Type.BaseType != typeof(MulticastDelegate)) return null;
@@ -237,9 +266,16 @@ public class FactoryDependencyProvider : IDependencyProvider
 
         var parameterTypes = parameters.Select(p => p.ParameterType).ToArray();
 
+        var factoryArgumentsProvider = new FactoryArgumentsDependencyProvider(parameterTypes);
+
         Scope MakeSubscope(Scope parent)
         {
-            var provider = parent.Provider;
+            if (factoryArgumentsProvider is null) throw new Exception($"Internal error in {nameof(FactoryDependencyProvider)}");
+
+            var provider = new CombinedDependencyProvider(
+                factoryArgumentsProvider,
+                parent.Provider
+            );
 
             var subScope = new Scope(provider, new Dependency(returnType, DependencyRuntimeMaturity.Finished));
 
@@ -254,6 +290,10 @@ public class FactoryDependencyProvider : IDependencyProvider
 
             Object Create(Object[] args)
             {
+                factoryArgumentsProvider.Arguments = parameterTypes
+                    .Select((type, i) => (type, instance: args[i]))
+                    .ToDictionary(d => new Dependency(d.type, DependencyRuntimeMaturity.Finished), d => d.instance);
+
                 var runtimeScope = subScope.CreateRuntimeScope();
 
                 return runtimeScope.Root;
@@ -266,9 +306,14 @@ public class FactoryDependencyProvider : IDependencyProvider
     }
 }
 
+
+
 public class ConcreteDependencyProvider : IDependencyProvider
 {
     Dictionary<Dependency, Object?> dependencies;
+
+    public ConcreteDependencyProvider(params (Type type, Object? instance)[] dependencies)
+        => this.dependencies = dependencies.ToDictionary(p => new Dependency(p.type, DependencyRuntimeMaturity.Finished), p => p.instance);
 
     public ConcreteDependencyProvider(params (Dependency dependency, Object? instance)[] dependencies)
         => this.dependencies = dependencies.ToDictionary(p => p.dependency, p => p.instance);

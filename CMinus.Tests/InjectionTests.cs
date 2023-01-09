@@ -5,6 +5,8 @@ using System;
 
 namespace CMinus.Tests
 {
+    public record Config(String Name);
+
     public class RootService
     {
 
@@ -30,13 +32,35 @@ namespace CMinus.Tests
         }
     }
 
-    public interface InterfaceTypeWithFactory
+    public interface InterfaceTypeWithSimpleFactory
     {
         Func<InterfaceType> Create { get; init; }
 
         void Validate()
         {
             var instance = Create();
+
+            instance.Validate();
+        }
+    }
+
+    public interface NestedInterfaceType
+    {
+        Config Config { get; init; }
+
+        void Validate()
+        {
+            Assert.AreEqual("Moldinium", Config.Name);
+        }
+    }
+
+    public interface InterfaceTypeWithParameterizedFactory
+    {
+        Func<Config, NestedInterfaceType> Create { get; init; }
+
+        void Validate()
+        {
+            var instance = Create(new Config("Moldinium"));
 
             instance.Validate();
         }
@@ -91,9 +115,17 @@ namespace CMinus.Tests
         }
 
         [TestMethod]
-        public void InterfaceWithFactoryInstanceTests()
+        public void InterfaceWithSimpleFactoryInstanceTests()
         {
-            var instance = provider.CreateInstance<InterfaceTypeWithFactory>();
+            var instance = provider.CreateInstance<InterfaceTypeWithSimpleFactory>();
+
+            instance.Validate();
+        }
+
+        [TestMethod]
+        public void InterfaceTypeWithParameterizedFactoryInstanceTests()
+        {
+            var instance = provider.CreateInstance<InterfaceTypeWithParameterizedFactory>();
 
             instance.Validate();
         }
