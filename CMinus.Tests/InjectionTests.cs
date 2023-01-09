@@ -1,6 +1,7 @@
 ﻿using CMinus.Injection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
 
 namespace CMinus.Tests
 {
@@ -29,6 +30,18 @@ namespace CMinus.Tests
         }
     }
 
+    public interface InterfaceTypeWithFactory
+    {
+        Func<InterfaceType> Create { get; init; }
+
+        void Validate()
+        {
+            var instance = Create();
+
+            instance.Validate();
+        }
+    }
+
     [TestClass]
     public class InjectionTests
     {
@@ -52,23 +65,36 @@ namespace CMinus.Tests
         }
 
         [TestMethod]
-        public void ClassTests()
+        public void InterfaceTypeResolutionTests()
         {
-            var scope = new Scope<ClassType>(provider);
+            var resolvedType = provider.ResolveType(typeof(InterfaceType));
 
-            var classTypeInstance = scope.InstantiateRootType();
-
-            classTypeInstance.Validate();
+            Assert.IsTrue(resolvedType.IsClass);
+            Assert.IsTrue(resolvedType.GetInterface(nameof(InterfaceType)) is not null);
         }
 
         [TestMethod]
-        public void InterfaceTests()
+        public void ClassInstanceTests()
         {
-            var scope = new Scope<InterfaceType>(provider);
+            var instance = provider.CreateInstance<ClassType>();
 
-            var interfaceTypeInstance = scope.InstantiateRootType();
-
-            interfaceTypeInstance.Validate();
+            instance.Validate();
         }
+
+        [TestMethod]
+        public void InterfaceInstanceTests()
+        {
+            var instance = provider.CreateInstance<InterfaceType>();
+
+            instance.Validate();
+        }
+
+        //[TestMethod]
+        //public void InterfaceWithFactoryInstanceTests()
+        //{
+        //    var instance = provider.CreateInstance<InterfaceTypeWithFactory>();
+
+        //    instance.Validate();
+        //}
     }
 }

@@ -50,24 +50,12 @@ public enum DependencyRuntimeMaturity
     OnlyType,
 
     // We have an uninitialized instance
-    Instance,
+    UntouchedInstance,
 
     // We're done
-    InitSettersSet,
+    InitSettersSetInstance,
 
-    Finished = InitSettersSet
-}
-
-public enum DependencyResolutionFlags
-{
-    // The resolved type is known at resolution time
-    Type = 1,
-
-    // An instance can be provided
-    Instance = 2,
-
-    // The type or instance does not require further dependency resolution
-    Finished = 4
+    Finished = InitSettersSetInstance
 }
 
 public class DependencyBag
@@ -93,7 +81,13 @@ public class DependencyBag
 
 public delegate Object InstanceGetter(RuntimeScope scope);
 
-public record DependencyResolution(IDependencyProvider Provider, Dependency Dep, DependencyBag Dependencies, InstanceGetter Get);
+public record DependencyResolution(
+    IDependencyProvider Provider,
+    Dependency Dep,
+    Dependency? SameInstanceDependency,
+    DependencyBag Dependencies,
+    InstanceGetter Get
+);
 
 public interface IDependencyProvider
 {
@@ -120,7 +114,8 @@ public class BakeryDependencyProvider : IDependencyProvider
         return new DependencyResolution(
             this,
             dep,
-            new DependencyBag(new Dependency(bakedType, DependencyRuntimeMaturity.Finished)),
+            new Dependency(bakedType, DependencyRuntimeMaturity.Finished),
+            DependencyBag.Empty,
             Get: scope => scope.Get(bakedInstanceDependency)
         );
     }
@@ -137,13 +132,13 @@ public class ServiceProviderDependencyProvider : IDependencyProvider
 
     public DependencyResolution? Query(Dependency dep)
     {
-        if (dep.Maturity != DependencyRuntimeMaturity.Instance) return null;
+        if (dep.Maturity != DependencyRuntimeMaturity.UntouchedInstance) return null;
 
         var service = provider.GetService(dep.Type);
 
         if (service is null) return null;
 
-        return new DependencyResolution(this, dep, DependencyBag.Empty, Get: _ => service);
+        return new DependencyResolution(this, dep, null, DependencyBag.Empty, Get: _ => service);
     }
 }
 
@@ -160,6 +155,7 @@ public class AcceptingDefaultConstructiblesDependencyProvider : IDependencyProvi
         return new DependencyResolution(
             this,
             dep,
+            null,
             DependencyBag.Empty,
             Get: _ => throw new InvalidOperationException("There is no instance")
         );
@@ -170,7 +166,7 @@ public class ActivatorDependencyProvider : IDependencyProvider
 {
     public DependencyResolution? Query(Dependency dep)
     {
-        if (dep.Maturity != DependencyRuntimeMaturity.Instance) return null;
+        if (dep.Maturity != DependencyRuntimeMaturity.UntouchedInstance) return null;
 
         var reflection = Reflection.Get(dep.Type);
 
@@ -179,7 +175,8 @@ public class ActivatorDependencyProvider : IDependencyProvider
         return new DependencyResolution(
             this,
             dep,
-            new DependencyBag(dep with { Maturity = DependencyRuntimeMaturity.OnlyType }),
+            dep with { Maturity = DependencyRuntimeMaturity.OnlyType },
+            DependencyBag.Empty,
             Get: _ => Activator.CreateInstance(dep.Type) ?? throw new Exception($"Activator failed to provide a type")
         );
     }
@@ -189,7 +186,7 @@ public class InitSetterDependencyProvider : IDependencyProvider
 {
     public DependencyResolution? Query(Dependency dep)
     {
-        if (dep.Maturity != DependencyRuntimeMaturity.InitSettersSet) return null;
+        if (dep.Maturity != DependencyRuntimeMaturity.InitSettersSetInstance) return null;
 
         var reflection = Reflection.Get(dep.Type);
 
@@ -198,12 +195,13 @@ public class InitSetterDependencyProvider : IDependencyProvider
             where p.hasInitSetter
             select new Dependency(p.info.PropertyType, DependencyRuntimeMaturity.Finished);
 
-        var embryoDependency = dep with { Maturity = DependencyRuntimeMaturity.Instance };
+        var embryoDependency = dep with { Maturity = DependencyRuntimeMaturity.UntouchedInstance };
 
         return new DependencyResolution(
             this,
             dep,
-            new DependencyBag(embryoDependency).Concat(new DependencyBag(dependencies)),
+            embryoDependency,
+            new DependencyBag(dependencies),
             Get: scope =>
             {
                 var embryo = scope.Get(embryoDependency);
@@ -234,12 +232,26 @@ public class InitSetterDependencyProvider : IDependencyProvider
 
 //        var parameterTypes = parameters.Select(p => p.ParameterType).ToArray();
 
-//        Object Create(Object[] args)
+//        /* Either
+//         * 
+//         * - pass the scope to Query so we can recursively create subscopes
+//         * - add a new method GetStatic besides Get to resolve scoped dependencies here
+//         * 
+//         */
+
+//        Object Get(RuntimeScope runtimeScope)
 //        {
+//            var scope = runtimeScope.Scope;
+
+//            Object Create(Object[] args)
+//            {
+
+//            }
 
 //        }
 
-//        return new DependencyResolution(dep, Get: _ => DelegateCreation.CreateDelegate(dep, Create));
+
+//        return new DependencyResolution(dep, Get: s => DelegateCreation.CreateDelegate(dep, Create));
 //    }
 //}
 
@@ -263,6 +275,7 @@ public class ConcreteDependencyProvider : IDependencyProvider
             return new DependencyResolution(
                 this,
                 type,
+                null,
                 DependencyBag.Empty,
                 Get: _ => instance ?? throw new InvalidOperationException("There is no instance")
             );
@@ -298,8 +311,8 @@ public class CombinedDependencyProvider : IDependencyProvider
 
 public class Scope<T> : Scope
 {
-    public Scope(IDependencyProvider provider)
-        : base(provider, typeof(T))
+    public Scope(IDependencyProvider provider, DependencyRuntimeMaturity maturity)
+        : base(provider, new Dependency(typeof(T), maturity))
     {
     }
 
@@ -322,14 +335,10 @@ public class Scope
 
     public DependencyResolution GetResolution(Dependency dep) => resolutions[dep];
 
-    public static Scope<T> Create<T>(IDependencyProvider provider)
-        => new Scope<T>(provider);
-
-    public Scope(IDependencyProvider provider, Type rootType)
+    public Scope(IDependencyProvider provider, Dependency root)
     {
         this.provider = provider;
-
-        root = new Dependency(rootType, DependencyRuntimeMaturity.Finished);
+        this.root = root;
 
         pending.Enqueue(root);
 
@@ -339,6 +348,16 @@ public class Scope
     public RuntimeScope Instantiate()
     {
         return  new RuntimeScope(this);
+    }
+
+    public Dependency GetFinalSameInstanceDependency(Dependency dependency)
+    {
+        while (resolutions.TryGetValue(dependency, out var resolution) && resolution.SameInstanceDependency is Dependency sameInstanceDependency)
+        {
+            dependency = sameInstanceDependency;
+        }
+
+        return dependency;
     }
 
     void Resolve()
@@ -353,15 +372,25 @@ public class Scope
 
             resolutions.Add(next, resolution);
 
+            if (resolution.SameInstanceDependency is Dependency sameInstanceDependency)
+            {
+                AddDependency(sameInstanceDependency, resolution);
+            }
+
             foreach (var dep in resolution.Dependencies.Items)
             {
-                if (!resolutions.ContainsKey(dep))
-                {
-                    sources.Add(dep, resolution);
-
-                    pending.Enqueue(dep);
-                }
+                AddDependency(dep, resolution);
             }
+        }
+    }
+
+    void AddDependency(Dependency dep, DependencyResolution source)
+    {
+        if (!resolutions.ContainsKey(dep))
+        {
+            sources.Add(dep, source);
+
+            pending.Enqueue(dep);
         }
     }
 
@@ -399,6 +428,8 @@ public class RuntimeScope
 
     Object root;
 
+    public Scope Scope => Scope;
+
     public Object Root => root;
 
     public RuntimeScope(Scope scope)
@@ -431,4 +462,30 @@ public class RuntimeScope<T> : RuntimeScope
         : base(scope)
     {
     }
+}
+
+public static class Extensions
+{
+    public static RuntimeScope CreateRuntimeScope(this Scope scope)
+        => new RuntimeScope(scope);
+
+    public static IDependencyProvider AcceptDefaultConstructibles(this IDependencyProvider provider)
+        => new CombinedDependencyProvider(provider, new AcceptingDefaultConstructiblesDependencyProvider());
+
+    public static Type ResolveType(this IDependencyProvider provider, Type type)
+    {
+        var root = new Dependency(type, DependencyRuntimeMaturity.OnlyType);
+
+        var scope = new Scope(provider.AcceptDefaultConstructibles(), root);
+
+        var final = scope.GetFinalSameInstanceDependency(root);
+
+        return final.Type;
+    }
+
+    public static Object CreateInstance(this IDependencyProvider provider, Type type, DependencyRuntimeMaturity maturity = DependencyRuntimeMaturity.InitSettersSetInstance)
+        => new Scope(provider, new Dependency(type, maturity)).CreateRuntimeScope().Root;
+
+    public static T CreateInstance<T>(this IDependencyProvider provider, DependencyRuntimeMaturity maturity = DependencyRuntimeMaturity.InitSettersSetInstance) where T : class
+        => (T)provider.CreateInstance(typeof(T), maturity);
 }
