@@ -59,6 +59,7 @@ namespace CMinus.Tests
                 new ServiceProviderDependencyProvider(services.BuildServiceProvider()),
                 new AcceptingDefaultConstructiblesDependencyProvider(), // We really should only allow "baked" types to be blindly constructed
                 new BakeryDependencyProvider(new Bakery("TestBakery", makeAbstract: false)),
+                new FactoryDependencyProvider(),
                 new ActivatorDependencyProvider(),
                 new InitSetterDependencyProvider()
             );
@@ -89,12 +90,12 @@ namespace CMinus.Tests
             instance.Validate();
         }
 
-        //[TestMethod]
-        //public void InterfaceWithFactoryInstanceTests()
-        //{
-        //    var instance = provider.CreateInstance<InterfaceTypeWithFactory>();
+        [TestMethod]
+        public void InterfaceWithFactoryInstanceTests()
+        {
+            var instance = provider.CreateInstance<InterfaceTypeWithFactory>();
 
-        //    instance.Validate();
-        //}
+            instance.Validate();
+        }
     }
 }

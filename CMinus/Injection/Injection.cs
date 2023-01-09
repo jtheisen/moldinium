@@ -79,14 +79,17 @@ public class DependencyBag
         => new DependencyBag(dependencies.Union(rhs.dependencies));
 }
 
+public delegate Scope SubscopeCreator(Scope scope);
+
 public delegate Object InstanceGetter(RuntimeScope scope);
 
 public record DependencyResolution(
     IDependencyProvider Provider,
     Dependency Dep,
-    Dependency? SameInstanceDependency,
-    DependencyBag Dependencies,
-    InstanceGetter Get
+    Dependency? SameInstanceDependency = null,
+    DependencyBag? Dependencies = null,
+    SubscopeCreator? MakeSubscope = null,
+    InstanceGetter? Get = null
 );
 
 public interface IDependencyProvider
@@ -218,42 +221,50 @@ public class InitSetterDependencyProvider : IDependencyProvider
     }
 }
 
-//public class FactoryDependencyProvider : IDependencyProvider
-//{
-//    public DependencyResolution? Query(Dependency dep)
-//    {
-//        if (dep.Type.BaseType != typeof(Delegate)) return null;
+public class FactoryDependencyProvider : IDependencyProvider
+{
+    public DependencyResolution? Query(Dependency dep)
+    {
+        if (dep.Type.BaseType != typeof(Delegate) && dep.Type.BaseType != typeof(MulticastDelegate)) return null;
 
-//        var method = dep.Type.GetMethod("Invoke");
+        var method = dep.Type.GetMethod("Invoke");
 
-//        if (method is null) throw new Exception("Could not get method for delegate");
+        if (method is null) throw new Exception("Could not get method for delegate");
 
-//        var parameters = method.GetParameters();
+        if (method.ReturnType is not Type returnType) return null;
 
-//        var parameterTypes = parameters.Select(p => p.ParameterType).ToArray();
+        var parameters = method.GetParameters();
 
-//        /* Either
-//         * 
-//         * - pass the scope to Query so we can recursively create subscopes
-//         * - add a new method GetStatic besides Get to resolve scoped dependencies here
-//         * 
-//         */
+        var parameterTypes = parameters.Select(p => p.ParameterType).ToArray();
 
-//        Object Get(RuntimeScope runtimeScope)
-//        {
-//            var scope = runtimeScope.Scope;
+        Scope MakeSubscope(Scope parent)
+        {
+            var provider = parent.Provider;
 
-//            Object Create(Object[] args)
-//            {
+            var subScope = new Scope(provider, new Dependency(returnType, DependencyRuntimeMaturity.Finished));
 
-//            }
+            return subScope;
+        }
 
-//        }
+        Object Get(RuntimeScope runtimeScope)
+        {
+            var scope = runtimeScope.Scope;
 
+            Scope subScope = scope.GetSubscope(dep);
 
-//        return new DependencyResolution(dep, Get: s => DelegateCreation.CreateDelegate(dep, Create));
-//    }
-//}
+            Object Create(Object[] args)
+            {
+                var runtimeScope = subScope.CreateRuntimeScope();
+
+                return runtimeScope.Root;
+            }
+
+            return DelegateCreation.CreateDelegate(dep.Type, Create);
+        }
+
+        return new DependencyResolution(this, dep, MakeSubscope: MakeSubscope, Get: Get);
+    }
+}
 
 public class ConcreteDependencyProvider : IDependencyProvider
 {
@@ -321,17 +332,23 @@ public class Scope<T> : Scope
 
 public class Scope
 {
-    private readonly IDependencyProvider provider;
+    readonly IDependencyProvider provider;
 
-    Dependency root;
+    readonly Dependency root;
 
-    Queue<Dependency> pending = new Queue<Dependency>();
+    readonly Queue<Dependency> pending = new Queue<Dependency>();
 
-    Dictionary<Dependency, DependencyResolution> resolutions = new Dictionary<Dependency, DependencyResolution>();
+    readonly Dictionary<Dependency, DependencyResolution> resolutions = new Dictionary<Dependency, DependencyResolution>();
 
-    Dictionary<Dependency, DependencyResolution> sources = new Dictionary<Dependency, DependencyResolution>();
+    readonly Dictionary<Dependency, DependencyResolution> sources = new Dictionary<Dependency, DependencyResolution>();
+
+    readonly Dictionary<Dependency, Scope> subscopes = new Dictionary<Dependency, Scope>();
+
+    readonly Queue<DependencyResolution> pendingSubscopes = new Queue<DependencyResolution>();
 
     public Dependency Root => root;
+
+    public IDependencyProvider Provider => provider;
 
     public DependencyResolution GetResolution(Dependency dep) => resolutions[dep];
 
@@ -360,6 +377,8 @@ public class Scope
         return dependency;
     }
 
+    public Scope GetSubscope(Dependency dependency) => subscopes[dependency];
+
     void Resolve()
     {
         while (pending.Count > 0)
@@ -377,10 +396,32 @@ public class Scope
                 AddDependency(sameInstanceDependency, resolution);
             }
 
-            foreach (var dep in resolution.Dependencies.Items)
+            if (resolution.Dependencies is DependencyBag dependencies)
             {
-                AddDependency(dep, resolution);
+                foreach (var dep in dependencies.Items)
+                {
+                    AddDependency(dep, resolution);
+                }
             }
+
+            if (resolution.MakeSubscope is not null)
+            {
+                pendingSubscopes.Enqueue(resolution);
+            }
+        }
+
+        ResolveSubscopes();
+    }
+
+    void ResolveSubscopes()
+    {
+        while (pendingSubscopes.Count > 0)
+        {
+            var next = pendingSubscopes.Dequeue();
+
+            var subScope = next.MakeSubscope!(this);
+
+            subscopes.Add(next.Dep, subScope);
         }
     }
 
@@ -428,7 +469,7 @@ public class RuntimeScope
 
     Object root;
 
-    public Scope Scope => Scope;
+    public Scope Scope => scope;
 
     public Object Root => root;
 

@@ -8,6 +8,10 @@ public delegate Object DelegateImplementation(params Object[] args);
 
 public static class DelegateCreation
 {
+    public static D CreateDelegate<D>(DelegateImplementation implementation)
+        where D : Delegate
+        => (D)CreateDelegate(typeof(D), implementation);
+
     public static Object CreateDelegate(Type delegateType, DelegateImplementation implementation)
     {
         var method = delegateType.GetMethod("Invoke");
@@ -26,19 +30,43 @@ public static class DelegateCreation
             if (p.ParameterType.IsValueType) throw new ArgumentException($"The delegate parameter {p.Name} is a value type which is unsupported");
         }
 
-        var proxy = new DynamicMethod(
-            "ProxyDelegate",
-            returnType,
-            parameterTypes);
+        (Boolean hasTarget, DynamicMethod proxy) CreateMethod()
+        {
+            if (implementation.Target is Object target)
+            {
+                return (true, new DynamicMethod(
+                    "ProxyDelegate",
+                    returnType,
+                    new[] { target }.Concat(parameterTypes).ToArray(),
+                    target.GetType(),
+                    true));
+            }
+            else
+            {
+                return (false, new DynamicMethod(
+                    "ProxyDelegate",
+                    returnType,
+                    parameterTypes));
+            }
+        }
+
+        var (hasTarget, proxy) = CreateMethod();
 
         var il = proxy.GetILGenerator();
 
+        var i = 0;
+
+        if (hasTarget)
+        {
+            il.Emit(OpCodes.Ldarg, i++);
+        }
+
         il.Emit(OpCodes.Ldc_I4, parameterTypes.Length);
         il.Emit(OpCodes.Newarr, typeof(object));
-        for (int i = 0; i < parameterTypes.Length; i++)
+        foreach (var _ in parameterTypes)
         {
             il.Emit(OpCodes.Dup);
-            il.Emit(OpCodes.Ldc_I4, i);
+            il.Emit(OpCodes.Ldc_I4, i++);
             il.Emit(OpCodes.Ldarg, i);
             il.Emit(OpCodes.Stelem, typeof(object));
         }
@@ -46,6 +74,6 @@ public static class DelegateCreation
 
         il.Emit(OpCodes.Ret);
 
-        return proxy.CreateDelegate(delegateType);
+        return proxy.CreateDelegate(delegateType, implementation.Target);
     }
 }
