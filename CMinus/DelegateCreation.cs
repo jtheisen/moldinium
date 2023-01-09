@@ -37,7 +37,7 @@ public static class DelegateCreation
                 return (true, new DynamicMethod(
                     "ProxyDelegate",
                     returnType,
-                    new[] { target }.Concat(parameterTypes).ToArray(),
+                    new[] { target.GetType() }.Concat(parameterTypes).ToArray(),
                     target.GetType(),
                     true));
             }
