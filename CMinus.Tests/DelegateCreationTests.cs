@@ -27,7 +27,7 @@ public class DelegateCreationTests
     }
 
     [TestMethod]
-    public void ClosureTest()
+    public void Arg0ClosureTest()
     {
         var text = "Hello!";
 
@@ -36,5 +36,29 @@ public class DelegateCreationTests
         var getString = DelegateCreation.CreateDelegate<Func<String>>(GetString);
 
         Assert.AreEqual(text, getString());
+    }
+
+    [TestMethod]
+    public void Arg1ClosureTest()
+    {
+        var text = "Hello";
+
+        Object GetString(Object[] args) => $"{text}, {args[0]}!";
+
+        var getString = DelegateCreation.CreateDelegate<Func<String, String>>(GetString);
+
+        Assert.AreEqual("Hello, you!", getString("you"));
+    }
+
+    [TestMethod]
+    public void Arg2ClosureTest()
+    {
+        var text = "Hello";
+
+        Object GetString(Object[] args) => $"{text}, {args[0]} {args[1]}!";
+
+        var getString = DelegateCreation.CreateDelegate<Func<String, String, String>>(GetString);
+
+        Assert.AreEqual("Hello, you there!", getString("you", "there"));
     }
 }

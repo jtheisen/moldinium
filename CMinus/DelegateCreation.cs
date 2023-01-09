@@ -54,20 +54,21 @@ public static class DelegateCreation
 
         var il = proxy.GetILGenerator();
 
-        var i = 0;
+        var argOffset = 0;
 
         if (hasTarget)
         {
-            il.Emit(OpCodes.Ldarg, i++);
+            il.Emit(OpCodes.Ldarg, 0);
+            ++argOffset;
         }
 
         il.Emit(OpCodes.Ldc_I4, parameterTypes.Length);
         il.Emit(OpCodes.Newarr, typeof(object));
-        foreach (var _ in parameterTypes)
+        for (int i = 0; i < parameterTypes.Length; i++)
         {
             il.Emit(OpCodes.Dup);
-            il.Emit(OpCodes.Ldc_I4, i++);
-            il.Emit(OpCodes.Ldarg, i);
+            il.Emit(OpCodes.Ldc_I4, i);
+            il.Emit(OpCodes.Ldarg, i + argOffset);
             il.Emit(OpCodes.Stelem, typeof(object));
         }
         il.Emit(OpCodes.Call, implementation.Method);
