@@ -3,12 +3,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Reflection.PortableExecutable;
 
 namespace CMinus;
 
-public record BakingState(TypeBuilder TypeBuilder)
+public delegate FieldBuilder MixinEnsurer(BakingState state, Type type);
+
+public record BakingState(TypeBuilder TypeBuilder, MixinEnsurer EnsureMixin)
 {
-    public readonly Dictionary<Type, FieldBuilder> MixIns = new Dictionary<Type, FieldBuilder>();
+    public readonly Dictionary<Type, FieldBuilder> Mixins = new Dictionary<Type, FieldBuilder>();
 }
 
 public class Bakery
@@ -18,6 +21,8 @@ public class Bakery
     readonly IBakeryComponentGenerators generators;
     readonly TypeAttributes typeAttributes;
     readonly ModuleBuilder moduleBuilder;
+
+    BakingState? state;
 
     public String Name => name;
 
@@ -56,23 +61,87 @@ public class Bakery
 
     Type Create(String name, Type interfaceType)
     {
+        if (state is not null) throw new Exception("Already building a type");
+
         var typeBuilder = moduleBuilder.DefineType(name, typeAttributes);
-        typeBuilder.AddInterfaceImplementation(interfaceType);
 
-        var state = new BakingState(typeBuilder);
+        state = new BakingState(typeBuilder, EnsureMixin);
 
-        foreach (var property in interfaceType.GetProperties())
+        try
+        {
+            ImplementInterface(state, interfaceType);
+
+            return typeBuilder.CreateType() ?? throw new Exception("no type?");
+        }
+        finally
+        {
+            state = null;
+        }
+    }
+
+    void ImplementInterface(BakingState state, Type type)
+    {
+        var typeBuilder = state.TypeBuilder;
+
+        typeBuilder.AddInterfaceImplementation(type);
+
+        foreach (var property in type.GetProperties())
         {
             generators.GetPropertyGenerator(property).GenerateProperty(state, property);
         }
 
-        foreach (var method in interfaceType.GetMethods())
+        foreach (var evt in type.GetEvents())
+        {
+            generators.GetEventGenerator(evt).GenerateEvent(state, evt);
+        }
+
+        foreach (var method in type.GetMethods())
         {
             if (!method.IsAbstract || method.IsSpecialName) continue;
 
             typeBuilder.DefineMethod(method.Name, method.Attributes | MethodAttributes.Public, method.ReturnType, method.GetParameters().Select(p => p.ParameterType).ToArray());
         }
-
-        return typeBuilder.CreateType() ?? throw new Exception("no type?");
     }
+
+    FieldBuilder EnsureMixin(BakingState state, Type type)
+    {
+        var fieldBuilder = state.Mixins.GetValueOrDefault(type);
+
+        if (fieldBuilder is null)
+        {
+            CreateMixin(state, type, out fieldBuilder);
+        }
+
+        return fieldBuilder;
+    }
+
+    void CreateMixin(BakingState state, Type type, out FieldBuilder fieldBuilder)
+    {
+        var typeBuilder = state.TypeBuilder;
+
+        fieldBuilder = typeBuilder.DefineField($"mixin_{(type.FullName ?? "x").Replace('.', '_')}_{Guid.NewGuid()}", type, FieldAttributes.Private);
+
+        state.Mixins[type] = fieldBuilder;
+
+        var propertyImplementationType = typeof(IPropertyImplementation);
+
+        var interfaces = (
+            from i in type.GetInterfaces()
+            where !propertyImplementationType.IsAssignableFrom(i)
+            select i
+        ).ToArray();
+
+        if (interfaces.Length == 0) return;
+
+        if (interfaces.Length > 1)
+        {
+            throw new Exception("Implementing more than one interface for a mixin is currently not supported;"
+                + $" interfaces are {String.Join(", ", from i in interfaces select i.Name)}");
+        }
+
+        var singleInterface = interfaces.Single();
+
+        ImplementInterface(state, singleInterface);
+    }
+
 }

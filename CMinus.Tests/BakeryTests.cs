@@ -9,7 +9,7 @@ public class BakeryTests
 {
     static Bakery BasicFactory = new Bakery("Basic");
 
-    public interface ITest
+    public interface IPropertyTest
     {
         String? Value { get; set; }
 
@@ -29,10 +29,26 @@ public class BakeryTests
         }
     }
 
+    public interface IPropertyTestWithInit
+    {
+        String Value { get; init; }
+
+        void Validate()
+        {
+            // TODO: this should give a "" default
+            Assert.AreEqual(null, Value);
+        }
+    }
+
+    public interface IEventTest
+    {
+        event Action Event;
+    }
+
     [TestMethod]
     public void SimpleTest()
     {
-        var test = BasicFactory.Create<ITest>();
+        var test = BasicFactory.Create<IPropertyTest>();
 
         Assert.AreEqual(null, test.Value);
 
@@ -45,19 +61,11 @@ public class BakeryTests
         Assert.AreEqual("bar", test.Value);
     }
 
-    public interface ITestWithInit
-    {
-        String Value { get; init; }
-
-        void Validate()
-        {
-            // TODO: this should give a "" default
-            Assert.AreEqual(null, Value);
-        }
-    }
+    [TestMethod]
+    public void EventTypeCreationTest() => BasicFactory.Create<IEventTest>();
 
     [TestMethod]
-    public void WithInitTest() => BasicFactory.Create<ITestWithInit>();
+    public void WithInitTest() => BasicFactory.Create<IPropertyTestWithInit>();
 
     public struct TrivialComplexPropertyImplementation<Value, Container> : IPropertyImplementation<Value, Container, EmptyMixIn>
     {
@@ -70,28 +78,28 @@ public class BakeryTests
 
     [TestMethod]
     public void TrivialComplexTest() => BakeryConfiguration.Create(typeof(TrivialComplexPropertyImplementation<,>))
-        .CreateBakery("Complex")
-        .Create<ITest>()
+        .CreateBakery(nameof(TrivialComplexTest))
+        .Create<IPropertyTest>()
         .Validate();
 
 
 
 
-    public struct TestMixin : INotifyPropertyChanged
+    public struct NotifyPropertChangedMixin : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler? PropertyChanged;
 
         public void NotifyPropertyChanged(Object o) => PropertyChanged?.Invoke(o, new PropertyChangedEventArgs(""));
     }
 
-    public struct NotifyPropertyChangedPropertyImplementation<Value, Container> : IPropertyImplementation<Value, Container, TestMixin>
+    public struct NotifyPropertyChangedPropertyImplementation<Value, Container> : IPropertyImplementation<Value, Container, NotifyPropertChangedMixin>
         where Container : class
     {
         Value value;
 
-        public Value Get(Container self, ref TestMixin mixIn) => value;
+        public Value Get(Container self, ref NotifyPropertChangedMixin mixIn) => value;
 
-        public void Set(Container self, ref TestMixin mixIn, Value value)
+        public void Set(Container self, ref NotifyPropertChangedMixin mixIn, Value value)
         {
             this.value = value;
 
@@ -103,8 +111,8 @@ public class BakeryTests
     public void NotifyPropertyChangedTest()
     {
         var instance = BakeryConfiguration.Create(typeof(NotifyPropertyChangedPropertyImplementation<,>))
-            .CreateBakery("Complex")
-            .Create<ITest>();
+            .CreateBakery(nameof(NotifyPropertyChangedTest))
+            .Create<IPropertyTest>();
 
         var instanceAsNotifyPropertyChanged = instance as INotifyPropertyChanged;
 

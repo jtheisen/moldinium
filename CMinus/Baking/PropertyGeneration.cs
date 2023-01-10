@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection.Emit;
 using System.Reflection;
+using System.Reflection.PortableExecutable;
+using System.Threading;
 
 namespace CMinus;
 
@@ -48,33 +50,8 @@ public struct GenericPropertyImplementation<T> : IPropertyImplementation<T>
     public T Value { get; set; }
 }
 
-public abstract class AbstractPropertyGenerator
+public abstract class AbstractGenerator
 {
-    protected readonly Type propertyImplementationType;
-
-    protected AbstractPropertyGenerator(Type propertyImplementationType)
-    {
-        this.propertyImplementationType = propertyImplementationType;
-    }
-
-    protected abstract Type GetBackingType(PropertyInfo property);
-
-    public abstract void GenerateProperty(BakingState state, PropertyInfo property);
-
-    protected FieldBuilder EnsureMixin(BakingState state, Type type)
-    {
-        var typeBuilder = state.TypeBuilder;
-
-        var fieldBuilder = state.MixIns.GetValueOrDefault(type);
-
-        if (fieldBuilder is null)
-        {
-            fieldBuilder = typeBuilder.DefineField($"mixin_{(type.FullName ?? "x").Replace('.', '_')}_{Guid.NewGuid()}", type, FieldAttributes.Private);
-        }
-
-        return fieldBuilder;
-    }
-
     protected MethodBuilder Create(TypeBuilder typeBuilder, MethodInfo methodTemplate, Boolean isAbstract = true)
     {
         var attributes = methodTemplate.Attributes | MethodAttributes.Public;
@@ -97,6 +74,20 @@ public abstract class AbstractPropertyGenerator
 
         return methodBuilder;
     }
+}
+
+public abstract class AbstractPropertyGenerator : AbstractGenerator
+{
+    protected readonly Type propertyImplementationType;
+
+    protected AbstractPropertyGenerator(Type propertyImplementationType)
+    {
+        this.propertyImplementationType = propertyImplementationType;
+    }
+
+    public abstract void GenerateProperty(BakingState state, PropertyInfo property);
+
+    protected abstract Type GetBackingType(PropertyInfo property);
 }
 
 public class BasicPropertyGenerator : AbstractPropertyGenerator
@@ -217,7 +208,7 @@ public class ComplexPropertyGenerator : AbstractPropertyGenerator
 
         var propertyBuilder = typeBuilder.DefineProperty(property.Name, property.Attributes, property.PropertyType, null);
 
-        var mixin = EnsureMixin(state, mixinType);
+        var mixin = state.EnsureMixin(state, mixinType);
 
         var setMethod = property.GetSetMethod();
         var getMethod = property.GetGetMethod();
