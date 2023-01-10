@@ -86,14 +86,32 @@ public class BakeryTests
 
     public interface INotifyPropertChangedMixin : INotifyPropertyChanged
     {
+        Int32 ListenerCount { get; set; }
     }
 
     public struct NotifyPropertChangedMixin : INotifyPropertChangedMixin
     {
+        public Int32 ListenerCount { get; set; }
 
-        public event PropertyChangedEventHandler? PropertyChanged;
+        event PropertyChangedEventHandler? backingPropertyChanged;
 
-        public void NotifyPropertyChanged(Object o) => PropertyChanged?.Invoke(o, new PropertyChangedEventArgs(""));
+        public event PropertyChangedEventHandler? PropertyChanged
+        {
+            add
+            {
+                ListenerCount++;
+
+                backingPropertyChanged += value;
+            }
+            remove
+            {
+                backingPropertyChanged -= value;
+
+                ListenerCount--;
+            }
+        }
+
+        public void NotifyPropertyChanged(Object o) => backingPropertyChanged?.Invoke(o, new PropertyChangedEventArgs(""));
     }
 
     public struct NotifyPropertyChangedPropertyImplementation<Value, Container> : IPropertyImplementation<Value, Container, NotifyPropertChangedMixin>
@@ -118,18 +136,24 @@ public class BakeryTests
             .CreateBakery(nameof(NotifyPropertyChangedTest))
             .Create<IPropertyTest>();
 
-        var instanceAsNotifyPropertyChanged = instance as INotifyPropertyChanged;
+        var instanceAsNotifyPropertyChanged = instance as INotifyPropertChangedMixin;
 
         var changeCount = 0;
 
         Assert.IsNotNull(instanceAsNotifyPropertyChanged);
 
-        instanceAsNotifyPropertyChanged!.PropertyChanged += (o, e) =>
+        Assert.AreEqual(0, instanceAsNotifyPropertyChanged!.ListenerCount);
+
+        PropertyChangedEventHandler handler = (o, e) =>
         {
             Assert.AreSame(instance, o);
 
             ++changeCount;
         };
+
+        instanceAsNotifyPropertyChanged!.PropertyChanged += handler;
+
+        Assert.AreEqual(1, instanceAsNotifyPropertyChanged!.ListenerCount);
 
         Assert.AreEqual(0, changeCount);
 
@@ -138,5 +162,9 @@ public class BakeryTests
         Assert.AreEqual("Foo", instance.Value);
 
         Assert.AreEqual(1, changeCount);
+
+        instanceAsNotifyPropertyChanged!.PropertyChanged -= handler;
+
+        Assert.AreEqual(0, instanceAsNotifyPropertyChanged!.ListenerCount);
     }
 }

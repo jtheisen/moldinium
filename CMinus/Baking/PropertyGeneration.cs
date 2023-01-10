@@ -78,37 +78,13 @@ public abstract class AbstractGenerator
 
 public abstract class AbstractPropertyGenerator : AbstractGenerator
 {
-    public abstract void GenerateProperty(BakingState state, PropertyInfo property);
-}
-
-public abstract class AbstractImplementationTypePropertyGenerator : AbstractPropertyGenerator
-{
-    protected readonly Type propertyImplementationType;
-
-    protected AbstractImplementationTypePropertyGenerator(Type propertyImplementationType)
-    {
-        this.propertyImplementationType = propertyImplementationType;
-    }
-
-    protected abstract Type GetBackingType(PropertyInfo property);
-}
-
-public class UnimplementedPropertyGenerator : AbstractPropertyGenerator
-{
-    public static readonly UnimplementedPropertyGenerator Instance = new UnimplementedPropertyGenerator();
-
-    public override void GenerateProperty(BakingState state, PropertyInfo property) => throw new NotImplementedException();
-}
-
-public class BasicPropertyGenerator : AbstractImplementationTypePropertyGenerator
-{
-    public BasicPropertyGenerator(Type propertyImplementationType) : base(propertyImplementationType) { }
-
-    public override void GenerateProperty(BakingState state, PropertyInfo property)
+    public virtual void GenerateProperty(BakingState state, PropertyInfo property)
     {
         var typeBuilder = state.TypeBuilder;
 
         var propertyBuilder = typeBuilder.DefineProperty(property.Name, property.Attributes, property.PropertyType, null);
+
+        var mixinFieldBuilder = EnsureMixin(state);
 
         var setMethod = property.GetSetMethod();
         var getMethod = property.GetGetMethod();
@@ -117,25 +93,24 @@ public class BasicPropertyGenerator : AbstractImplementationTypePropertyGenerato
         {
             if (getMethod == null) throw new Exception("A writable property must also be readable");
 
-            var backingPropertyImplementationType = GetBackingType(property);
-            var fieldBuilder = typeBuilder.DefineField($"backing_{property.Name}", backingPropertyImplementationType, FieldAttributes.Private);
-            var backingProperty = backingPropertyImplementationType.GetProperty("Value");
-            var backingGetMethod = backingProperty?.GetGetMethod();
-            var backingSetMethod = backingProperty?.GetSetMethod();
+            var (fieldBuilder, backingGetMethodName, backingSetMethodName) = GetBackings(typeBuilder, property);
 
-            if (backingGetMethod == null) throw new Exception("Type must have a readable 'Value' property");
-            if (backingSetMethod == null) throw new Exception("Type must have a writable 'Value' property");
+            var backingGetMethod = fieldBuilder.FieldType.GetMethod(backingGetMethodName);
+            var backingSetMethod = fieldBuilder.FieldType.GetMethod(backingSetMethodName);
+
+            if (backingGetMethod == null) throw new Exception($"Property implementation type must have a '{backingGetMethodName}' method");
+            if (backingSetMethod == null) throw new Exception($"Property implementation type must have a '{backingSetMethodName}' method");
 
             {
                 var getMethodBuilder = Create(typeBuilder, getMethod, isAbstract: false);
                 var generator = getMethodBuilder.GetILGenerator();
-                GenerateGetterCode(generator, fieldBuilder, backingGetMethod);
+                GenerateGetterCode(generator, fieldBuilder, backingGetMethod, mixinFieldBuilder);
                 propertyBuilder.SetGetMethod(getMethodBuilder);
             }
             {
                 var setMethodBuilder = Create(typeBuilder, setMethod, isAbstract: false);
                 var generator = setMethodBuilder.GetILGenerator();
-                GenerateSetterCode(generator, fieldBuilder, backingSetMethod);
+                GenerateSetterCode(generator, fieldBuilder, backingSetMethod, mixinFieldBuilder);
                 propertyBuilder.SetSetMethod(setMethodBuilder);
             }
         }
@@ -149,10 +124,11 @@ public class BasicPropertyGenerator : AbstractImplementationTypePropertyGenerato
         }
     }
 
-    protected override Type GetBackingType(PropertyInfo property)
-        => propertyImplementationType.MakeGenericType(property.PropertyType);
+    protected virtual FieldBuilder? EnsureMixin(BakingState state) => null;
 
-    void GenerateGetterCode(ILGenerator generator, FieldBuilder fieldBuilder, MethodInfo backingGetMethod)
+    protected abstract (FieldBuilder fieldBuilder, String backingGetMethodName, String backingSetMethodName) GetBackings(TypeBuilder typeBuilder, PropertyInfo property);
+
+    protected virtual void GenerateGetterCode(ILGenerator generator, FieldBuilder fieldBuilder, MethodInfo backingGetMethod, FieldBuilder? _)
     {
         generator.Emit(OpCodes.Ldarg_0);
         generator.Emit(OpCodes.Ldflda, fieldBuilder);
@@ -160,7 +136,7 @@ public class BasicPropertyGenerator : AbstractImplementationTypePropertyGenerato
         generator.Emit(OpCodes.Ret);
     }
 
-    void GenerateSetterCode(ILGenerator generator, FieldBuilder fieldBuilder, MethodInfo backingSetMethod)
+    protected virtual void GenerateSetterCode(ILGenerator generator, FieldBuilder fieldBuilder, MethodInfo backingSetMethod, FieldBuilder? _)
     {
         generator.Emit(OpCodes.Ldarg_0);
         generator.Emit(OpCodes.Ldflda, fieldBuilder);
@@ -168,6 +144,53 @@ public class BasicPropertyGenerator : AbstractImplementationTypePropertyGenerato
         generator.Emit(OpCodes.Call, backingSetMethod);
         generator.Emit(OpCodes.Ret);
     }
+}
+
+public abstract class AbstractImplementationTypePropertyGenerator : AbstractPropertyGenerator
+{
+    protected readonly Type propertyImplementationType;
+
+    protected AbstractImplementationTypePropertyGenerator(Type propertyImplementationType)
+    {
+        this.propertyImplementationType = propertyImplementationType;
+    }
+}
+
+public class UnimplementedPropertyGenerator : AbstractPropertyGenerator
+{
+    public static readonly UnimplementedPropertyGenerator Instance = new UnimplementedPropertyGenerator();
+
+    public override void GenerateProperty(BakingState state, PropertyInfo property) => throw new NotImplementedException();
+
+    protected override (FieldBuilder fieldBuilder, string backingGetMethodName, string backingSetMethodName)
+        GetBackings(TypeBuilder typeBuilder, PropertyInfo property)
+        => throw new NotImplementedException();
+}
+
+public class BasicPropertyGenerator : AbstractImplementationTypePropertyGenerator
+{
+    public BasicPropertyGenerator(Type propertyImplementationType) : base(propertyImplementationType) { }
+
+    protected override (FieldBuilder fieldBuilder, String backingGetMethodName, String backingSetMethodName)
+        GetBackings(TypeBuilder typeBuilder, PropertyInfo property)
+    {
+        var backingEventImplementationType = propertyImplementationType.MakeGenericType(property.PropertyType);
+        var fieldBuilder = typeBuilder.DefineField($"backing_{property.Name}", backingEventImplementationType, FieldAttributes.Private);
+        return (fieldBuilder, "Get", "Set");
+    }
+}
+
+public class DelegatingPropertyGenerator : AbstractPropertyGenerator
+{
+    private readonly FieldBuilder fieldBuilder;
+
+    public DelegatingPropertyGenerator(FieldBuilder targetFieldBuilder)
+    {
+        this.fieldBuilder = targetFieldBuilder;
+    }
+
+    protected override (FieldBuilder fieldBuilder, String backingGetMethodName, String backingSetMethodName)
+        GetBackings(TypeBuilder typeBuilder, PropertyInfo property) => (fieldBuilder, property.GetGetMethod()!.Name, property.GetSetMethod()!.Name);
 }
 
 public class ComplexPropertyGenerator : AbstractImplementationTypePropertyGenerator
@@ -212,57 +235,17 @@ public class ComplexPropertyGenerator : AbstractImplementationTypePropertyGenera
         }
     }
 
-    public override void GenerateProperty(BakingState state, PropertyInfo property)
+    protected override FieldBuilder? EnsureMixin(BakingState state) => state.EnsureMixin(state, mixinType);
+
+    protected override (FieldBuilder fieldBuilder, String backingGetMethodName, String backingSetMethodName)
+        GetBackings(TypeBuilder typeBuilder, PropertyInfo property)
     {
-        var typeBuilder = state.TypeBuilder;
-
-        var propertyBuilder = typeBuilder.DefineProperty(property.Name, property.Attributes, property.PropertyType, null);
-
-        var mixin = state.EnsureMixin(state, mixinType);
-
-        var setMethod = property.GetSetMethod();
-        var getMethod = property.GetGetMethod();
-
-        if (setMethod != null)
-        {
-            if (getMethod == null) throw new Exception("A writable property must also be readable");
-
-            var backingPropertyImplementationType = GetBackingType(property);
-            var fieldBuilder = typeBuilder.DefineField($"backing_{property.Name}", backingPropertyImplementationType, FieldAttributes.Private);
-
-            var backingGetMethod = fieldBuilder.FieldType.GetMethod("Get");
-            var backingSetMethod = fieldBuilder.FieldType.GetMethod("Set");
-
-            if (backingGetMethod is null) throw new Exception("Type must have a 'Get' method");
-            if (backingSetMethod is null) throw new Exception("Type must have a 'Set' method");
-
-            {
-                var getMethodBuilder = Create(typeBuilder, getMethod, isAbstract: false);
-                var generator = getMethodBuilder.GetILGenerator();
-                GenerateGetterCode(generator, fieldBuilder, backingGetMethod, mixin);
-                propertyBuilder.SetGetMethod(getMethodBuilder);
-            }
-            {
-                var setMethodBuilder = Create(typeBuilder, setMethod, isAbstract: false);
-                var generator = setMethodBuilder.GetILGenerator();
-                GenerateSetterCode(generator, fieldBuilder, backingSetMethod, mixin);
-                propertyBuilder.SetSetMethod(setMethodBuilder);
-            }
-        }
-        else if (getMethod != null)
-        {
-            propertyBuilder.SetGetMethod(Create(typeBuilder, getMethod));
-        }
-        else
-        {
-            throw new Exception("A property that is neither readable nor writable was encountered");
-        }
+        var backingEventImplementationType = propertyImplementationType.MakeGenericType(property.PropertyType, property.DeclaringType!);
+        var fieldBuilder = typeBuilder.DefineField($"backing_{property.Name}", backingEventImplementationType, FieldAttributes.Private);
+        return (fieldBuilder, "Get", "Set");
     }
 
-    protected override Type GetBackingType(PropertyInfo property)
-        => propertyImplementationType.MakeGenericType(property.PropertyType, property.DeclaringType!);
-
-    void GenerateGetterCode(ILGenerator generator, FieldBuilder fieldBuilder, MethodInfo backingGetMethod, FieldBuilder mixInFieldBuilder)
+    protected override void GenerateGetterCode(ILGenerator generator, FieldBuilder fieldBuilder, MethodInfo backingGetMethod, FieldBuilder? mixInFieldBuilder)
     {
         generator.Emit(OpCodes.Ldarg_0);
         generator.Emit(OpCodes.Ldflda, fieldBuilder);
@@ -270,14 +253,14 @@ public class ComplexPropertyGenerator : AbstractImplementationTypePropertyGenera
         generator.Emit(OpCodes.Ldarg_0);
 
         generator.Emit(OpCodes.Ldarg_0);
-        generator.Emit(OpCodes.Ldflda, mixInFieldBuilder);
+        generator.Emit(OpCodes.Ldflda, mixInFieldBuilder!);
 
         generator.Emit(OpCodes.Call, backingGetMethod);
 
         generator.Emit(OpCodes.Ret);
     }
 
-    void GenerateSetterCode(ILGenerator generator, FieldBuilder fieldBuilder, MethodInfo backingSetMethod, FieldBuilder mixInFieldBuilder)
+    protected override void GenerateSetterCode(ILGenerator generator, FieldBuilder fieldBuilder, MethodInfo backingSetMethod, FieldBuilder? mixInFieldBuilder)
     {
         generator.Emit(OpCodes.Ldarg_0);
         generator.Emit(OpCodes.Ldflda, fieldBuilder);
@@ -285,7 +268,7 @@ public class ComplexPropertyGenerator : AbstractImplementationTypePropertyGenera
         generator.Emit(OpCodes.Ldarg_0);
 
         generator.Emit(OpCodes.Ldarg_0);
-        generator.Emit(OpCodes.Ldflda, mixInFieldBuilder);
+        generator.Emit(OpCodes.Ldflda, mixInFieldBuilder!);
 
         generator.Emit(OpCodes.Ldarg_1);
 

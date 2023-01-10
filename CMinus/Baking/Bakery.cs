@@ -133,27 +133,15 @@ public class Bakery
 
         if (interfaces.Length == 0) return;
 
-        var interfacesSet = new HashSet<Type>(interfaces);
-
-        var mostDervivedInterfaces =
-            interfaces.Where(b => !interfaces.Any(d => d != b && d.IsAssignableTo(b))).ToArray();
-
-        if (mostDervivedInterfaces.Length == 0) throw new Exception($"Internal error: One interface should be most derived");
-
-        if (mostDervivedInterfaces.Length > 1)
-        {
-            throw new Exception("Implementing more than one interface for a mixin is currently not supported;"
-                + $" interfaces are {String.Join(", ", from i in mostDervivedInterfaces select i.Name)}");
-        }
-
-        var singleInterface = mostDervivedInterfaces.Single();
-
         var nestedGenerators = new ComponentGenerators(
-            UnimplementedPropertyGenerator.Instance, // FIXME
+            new DelegatingPropertyGenerator(fieldBuilder),
             new DelegatingEventGenerator(fieldBuilder)
         );
 
-        ImplementInterface(state, singleInterface, nestedGenerators);
+        foreach (var ifc in interfaces)
+        {
+            ImplementInterface(state, ifc, nestedGenerators);
+        }
     }
 
 }
