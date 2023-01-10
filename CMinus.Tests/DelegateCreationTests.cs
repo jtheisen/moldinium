@@ -1,4 +1,5 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿using CMinus.Misc;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 
 namespace CMinus.Tests;

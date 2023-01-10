@@ -9,7 +9,6 @@ namespace CMinus.Tests
 
     public class RootService
     {
-
     }
 
     public class ClassType
@@ -90,7 +89,7 @@ namespace CMinus.Tests
         }
 
         [TestMethod]
-        public void InterfaceTypeResolutionTests()
+        public void InterfaceTypeResolutionTest()
         {
             var resolvedType = provider.ResolveType(typeof(InterfaceType));
 
@@ -99,35 +98,18 @@ namespace CMinus.Tests
         }
 
         [TestMethod]
-        public void ClassInstanceTests()
-        {
-            var instance = provider.CreateInstance<ClassType>();
-
-            instance.Validate();
-        }
+        public void ClassInstanceTest()
+            => provider.CreateInstance<ClassType>().Validate();
 
         [TestMethod]
-        public void InterfaceInstanceTests()
-        {
-            var instance = provider.CreateInstance<InterfaceType>();
-
-            instance.Validate();
-        }
+        public void InterfaceInstanceTest() => provider.CreateInstance<InterfaceType>().Validate();
 
         [TestMethod]
-        public void InterfaceWithSimpleFactoryInstanceTests()
-        {
-            var instance = provider.CreateInstance<InterfaceTypeWithSimpleFactory>();
-
-            instance.Validate();
-        }
+        public void InterfaceWithSimpleFactoryInstanceTest()
+            => provider.CreateInstance<InterfaceTypeWithSimpleFactory>().Validate();
 
         [TestMethod]
-        public void InterfaceTypeWithParameterizedFactoryInstanceTests()
-        {
-            var instance = provider.CreateInstance<InterfaceTypeWithParameterizedFactory>();
-
-            instance.Validate();
-        }
+        public void InterfaceTypeWithParameterizedFactoryInstanceTest()
+            => provider.CreateInstance<InterfaceTypeWithParameterizedFactory>().Validate();
     }
 }

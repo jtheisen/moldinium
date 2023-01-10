@@ -2,9 +2,9 @@
 using System.Linq;
 using System.Reflection.Emit;
 
-namespace CMinus;
+namespace CMinus.Misc;
 
-public delegate Object DelegateImplementation(params Object[] args);
+public delegate object DelegateImplementation(params object[] args);
 
 public static class DelegateCreation
 {
@@ -12,7 +12,7 @@ public static class DelegateCreation
         where D : Delegate
         => (D)CreateDelegate(typeof(D), implementation);
 
-    public static Object CreateDelegate(Type delegateType, DelegateImplementation implementation)
+    public static object CreateDelegate(Type delegateType, DelegateImplementation implementation)
     {
         var method = delegateType.GetMethod("Invoke");
 
@@ -30,9 +30,9 @@ public static class DelegateCreation
             if (p.ParameterType.IsValueType) throw new ArgumentException($"The delegate parameter {p.Name} is a value type which is unsupported");
         }
 
-        (Boolean hasTarget, DynamicMethod proxy) CreateMethod()
+        (bool hasTarget, DynamicMethod proxy) CreateMethod()
         {
-            if (implementation.Target is Object target)
+            if (implementation.Target is object target)
             {
                 return (true, new DynamicMethod(
                     "ProxyDelegate",
