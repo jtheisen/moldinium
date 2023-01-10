@@ -1,5 +1,4 @@
-﻿using CMinus.Construction;
-using CMinus.Injection;
+﻿using CMinus.Injection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
