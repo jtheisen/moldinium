@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Reflection.PortableExecutable;
 
 namespace CMinus;
 
@@ -39,19 +40,7 @@ public struct GenericEventImplementation<D> : IEventImplementation<D>
 
 public abstract class AbstractEventGenerator : AbstractGenerator
 {
-    public abstract void GenerateEvent(BakingState state, EventInfo evt);
-}
-
-public class BasicEventGenerator : AbstractEventGenerator
-{
-    protected readonly Type eventImplementationType;
-
-    public BasicEventGenerator(Type eventImplementationType)
-    {
-        this.eventImplementationType = eventImplementationType;
-    }
-
-    public override void GenerateEvent(BakingState state, EventInfo evt)
+    public void GenerateEvent(BakingState state, EventInfo evt)
     {
         var typeBuilder = state.TypeBuilder;
 
@@ -65,13 +54,12 @@ public class BasicEventGenerator : AbstractEventGenerator
         if (addMethod is null) throw new Exception("An event must have an add method");
         if (removeMethod is null) throw new Exception("An event must have a remove method");
 
-        var backingEventImplementationType = GetBackingType(evt);
-        var fieldBuilder = typeBuilder.DefineField($"backing_evt_{evt.Name}", backingEventImplementationType, FieldAttributes.Private);
-        var backingAddMethod = fieldBuilder.FieldType.GetMethod("Add");
-        var backingRemoveMethod = fieldBuilder.FieldType.GetMethod("Remove");
+        var (fieldBuilder, backingAddMethodName, backingRemoveMethodName) = GetBackings(typeBuilder, evt);
+        var backingAddMethod = fieldBuilder.FieldType.GetMethod(backingAddMethodName);
+        var backingRemoveMethod = fieldBuilder.FieldType.GetMethod(backingRemoveMethodName);
 
-        if (backingAddMethod is null) throw new Exception("Event implementation type must have an 'Add' method");
-        if (backingRemoveMethod is null) throw new Exception("Event implementation type must have a 'Remove' method");
+        if (backingAddMethod is null) throw new Exception($"Event implementation type must have an '{backingAddMethodName}' method");
+        if (backingRemoveMethod is null) throw new Exception($"Event implementation type must have a '{backingRemoveMethodName}' method");
 
         {
             var addMethodBuilder = Create(typeBuilder, addMethod, isAbstract: false);
@@ -87,16 +75,41 @@ public class BasicEventGenerator : AbstractEventGenerator
         }
     }
 
-    Type GetBackingType(EventInfo eventInfo)
-        => eventImplementationType.MakeGenericType(eventInfo.EventHandlerType!);
+    protected abstract (FieldBuilder fieldBuilder, String backingAddMethodName, String backingRemoveMethodName) GetBackings(TypeBuilder typeBuilder, EventInfo evt);
 
-    void GenerateWrapperCode(ILGenerator generator, FieldBuilder fieldBuilder, MethodInfo backingMethod)
+    protected virtual void GenerateWrapperCode(ILGenerator generator, FieldBuilder fieldBuilder, MethodInfo backingMethod)
     {
         generator.Emit(OpCodes.Ldarg_0);
         generator.Emit(OpCodes.Ldflda, fieldBuilder);
         generator.Emit(OpCodes.Ldarg_1);
         generator.Emit(OpCodes.Call, backingMethod);
         generator.Emit(OpCodes.Ret);
+    }
+}
+
+public abstract class AbstractImplementationTypeEventGenerator : AbstractEventGenerator
+{
+    protected readonly Type eventImplementationType;
+
+    public AbstractImplementationTypeEventGenerator(Type eventImplementationType)
+    {
+        this.eventImplementationType = eventImplementationType;
+    }
+}
+
+public class BasicEventGenerator : AbstractImplementationTypeEventGenerator
+{
+    public BasicEventGenerator(Type eventImplementationType)
+        : base(eventImplementationType)
+    {
+    }
+
+    protected override (FieldBuilder fieldBuilder, String backingAddMethodName, String backingRemoveMethodName)
+        GetBackings(TypeBuilder typeBuilder, EventInfo evt)
+    {
+        var backingEventImplementationType = eventImplementationType.MakeGenericType(evt.EventHandlerType!);
+        var fieldBuilder = typeBuilder.DefineField($"backing_evt_{evt.Name}", backingEventImplementationType, FieldAttributes.Private);
+        return (fieldBuilder, "Add", "Remove");
     }
 }
 
@@ -109,48 +122,8 @@ public class DelegatingEventGenerator : AbstractEventGenerator
         this.fieldBuilder = targetFieldBuilder;
     }
 
-    public override void GenerateEvent(BakingState state, EventInfo evt)
-    {
-        var typeBuilder = state.TypeBuilder;
-
-        if (evt.EventHandlerType is null) throw new Exception($"Event {evt} has no handler type");
-
-        var eventBuilder = typeBuilder.DefineEvent(evt.Name, evt.Attributes, evt.EventHandlerType);
-
-        var addMethod = evt.GetAddMethod();
-        var removeMethod = evt.GetRemoveMethod();
-
-        if (addMethod is null) throw new Exception("An event must have an add method");
-        if (removeMethod is null) throw new Exception("An event must have a remove method");
-
-        var backingAddMethod = fieldBuilder.FieldType.GetMethod(addMethod.Name);
-        var backingRemoveMethod = fieldBuilder.FieldType.GetMethod(removeMethod.Name);
-
-        if (backingAddMethod is null) throw new Exception("Event implementation type must have an 'Add' method");
-        if (backingRemoveMethod is null) throw new Exception("Event implementation type must have a 'Remove' method");
-
-        {
-            var addMethodBuilder = Create(typeBuilder, addMethod, isAbstract: false);
-            var generator = addMethodBuilder.GetILGenerator();
-            GenerateWrapperCode(generator, fieldBuilder, backingAddMethod);
-            eventBuilder.SetAddOnMethod(addMethodBuilder);
-        }
-        {
-            var removeMethodBuilder = Create(typeBuilder, removeMethod, isAbstract: false);
-            var generator = removeMethodBuilder.GetILGenerator();
-            GenerateWrapperCode(generator, fieldBuilder, backingRemoveMethod);
-            eventBuilder.SetRemoveOnMethod(removeMethodBuilder);
-        }
-    }
-
-    void GenerateWrapperCode(ILGenerator generator, FieldBuilder fieldBuilder, MethodInfo backingMethod)
-    {
-        generator.Emit(OpCodes.Ldarg_0);
-        generator.Emit(OpCodes.Ldflda, fieldBuilder);
-        generator.Emit(OpCodes.Ldarg_1);
-        generator.Emit(OpCodes.Call, backingMethod);
-        generator.Emit(OpCodes.Ret);
-    }
+    protected override (FieldBuilder fieldBuilder, String backingAddMethodName, String backingRemoveMethodName)
+        GetBackings(TypeBuilder typeBuilder, EventInfo evt) => (fieldBuilder, evt.AddMethod!.Name, evt.RemoveMethod!.Name);
 }
 
 public static class EventGenerator
