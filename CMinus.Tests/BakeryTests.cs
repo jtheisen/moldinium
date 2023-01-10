@@ -84,9 +84,13 @@ public class BakeryTests
 
 
 
-
-    public struct NotifyPropertChangedMixin : INotifyPropertyChanged
+    public interface INotifyPropertChangedMixin : INotifyPropertyChanged
     {
+    }
+
+    public struct NotifyPropertChangedMixin : INotifyPropertChangedMixin
+    {
+
         public event PropertyChangedEventHandler? PropertyChanged;
 
         public void NotifyPropertyChanged(Object o) => PropertyChanged?.Invoke(o, new PropertyChangedEventArgs(""));
