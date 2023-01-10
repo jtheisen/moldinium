@@ -3,32 +3,39 @@ using System.Reflection;
 
 namespace CMinus.Construction;
 
-public interface IBakeryConfiguration
-{
-    Boolean MakeAbstract => false;
+//public interface IPropertyImplementation
+//        <ValueInterface, ContainerInterface, Value, Container, MixIn>
+//        where Value : ValueInterface
+//        where Container : ContainerInterface
+//        where MixIn : struct
+//{
+//    Value Get(
+//        Container self,
+//        ref MixIn mixIn
+//        );
 
-    PropertyGenerator GetGenerator(PropertyInfo property);
+//    void Set(
+//        Container self,
+//        ref MixIn mixIn,
+//        Value value
+//        );
+//}
+
+[AttributeUsage(AttributeTargets.Interface)]
+public class PropertyImplementationInterfaceAttribute : Attribute
+{
+    public Type PropertyGeneratorType { get; }
+
+    public PropertyImplementationInterfaceAttribute(Type propertyGeneratorType)
+    {
+        PropertyGeneratorType = propertyGeneratorType;
+    }
 }
 
-public class BakeryConfiguration : IBakeryConfiguration
-{
-    private readonly PropertyGenerator generator;
+public interface IPropertyImplementation { }
 
-    public BakeryConfiguration(PropertyGenerator generator)
-    {
-        this.generator = generator;
-    }
-
-    public PropertyGenerator GetGenerator(PropertyInfo _)
-    {
-        return generator;
-    }
-}
-
-public interface IPropertyImplementation
-        <ValueInterface, ContainerInterface, Value, Container, MixIn>
-        where Value : ValueInterface
-        where Container : ContainerInterface
+[PropertyImplementationInterface(typeof(ComplexPropertyGenerator))]
+public interface IPropertyImplementation<Value, Container, MixIn> : IPropertyImplementation
         where MixIn : struct
 {
     Value Get(
@@ -56,16 +63,8 @@ public interface IMysteriousAccessor<Value, Container>
 
 public struct EmptyMixIn { }
 
-public struct GenericComplexPropertyImplementation<Value, Container> : IPropertyImplementation<Value, Container, Value, Container, EmptyMixIn>
-{
-    Value value;
-
-    public Value Get(Container self, ref EmptyMixIn mixIn) => value;
-
-    public void Set(Container self, ref EmptyMixIn mixIn, Value value) => this.value = value;
-}
-
-public interface IPropertyImplementation<T>
+[PropertyImplementationInterfaceAttribute(typeof(BasicPropertyGenerator))]
+public interface IPropertyImplementation<T> : IPropertyImplementation
 {
     T Value { get; set; }
 }

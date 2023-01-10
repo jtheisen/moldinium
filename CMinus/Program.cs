@@ -11,7 +11,7 @@ namespace CMinus
 
     class Program
     {
-        static Bakery classFactory = new Bakery("Funky", new BakeryConfiguration(new PropertyGenerator()));
+        static Bakery classFactory = new Bakery("Funky");
 
         static void Main(string[] args)
         {
