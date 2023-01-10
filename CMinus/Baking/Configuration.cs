@@ -14,12 +14,12 @@ public interface IBakeryComponentGenerators
     AbstractEventGenerator GetEventGenerator(EventInfo evt);
 }
 
-public class ComponentGenerator : IBakeryComponentGenerators
+public class ComponentGenerators : IBakeryComponentGenerators
 {
     private readonly AbstractPropertyGenerator propertyGenerator;
     private readonly AbstractEventGenerator eventGenerator;
 
-    public ComponentGenerator(AbstractPropertyGenerator propertyGenerator, AbstractEventGenerator eventGenerator)
+    public ComponentGenerators(AbstractPropertyGenerator propertyGenerator, AbstractEventGenerator eventGenerator)
     {
         this.propertyGenerator = propertyGenerator;
         this.eventGenerator = eventGenerator;
@@ -31,8 +31,8 @@ public class ComponentGenerator : IBakeryComponentGenerators
 
     public AbstractEventGenerator GetEventGenerator(EventInfo evt) => eventGenerator;
 
-    public static ComponentGenerator Create(Type propertyImplementationType, Type eventImplementationType)
-        => new ComponentGenerator(
+    public static ComponentGenerators Create(Type propertyImplementationType, Type eventImplementationType)
+        => new ComponentGenerators(
             PropertyGenerator.Create(propertyImplementationType),
             EventGenerator.Create(eventImplementationType)
         );
@@ -41,12 +41,12 @@ public class ComponentGenerator : IBakeryComponentGenerators
 public record BakeryConfiguration(IBakeryComponentGenerators Generators, Boolean MakeAbstract = false)
 {
     public static BakeryConfiguration Create(Type? propertyImplementationType = null, Type? eventImplementationType = null)
-        => new BakeryConfiguration(ComponentGenerator.Create(
+        => new BakeryConfiguration(ComponentGenerators.Create(
             propertyImplementationType ?? typeof(GenericPropertyImplementation<>),
             eventImplementationType ?? typeof(GenericEventImplementation<>)));
 
     public static BakeryConfiguration PocGenerationConfiguration
-        = new BakeryConfiguration(ComponentGenerator.Create(typeof(GenericPropertyImplementation<>), typeof(GenericEventImplementation<>)));
+        = new BakeryConfiguration(ComponentGenerators.Create(typeof(GenericPropertyImplementation<>), typeof(GenericEventImplementation<>)));
 
     public Bakery CreateBakery(String name) => new Bakery(name, this);
 }

@@ -69,7 +69,7 @@ public class Bakery
 
         try
         {
-            ImplementInterface(state, interfaceType);
+            ImplementInterface(state, interfaceType, generators);
 
             return typeBuilder.CreateType() ?? throw new Exception("no type?");
         }
@@ -79,7 +79,7 @@ public class Bakery
         }
     }
 
-    void ImplementInterface(BakingState state, Type type)
+    void ImplementInterface(BakingState state, Type type, IBakeryComponentGenerators generators)
     {
         var typeBuilder = state.TypeBuilder;
 
@@ -141,7 +141,12 @@ public class Bakery
 
         var singleInterface = interfaces.Single();
 
-        ImplementInterface(state, singleInterface);
+        var nestedGenerators = new ComponentGenerators(
+            UnimplementedPropertyGenerator.Instance, // FIXME
+            new DelegatingEventGenerator(fieldBuilder)
+        );
+
+        ImplementInterface(state, singleInterface, nestedGenerators);
     }
 
 }

@@ -39,23 +39,16 @@ public struct GenericEventImplementation<D> : IEventImplementation<D>
 
 public abstract class AbstractEventGenerator : AbstractGenerator
 {
-    protected readonly Type eventImplementationType;
-
-    protected AbstractEventGenerator(Type eventImplementationType)
-    {
-        this.eventImplementationType = eventImplementationType;
-    }
-
-    protected abstract Type GetBackingType(EventInfo evt);
-
     public abstract void GenerateEvent(BakingState state, EventInfo evt);
 }
 
 public class BasicEventGenerator : AbstractEventGenerator
 {
+    protected readonly Type eventImplementationType;
+
     public BasicEventGenerator(Type eventImplementationType)
-        : base(eventImplementationType)
     {
+        this.eventImplementationType = eventImplementationType;
     }
 
     public override void GenerateEvent(BakingState state, EventInfo evt)
@@ -94,8 +87,61 @@ public class BasicEventGenerator : AbstractEventGenerator
         }
     }
 
-    protected override Type GetBackingType(EventInfo eventInfo)
+    Type GetBackingType(EventInfo eventInfo)
         => eventImplementationType.MakeGenericType(eventInfo.EventHandlerType!);
+
+    void GenerateWrapperCode(ILGenerator generator, FieldBuilder fieldBuilder, MethodInfo backingMethod)
+    {
+        generator.Emit(OpCodes.Ldarg_0);
+        generator.Emit(OpCodes.Ldflda, fieldBuilder);
+        generator.Emit(OpCodes.Ldarg_1);
+        generator.Emit(OpCodes.Call, backingMethod);
+        generator.Emit(OpCodes.Ret);
+    }
+}
+
+public class DelegatingEventGenerator : AbstractEventGenerator
+{
+    private readonly FieldBuilder fieldBuilder;
+
+    public DelegatingEventGenerator(FieldBuilder targetFieldBuilder)
+    {
+        this.fieldBuilder = targetFieldBuilder;
+    }
+
+    public override void GenerateEvent(BakingState state, EventInfo evt)
+    {
+        var typeBuilder = state.TypeBuilder;
+
+        if (evt.EventHandlerType is null) throw new Exception($"Event {evt} has no handler type");
+
+        var eventBuilder = typeBuilder.DefineEvent(evt.Name, evt.Attributes, evt.EventHandlerType);
+
+        var addMethod = evt.GetAddMethod();
+        var removeMethod = evt.GetRemoveMethod();
+
+        if (addMethod is null) throw new Exception("An event must have an add method");
+        if (removeMethod is null) throw new Exception("An event must have a remove method");
+
+        var backingAddMethod = fieldBuilder.FieldType.GetMethod(addMethod.Name);
+        var backingRemoveMethod = fieldBuilder.FieldType.GetMethod(removeMethod.Name);
+
+        if (backingAddMethod is null) throw new Exception("Event implementation type must have an 'Add' method");
+        if (backingRemoveMethod is null) throw new Exception("Event implementation type must have a 'Remove' method");
+
+        {
+            var addMethodBuilder = Create(typeBuilder, addMethod, isAbstract: false);
+            var generator = addMethodBuilder.GetILGenerator();
+            GenerateWrapperCode(generator, fieldBuilder, backingAddMethod);
+            eventBuilder.SetAddOnMethod(addMethodBuilder);
+        }
+        {
+            var removeMethodBuilder = Create(typeBuilder, removeMethod, isAbstract: false);
+            var generator = removeMethodBuilder.GetILGenerator();
+            GenerateWrapperCode(generator, fieldBuilder, backingRemoveMethod);
+            eventBuilder.SetRemoveOnMethod(removeMethodBuilder);
+        }
+    }
 
     void GenerateWrapperCode(ILGenerator generator, FieldBuilder fieldBuilder, MethodInfo backingMethod)
     {

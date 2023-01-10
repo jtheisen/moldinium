@@ -78,19 +78,29 @@ public abstract class AbstractGenerator
 
 public abstract class AbstractPropertyGenerator : AbstractGenerator
 {
+    public abstract void GenerateProperty(BakingState state, PropertyInfo property);
+}
+
+public abstract class AbstractImplementationTypePropertyGenerator : AbstractPropertyGenerator
+{
     protected readonly Type propertyImplementationType;
 
-    protected AbstractPropertyGenerator(Type propertyImplementationType)
+    protected AbstractImplementationTypePropertyGenerator(Type propertyImplementationType)
     {
         this.propertyImplementationType = propertyImplementationType;
     }
 
-    public abstract void GenerateProperty(BakingState state, PropertyInfo property);
-
     protected abstract Type GetBackingType(PropertyInfo property);
 }
 
-public class BasicPropertyGenerator : AbstractPropertyGenerator
+public class UnimplementedPropertyGenerator : AbstractPropertyGenerator
+{
+    public static readonly UnimplementedPropertyGenerator Instance = new UnimplementedPropertyGenerator();
+
+    public override void GenerateProperty(BakingState state, PropertyInfo property) => throw new NotImplementedException();
+}
+
+public class BasicPropertyGenerator : AbstractImplementationTypePropertyGenerator
 {
     public BasicPropertyGenerator(Type propertyImplementationType) : base(propertyImplementationType) { }
 
@@ -160,7 +170,7 @@ public class BasicPropertyGenerator : AbstractPropertyGenerator
     }
 }
 
-public class ComplexPropertyGenerator : AbstractPropertyGenerator
+public class ComplexPropertyGenerator : AbstractImplementationTypePropertyGenerator
 {
     Type semiConcreteInterface;
     Type mixinType;
