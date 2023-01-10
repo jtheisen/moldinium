@@ -1,21 +1,57 @@
-﻿using System;
+﻿using CMinus.Construction;
+using System;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 
 namespace CMinus
 {
+    public class PropertyGenerator
+    {
+        public Type GetBackingType(PropertyInfo property)
+        {
+            return GetPropertyImplementationType(property.PropertyType);
+        }
+
+        public void GenerateGetterCode(ILGenerator generator, FieldBuilder fieldBuilder, MethodInfo backingGetMethod)
+        {
+            generator.Emit(OpCodes.Ldarg_0);
+            generator.Emit(OpCodes.Ldflda, fieldBuilder);
+            generator.Emit(OpCodes.Call, backingGetMethod);
+            generator.Emit(OpCodes.Ret);
+        }
+
+        public void GenerateSetterCode(ILGenerator generator, FieldBuilder fieldBuilder, MethodInfo backingSetMethod)
+        {
+            generator.Emit(OpCodes.Ldarg_0);
+            generator.Emit(OpCodes.Ldflda, fieldBuilder);
+            generator.Emit(OpCodes.Ldarg_1);
+            generator.Emit(OpCodes.Call, backingSetMethod);
+            generator.Emit(OpCodes.Ret);
+        }
+
+        Type GetPropertyImplementationType(Type propertyType)
+        {
+            return typeof(Construction.GenericPropertyImplementation<>).MakeGenericType(propertyType);
+        }
+    }
+
     public class Bakery
     {
-        TypeAttributes typeAttributes;
-        ModuleBuilder moduleBuilder;
+        readonly string name;
+        readonly IBakeryConfiguration configuration;
+        readonly TypeAttributes typeAttributes;
+        readonly ModuleBuilder moduleBuilder;
 
-        public Bakery(String name, Boolean makeAbstract = true)
+        public Bakery(String name, IBakeryConfiguration configuration)
         {
+            this.name = name;
+            this.configuration = configuration;
+
             var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName(name), AssemblyBuilderAccess.Run);
             moduleBuilder = assemblyBuilder.DefineDynamicModule(name);
             typeAttributes = TypeAttributes.Public;
-            if (makeAbstract) typeAttributes |= TypeAttributes.Abstract;
+            if (configuration.MakeAbstract) typeAttributes |= TypeAttributes.Abstract;
         }
 
         public T Create<T>()
@@ -54,7 +90,9 @@ namespace CMinus
                 {
                     if (getMethod == null) throw new Exception("A writable property must also be readable");
 
-                    var backingPropertyImplementationType = GetPropertyImplementationType(property.PropertyType);
+                    var propertyGenerator = configuration.GetGenerator(property);
+
+                    var backingPropertyImplementationType = propertyGenerator.GetBackingType(property);
                     var fieldBuilder = typeBuilder.DefineField($"backing_{property.Name}", backingPropertyImplementationType, FieldAttributes.Private);
                     var backingProperty = backingPropertyImplementationType.GetProperty("Value");
                     var backingGetMethod = backingProperty?.GetGetMethod();
@@ -66,22 +104,13 @@ namespace CMinus
                     {
                         var getMethodBuilder = Create(typeBuilder, getMethod, isAbstract: false);
                         var generator = getMethodBuilder.GetILGenerator();
-                        generator.Emit(OpCodes.Ldarg_0);
-                        generator.Emit(OpCodes.Ldflda, fieldBuilder);
-                        generator.Emit(OpCodes.Call, backingGetMethod);
-                        generator.Emit(OpCodes.Ret);
-
+                        propertyGenerator.GenerateGetterCode(generator, fieldBuilder, backingGetMethod);
                         propertyBuilder.SetGetMethod(getMethodBuilder);
                     }
                     {
                         var setMethodBuilder = Create(typeBuilder, setMethod, isAbstract: false);
                         var generator = setMethodBuilder.GetILGenerator();
-                        generator.Emit(OpCodes.Ldarg_0);
-                        generator.Emit(OpCodes.Ldflda, fieldBuilder);
-                        generator.Emit(OpCodes.Ldarg_1);
-                        generator.Emit(OpCodes.Call, backingSetMethod);
-                        generator.Emit(OpCodes.Ret);
-
+                        propertyGenerator.GenerateSetterCode(generator, fieldBuilder, backingSetMethod);
                         propertyBuilder.SetSetMethod(setMethodBuilder);
                     }
                 }

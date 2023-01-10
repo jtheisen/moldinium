@@ -1,3 +1,4 @@
+using CMinus.Construction;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 
@@ -6,7 +7,7 @@ namespace CMinus.Tests
     [TestClass]
     public class BakeryTests
     {
-        static Bakery classFactory = new Bakery("Funky", false);
+        static Bakery classFactory = new Bakery("Funky", new BakeryConfiguration(new PropertyGenerator()));
 
         public interface ITest
         {

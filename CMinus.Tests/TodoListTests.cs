@@ -1,4 +1,5 @@
-﻿using CMinus.Injection;
+﻿using CMinus.Construction;
+using CMinus.Injection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
@@ -48,7 +49,7 @@ namespace CMinus.Tests
         {
             provider = new CombinedDependencyProvider(
                 new AcceptingDefaultConstructiblesDependencyProvider(), // We really should only allow "baked" types to be blindly constructed
-                new BakeryDependencyProvider(new Bakery("TestBakery", makeAbstract: false)),
+                new BakeryDependencyProvider(new Bakery("TestBakery", new BakeryConfiguration(new PropertyGenerator()))),
                 new FactoryDependencyProvider(),
                 new ActivatorDependencyProvider(),
                 new InitSetterDependencyProvider()

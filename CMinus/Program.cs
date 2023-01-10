@@ -1,4 +1,5 @@
 ﻿using Castle.DynamicProxy;
+using CMinus.Construction;
 using SimpleInjector;
 using System;
 using System.Collections.Generic;
@@ -10,7 +11,7 @@ namespace CMinus
 
     class Program
     {
-        static Bakery classFactory = new Bakery("Funky", false);
+        static Bakery classFactory = new Bakery("Funky", new BakeryConfiguration(new PropertyGenerator()));
 
         static void Main(string[] args)
         {

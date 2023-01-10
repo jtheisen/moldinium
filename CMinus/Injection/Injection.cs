@@ -525,6 +525,8 @@ public class RuntimeScope
 
         var resolution = scope.GetResolution(scope.Root);
 
+        if (resolution.Get is null) throw new Exception($"Runtime scope can't be created for root without a {nameof(DependencyResolution.Get)} method");
+
         root = resolution.Get(this);
     }
 
@@ -533,6 +535,8 @@ public class RuntimeScope
         if (!instances.TryGetValue(dependency, out var instance))
         {
             var resolution = scope.GetResolution(dependency);
+
+            if (resolution.Get is null) throw new Exception($"Can't create {scope.Root.Type} as dependency resolution {resolution} doesn't have a {nameof(DependencyResolution.Get)} method");
 
             instances[dependency] = instance = resolution.Get(this);
         }
