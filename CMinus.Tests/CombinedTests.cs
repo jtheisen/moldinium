@@ -1,33 +1,64 @@
 ﻿using CMinus.Injection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
 
 namespace CMinus.Tests;
 
 [TestClass]
 public class CombinedTests
 {
-    IDependencyProvider provider;
+    DefaultDependencyProviderConfiguration configuration;
 
     public CombinedTests()
     {
         var services = new ServiceCollection();
         services.AddSingleton(new RootService());
 
-        // Not used right now as we're blindly accepting all default constructible types anyway
-        var knownTypesProvider = new ConcreteDependencyProvider(typeof(ClassType));
+        configuration = new DefaultDependencyProviderConfiguration(Services: services.BuildServiceProvider());
+    }
 
-        provider = new CombinedDependencyProvider(
-            new ServiceProviderDependencyProvider(services.BuildServiceProvider()),
-            new AcceptingDefaultConstructiblesDependencyProvider(), // We really should only allow "baked" types to be blindly constructed
-            new BakeryDependencyProvider(new Bakery("TestBakery")),
-            new FactoryDependencyProvider(),
-            new ActivatorDependencyProvider(),
-            new InitSetterDependencyProvider()
-        );
+    public interface TodoListEntry
+    {
+        String Text { get; set; }
     }
 
     [TestMethod]
     public void InterfaceTypeWithParameterizedFactoryInstanceTest()
-        => provider.CreateInstance<InterfaceTypeWithParameterizedFactory>().Validate();
+        => DependencyProvider.Create(configuration)
+        .CreateInstance<InterfaceTypeWithParameterizedFactory>().Validate();
+
+    [TestMethod]
+    public void ReactionTest()
+    {
+        var instance = DependencyProvider.Create(configuration)
+            .CreateInstance<TodoListEntry>();
+
+        instance.Text = "do the dishes";
+
+        Assert.AreEqual("do the dishes", instance.Text);
+
+        var changeCount = 0;
+
+        {
+            using var reaction = Watchable.React(() =>
+            {
+                ++changeCount;
+            });
+
+            Assert.AreEqual("do the dishes", instance.Text);
+
+            instance.Text = "take out the trash";
+
+            Assert.AreEqual("take out the trash", instance.Text);
+
+            Assert.AreEqual(1, changeCount);
+        }
+
+        instance.Text = "get the kids to bed";
+
+        Assert.AreEqual("get the kids to bed", instance.Text);
+
+        Assert.AreEqual(1, changeCount);
+    }
 }
