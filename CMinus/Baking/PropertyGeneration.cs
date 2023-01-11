@@ -120,7 +120,8 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
     protected virtual FieldBuilder? EnsureMixin(BakingState state) => null;
 
-    protected abstract (FieldBuilder fieldBuilder, MethodInfo backingGetMethod, MethodInfo backingSetMethod) GetBackings(TypeBuilder typeBuilder, PropertyInfo property);
+    protected abstract (FieldBuilder fieldBuilder, MethodInfo backingGetMethod, MethodInfo backingSetMethod)
+        GetBackings(TypeBuilder typeBuilder, PropertyInfo property);
 
     protected MethodInfo GetMethod(FieldBuilder fieldBuilder, String name)
         => fieldBuilder.FieldType.GetMethod(name)
@@ -195,7 +196,13 @@ public class DelegatingPropertyGenerator : AbstractPropertyGenerator
 
     protected override (FieldBuilder fieldBuilder, MethodInfo backingGetMethod, MethodInfo backingSetMethod)
         GetBackings(TypeBuilder typeBuilder, PropertyInfo property)
-        => (fieldBuilder, GetPropertyMethod(property, false), GetPropertyMethod(property, true));
+    {
+        var propertyOnImplementation = fieldBuilder.FieldType.GetProperty(property.Name);
+
+        if (propertyOnImplementation is null) throw new Exception($"Implementing type {fieldBuilder.FieldType} unexpectedly has no property named {property.Name}");
+
+        return (fieldBuilder, GetPropertyMethod(propertyOnImplementation, false), GetPropertyMethod(propertyOnImplementation, true));
+    }
 }
 
 public class ComplexPropertyGenerator : AbstractImplementationTypePropertyGenerator
