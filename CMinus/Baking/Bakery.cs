@@ -1,147 +1,150 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Reflection.PortableExecutable;
 
-namespace CMinus;
-
-public delegate FieldBuilder MixinEnsurer(BakingState state, Type type);
-
-public record BakingState(TypeBuilder TypeBuilder, MixinEnsurer EnsureMixin)
+namespace CMinus
 {
-    public readonly Dictionary<Type, FieldBuilder> Mixins = new Dictionary<Type, FieldBuilder>();
-}
+    public interface IPropertyImplementation { }
 
-public class Bakery
-{
-    readonly string name;
-    readonly BakeryConfiguration configuration;
-    readonly IBakeryComponentGenerators generators;
-    readonly TypeAttributes typeAttributes;
-    readonly ModuleBuilder moduleBuilder;
-
-    BakingState? state;
-
-    public String Name => name;
-
-    public Bakery(String name, BakeryConfiguration? configuration = null)
+    public interface IPropertyImplementation<T> : IPropertyImplementation
     {
-        this.name = name;
-        this.configuration = configuration ?? BakeryConfiguration.PocGenerationConfiguration;
-        this.generators = this.configuration.Generators;
-
-        var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName(name), AssemblyBuilderAccess.Run);
-        moduleBuilder = assemblyBuilder.DefineDynamicModule(name);
-        typeAttributes = TypeAttributes.Public;
-
-        if (this.configuration.MakeAbstract) typeAttributes |= TypeAttributes.Abstract;
+        T Value { get; set; }
     }
 
-    public T Create<T>()
+    public struct GenericPropertyImplementation<T> : IPropertyImplementation<T>
     {
-        var type = Resolve(typeof(T));
+        public T Value { get; set; }
+    }
 
-        if (Activator.CreateInstance(type) is T t)
+    public class Bakery
+    {
+        TypeAttributes typeAttributes;
+        ModuleBuilder moduleBuilder;
+
+        public Bakery(String name, Boolean makeAbstract = true)
         {
-            return t;
+            var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName(name), AssemblyBuilderAccess.Run);
+            moduleBuilder = assemblyBuilder.DefineDynamicModule(name);
+            typeAttributes = TypeAttributes.Public;
+            if (makeAbstract) typeAttributes |= TypeAttributes.Abstract;
         }
-        else
+
+        public T Create<T>()
         {
-            throw new Exception("Unexpectedly got null or the wrong type from activator");
+            var type = Resolve(typeof(T));
+
+            if (Activator.CreateInstance(type) is T t)
+            {
+                return t;
+            }
+            else
+            {
+                throw new Exception("Unexpectedly got null or the wrong type from activator");
+            }
         }
-    }
 
-    public Type Resolve(Type interfaceType)
-    {
-        var name = "C" + interfaceType.Name;
-        return moduleBuilder.GetType(name) ?? Create(name, interfaceType);
-    }
-
-    Type Create(String name, Type interfaceType)
-    {
-        if (state is not null) throw new Exception("Already building a type");
-
-        var typeBuilder = moduleBuilder.DefineType(name, typeAttributes);
-
-        state = new BakingState(typeBuilder, EnsureMixin);
-
-        try
+        public Type Resolve(Type interfaceType)
         {
-            ImplementInterface(state, interfaceType, generators);
+            var name = "C" + interfaceType.Name;
+            return moduleBuilder.GetType(name) ?? Create(name, interfaceType);
+        }
+
+        Type Create(String name, Type interfaceType)
+        {
+            var typeBuilder = moduleBuilder.DefineType(name, typeAttributes);
+            typeBuilder.AddInterfaceImplementation(interfaceType);
+
+            foreach (var property in interfaceType.GetProperties())
+            {
+                var propertyBuilder = typeBuilder.DefineProperty(property.Name, property.Attributes, property.PropertyType, null);
+
+                var setMethod = property.GetSetMethod();
+                var getMethod = property.GetGetMethod();
+
+                if (setMethod != null)
+                {
+                    if (getMethod == null) throw new Exception("A writable property must also be readable");
+
+                    var backingPropertyImplementationType = GetPropertyImplementationType(property.PropertyType);
+                    var fieldBuilder = typeBuilder.DefineField($"backing_{property.Name}", backingPropertyImplementationType, FieldAttributes.Private);
+                    var backingProperty = backingPropertyImplementationType.GetProperty("Value");
+                    var backingGetMethod = backingProperty?.GetGetMethod();
+                    var backingSetMethod = backingProperty?.GetSetMethod();
+
+                    if (backingGetMethod == null) throw new Exception("Type must have a readable 'Value' property");
+                    if (backingSetMethod == null) throw new Exception("Type must have a writable 'Value' property");
+
+                    {
+                        var getMethodBuilder = Create(typeBuilder, getMethod, isAbstract: false);
+                        var generator = getMethodBuilder.GetILGenerator();
+                        generator.Emit(OpCodes.Ldarg_0);
+                        generator.Emit(OpCodes.Ldflda, fieldBuilder);
+                        generator.Emit(OpCodes.Call, backingGetMethod);
+                        generator.Emit(OpCodes.Ret);
+
+                        propertyBuilder.SetGetMethod(getMethodBuilder);
+                    }
+                    {
+                        var setMethodBuilder = Create(typeBuilder, setMethod, isAbstract: false);
+                        var generator = setMethodBuilder.GetILGenerator();
+                        generator.Emit(OpCodes.Ldarg_0);
+                        generator.Emit(OpCodes.Ldflda, fieldBuilder);
+                        generator.Emit(OpCodes.Ldarg_1);
+                        generator.Emit(OpCodes.Call, backingSetMethod);
+                        generator.Emit(OpCodes.Ret);
+
+                        propertyBuilder.SetSetMethod(setMethodBuilder);
+                    }
+                }
+                else if (getMethod != null)
+                {
+                    propertyBuilder.SetGetMethod(Create(typeBuilder, getMethod));
+                }
+                else
+                {
+                    throw new Exception("A property that is neither readable nor writable was encountered");
+                }
+            }
+
+            foreach (var method in interfaceType.GetMethods())
+            {
+                if (!method.IsAbstract || method.IsSpecialName) continue;
+
+                typeBuilder.DefineMethod(method.Name, method.Attributes | MethodAttributes.Public, method.ReturnType, method.GetParameters().Select(p => p.ParameterType).ToArray());
+            }
 
             return typeBuilder.CreateType() ?? throw new Exception("no type?");
         }
-        finally
+
+        MethodBuilder Create(TypeBuilder typeBuilder, MethodInfo methodTemplate, Boolean isAbstract = true)
         {
-            state = null;
+            var attributes = methodTemplate.Attributes | MethodAttributes.Public;
+
+            if (!isAbstract) attributes &= ~MethodAttributes.Abstract;
+
+            var parameters = methodTemplate.GetParameters();
+
+            var methodBuilder = typeBuilder.DefineMethod(
+                methodTemplate.Name,
+                attributes,
+                methodTemplate.CallingConvention,
+                methodTemplate.ReturnType,
+                methodTemplate.ReturnParameter.GetRequiredCustomModifiers(),
+                methodTemplate.ReturnParameter.GetOptionalCustomModifiers(),
+                parameters.Select(p => p.ParameterType).ToArray(),
+                parameters.Select(p => p.GetRequiredCustomModifiers()).ToArray(),
+                parameters.Select(p => p.GetOptionalCustomModifiers()).ToArray()
+            );
+
+            return methodBuilder;
+        }
+
+        Type GetPropertyImplementationType(Type propertyType)
+        {
+            return typeof(GenericPropertyImplementation<>).MakeGenericType(propertyType);
         }
     }
 
-    void ImplementInterface(BakingState state, Type type, IBakeryComponentGenerators generators)
-    {
-        var typeBuilder = state.TypeBuilder;
-
-        typeBuilder.AddInterfaceImplementation(type);
-
-        foreach (var property in type.GetProperties())
-        {
-            generators.GetPropertyGenerator(property).GenerateProperty(state, property);
-        }
-
-        foreach (var evt in type.GetEvents())
-        {
-            generators.GetEventGenerator(evt).GenerateEvent(state, evt);
-        }
-
-        foreach (var method in type.GetMethods())
-        {
-            if (!method.IsAbstract || method.IsSpecialName) continue;
-
-            typeBuilder.DefineMethod(method.Name, method.Attributes | MethodAttributes.Public, method.ReturnType, method.GetParameters().Select(p => p.ParameterType).ToArray());
-        }
-    }
-
-    FieldBuilder EnsureMixin(BakingState state, Type type)
-    {
-        var fieldBuilder = state.Mixins.GetValueOrDefault(type);
-
-        if (fieldBuilder is null)
-        {
-            CreateMixin(state, type, out fieldBuilder);
-        }
-
-        return fieldBuilder;
-    }
-
-    void CreateMixin(BakingState state, Type type, out FieldBuilder fieldBuilder)
-    {
-        var typeBuilder = state.TypeBuilder;
-
-        fieldBuilder = typeBuilder.DefineField($"mixin_{(type.FullName ?? "x").Replace('.', '_')}_{Guid.NewGuid()}", type, FieldAttributes.Private);
-
-        state.Mixins[type] = fieldBuilder;
-
-        var propertyImplementationType = typeof(IPropertyImplementation);
-
-        var interfaces = (
-            from i in type.GetInterfaces()
-            where !propertyImplementationType.IsAssignableFrom(i)
-            select i
-        ).ToArray();
-
-        if (interfaces.Length == 0) return;
-
-        var nestedGenerators = new ComponentGenerators(
-            new DelegatingPropertyGenerator(fieldBuilder),
-            new DelegatingEventGenerator(fieldBuilder)
-        );
-
-        foreach (var ifc in interfaces)
-        {
-            ImplementInterface(state, ifc, nestedGenerators);
-        }
-    }
 
 }

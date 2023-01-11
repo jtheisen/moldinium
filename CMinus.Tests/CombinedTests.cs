@@ -15,7 +15,10 @@ public class CombinedTests
         var services = new ServiceCollection();
         services.AddSingleton(new RootService());
 
-        configuration = new DefaultDependencyProviderConfiguration(Services: services.BuildServiceProvider());
+        configuration = new DefaultDependencyProviderConfiguration(
+            EnableOldModliniumModels: true,
+            Services: services.BuildServiceProvider()
+        );
     }
 
     public interface TodoListEntry

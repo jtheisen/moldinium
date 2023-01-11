@@ -247,6 +247,20 @@ public static class Models
     }
 
     /// <summary>
+    /// Creates a new instance of the given model type.
+    /// </summary>
+    /// <typeparam name="TModel">The type of the model.</typeparam>
+    /// <returns>The newly created model.</returns>
+    public static Object Create(Type type)
+    {
+        CheckType(type);
+
+        var model = generator.CreateClassProxy(type, new[] { typeof(INotifyPropertyChanged) }, interceptor);
+
+        return model;
+    }
+
+    /// <summary>
     /// Creates a new instance of the given model type and a customizer function. Example usage: <code>Create&lt;MyModel>(m => m.Parent = this)</code>.
     /// </summary>
     /// <typeparam name="TModel">The type of the model.</typeparam>

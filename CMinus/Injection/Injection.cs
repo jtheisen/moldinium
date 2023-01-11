@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using System.Runtime.Intrinsics.Arm;
 
 namespace CMinus.Injection;
 
@@ -94,7 +95,6 @@ public interface IDependencyProvider
     DependencyResolution? Query(Dependency type);
 }
 
-
 public class BakeryDependencyProvider : IDependencyProvider
 {
     private readonly Bakery bakery;
@@ -118,6 +118,24 @@ public class BakeryDependencyProvider : IDependencyProvider
             new Dependency(bakedType, DependencyRuntimeMaturity.Finished),
             DependencyBag.Empty,
             Get: scope => scope.Get(bakedInstanceDependency)
+        );
+    }
+}
+
+public class OldMoldiniumModelDependencyProvider : IDependencyProvider
+{
+    public DependencyResolution? Query(Dependency dep)
+    {
+        if (dep.Maturity != DependencyRuntimeMaturity.UntouchedInstance) return null;
+
+        var type = dep.Type;
+
+        if (!type.IsClass || !type.IsAbstract) return null;
+
+        return new DependencyResolution(
+            this,
+            dep,
+            Get: scope => Models.Create(type)
         );
     }
 }

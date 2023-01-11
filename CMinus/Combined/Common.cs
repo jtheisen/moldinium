@@ -24,6 +24,7 @@ public enum DefaultDependencyProviderBakingMode
 
 public record DefaultDependencyProviderConfiguration(
     DefaultDependencyProviderBakingMode? Baking = DefaultDependencyProviderBakingMode.Basic,
+    Boolean EnableOldModliniumModels = false,
     Boolean InitializeInits = true,
     Boolean EnableFactories = true,
     IServiceProvider? Services = null
@@ -35,17 +36,25 @@ public static class DependencyProvider
     {
         var providers = new List<IDependencyProvider>();
 
+        if (config.Baking is not null && config.Baking != DefaultDependencyProviderBakingMode.Basic)
+        {
+            throw new NotImplementedException($"The simple bakery is not configurable");
+        }
+
         if (config.Services is IServiceProvider services)
         {
             providers.Add(new ServiceProviderDependencyProvider(services));
+        }
+
+        if (config.EnableOldModliniumModels)
+        {
+            providers.Add(new OldMoldiniumModelDependencyProvider());
         }
 
         providers.Add(new AcceptingDefaultConstructiblesDependencyProvider());
 
         if (config.Baking is DefaultDependencyProviderBakingMode bakingMode)
         {
-
-
             providers.Add(new BakeryDependencyProvider(new Bakery("TestBakery")));
         }
 
@@ -64,10 +73,10 @@ public static class DependencyProvider
         return new CombinedDependencyProvider(providers.ToArray());
     }
 
-    static BakeryConfiguration CreateBakeryConfiguration(DefaultDependencyProviderBakingMode mode) => mode switch
-    {
-        DefaultDependencyProviderBakingMode.Basic => BakeryConfiguration.Create(typeof(GenericPropertyImplementation<>)),
-        DefaultDependencyProviderBakingMode.Tracking => BakeryConfiguration.Create(typeof(TrackedPropertyImplementation<>)),
-        _ => throw new NotImplementedException()
-    };
+    //static BakeryConfiguration CreateBakeryConfiguration(DefaultDependencyProviderBakingMode mode) => mode switch
+    //{
+    //    DefaultDependencyProviderBakingMode.Basic => BakeryConfiguration.Create(typeof(GenericPropertyImplementation<>)),
+    //    DefaultDependencyProviderBakingMode.Tracking => BakeryConfiguration.Create(typeof(TrackedPropertyImplementation<>)),
+    //    _ => throw new NotImplementedException()
+    //};
 }
