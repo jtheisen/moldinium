@@ -1,7 +1,7 @@
 ﻿using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-namespace CMinus;
+namespace CMinus.Tests;
 
 [TestClass]
 public class WatchablesTests

@@ -2,7 +2,7 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Collections.Specialized;
 
-namespace CMinus;
+namespace CMinus.Tests;
 
 class CollectionChangeTestListener<T>
 {

@@ -29,7 +29,7 @@ public interface IPropertyImplementation<T> : IPropertyImplementation
 
 [PropertyImplementationInterface(typeof(ComplexPropertyGenerator))]
 public interface IPropertyImplementation<Value, Container, MixIn> : IPropertyImplementation
-        where MixIn : struct
+    where MixIn : struct
 {
     Value Get(
         Container self,
@@ -205,15 +205,18 @@ public class DelegatingPropertyGenerator : AbstractPropertyGenerator
     }
 }
 
-public class ComplexPropertyGenerator : AbstractImplementationTypePropertyGenerator
+public abstract class AbstractWithMixinPropertyGenerator : AbstractImplementationTypePropertyGenerator
 {
-    Type semiConcreteInterface;
-    Type mixinType;
+    protected readonly Type semiConcreteInterface;
+    protected readonly Type mixinType;
 
-    public ComplexPropertyGenerator(Type propertyImplementationType) : base(propertyImplementationType)
+    public AbstractWithMixinPropertyGenerator(
+        Type propertyImplementationType,
+        Type complexInterfaceBaseType,
+        Int32 expectedGenericParameters,
+        Int32 mixinParameterPosition
+    ) : base(propertyImplementationType)
     {
-        var complexInterfaceBaseType = typeof(IPropertyImplementation<,,>);
-
         semiConcreteInterface = propertyImplementationType.GetInterfaces()
             .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == complexInterfaceBaseType)
             ?? throw new Exception($"Property implementation type {propertyImplementationType} does not implement {complexInterfaceBaseType}");
@@ -222,29 +225,35 @@ public class ComplexPropertyGenerator : AbstractImplementationTypePropertyGenera
 
         if (implementationTypeArguments.Length != 2) throw new Exception($"Expected complex property type implementation to have two type parameters and found {implementationTypeArguments.Length}");
 
-        var valueType = implementationTypeArguments[0];
-        var containerType = implementationTypeArguments[1];
-
-        if (!valueType.IsGenericTypeParameter)
+        for (var i = 0; i < implementationTypeArguments.Length; ++i)
         {
-            throw new Exception($"Expected type paramter Value not to be concrete in property implementation type ${propertyImplementationType}");
-        }
-
-        if (!containerType.IsGenericTypeParameter)
-        {
-            throw new Exception($"Expected type paramter Container not to be concrete in property implementation type ${propertyImplementationType}");
+            if (i != mixinParameterPosition && implementationTypeArguments[i] is Type genericArgument && !genericArgument.IsGenericTypeParameter)
+            {
+                throw new Exception($"Expected type paramter #{i} not to be concrete in property implementation type ${propertyImplementationType}");
+            }
         }
 
         var semiConcreteInterfaceArguments = semiConcreteInterface.GetGenericArguments();
 
-        if (semiConcreteInterfaceArguments.Length != 3) throw new Exception($"Unexpected length of type arguments");
+        if (semiConcreteInterfaceArguments.Length != expectedGenericParameters)
+        {
+            throw new Exception($"Unexpected number of {semiConcreteInterfaceArguments.Length} instead of {expectedGenericParameters} type arguments");
+        }
 
-        mixinType = semiConcreteInterfaceArguments[2];
+        mixinType = semiConcreteInterfaceArguments[mixinParameterPosition];
 
         if (mixinType.IsGenericTypeParameter)
         {
             throw new Exception($"Expected type paramter Mixin to be concrete in property implementation type ${propertyImplementationType}");
         }
+    }
+}
+
+public class ComplexPropertyGenerator : AbstractWithMixinPropertyGenerator
+{
+    public ComplexPropertyGenerator(Type propertyImplementationType)
+        : base(propertyImplementationType, typeof(IPropertyImplementation<,,>), 3, 2)
+    {
     }
 
     protected override FieldBuilder? EnsureMixin(BakingState state) => state.EnsureMixin(state, mixinType);
