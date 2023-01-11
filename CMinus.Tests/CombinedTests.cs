@@ -12,12 +12,8 @@ public class CombinedTests
 
     public CombinedTests()
     {
-        var services = new ServiceCollection();
-        services.AddSingleton(new RootService());
-
         configuration = new DefaultDependencyProviderConfiguration(
-            EnableOldModliniumModels: true,
-            Services: services.BuildServiceProvider()
+            EnableOldModliniumModels: true
         );
     }
 
@@ -25,6 +21,11 @@ public class CombinedTests
     {
         String Text { get; set; }
     }
+
+    //public abstract class ATodoListEntry : TodoListEntry, IModel
+    //{
+    //    public abstract String Text { get; set; }
+    //}
 
     [TestMethod]
     public void InterfaceTypeWithParameterizedFactoryInstanceTest()
@@ -34,6 +35,17 @@ public class CombinedTests
     [TestMethod]
     public void ReactionTest()
     {
+        new ConcreteDependencyProvider(new Dependency(typeof(TodoListEntry), DependencyRuntimeMaturity.OnlyType));
+
+        var configuration = new DefaultDependencyProviderConfiguration(
+            Baking: DefaultDependencyProviderBakingMode.Basic,
+            EnableOldModliniumModels: true
+            //Build: b =>
+            //{
+            //    b.AddImplementation(typeof(TodoListEntry), typeof(ATodoListEntry));
+            //}
+        );
+
         var instance = DependencyProvider.Create(configuration)
             .CreateInstance<TodoListEntry>();
 
@@ -46,22 +58,26 @@ public class CombinedTests
         {
             using var reaction = Watchable.React(() =>
             {
+                var _ = instance.Text;
+
                 ++changeCount;
             });
 
             Assert.AreEqual("do the dishes", instance.Text);
 
+            Assert.AreEqual(1, changeCount);
+
             instance.Text = "take out the trash";
 
             Assert.AreEqual("take out the trash", instance.Text);
 
-            Assert.AreEqual(1, changeCount);
+            Assert.AreEqual(2, changeCount);
         }
 
         instance.Text = "get the kids to bed";
 
         Assert.AreEqual("get the kids to bed", instance.Text);
 
-        Assert.AreEqual(1, changeCount);
+        Assert.AreEqual(2, changeCount);
     }
 }

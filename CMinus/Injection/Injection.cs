@@ -1,4 +1,5 @@
-﻿using CMinus.Misc;
+﻿using Castle.DynamicProxy.Generators.Emitters.SimpleAST;
+using CMinus.Misc;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -40,7 +41,7 @@ namespace CMinus.Injection;
  * 
  */
 
-public record Dependency(Type Type, DependencyRuntimeMaturity Maturity);
+public record Dependency(Type Type, DependencyRuntimeMaturity Maturity = DependencyRuntimeMaturity.OnlyType);
 
 public enum DependencyRuntimeMaturity
 {
@@ -321,35 +322,89 @@ public class FactoryDependencyProvider : IDependencyProvider
     }
 }
 
+public class ConcreteImplementationDependencyProvider : IDependencyProvider
+{
+    Dictionary<Type, Type> implementations = new Dictionary<Type, Type>();
 
+    Boolean isClosed;
+
+    public Boolean IsEmpty => implementations.Count == 0;
+
+    public ConcreteImplementationDependencyProvider Add(Type interfaceType, Type implementationType)
+    {
+        if (isClosed) throw new Exception($"{nameof(ConcreteImplementationDependencyProvider)} has already been used and can't be modified");
+
+        implementations.Add(interfaceType, implementationType);
+
+        return this;
+    }
+
+    public DependencyResolution? Query(Dependency dep)
+    {
+        if (implementations.TryGetValue(dep.Type, out var implementationType))
+        {
+            var implementation = new Dependency(implementationType, dep.Maturity);
+
+            return new DependencyResolution(this, dep, implementation, Get: scope => scope.Get(implementation));
+        }
+        else
+        {
+            return null;
+        }
+    }
+}
 
 public class ConcreteDependencyProvider : IDependencyProvider
 {
-    Dictionary<Dependency, Object?> dependencies;
+    Dictionary<Dependency, DependencyResolution> dependencies = new Dictionary<Dependency, DependencyResolution>();
 
-    public ConcreteDependencyProvider(params (Type type, Object? instance)[] dependencies)
-        => this.dependencies = dependencies.ToDictionary(p => new Dependency(p.type, DependencyRuntimeMaturity.Finished), p => p.instance);
+    Boolean isClosed;
 
-    public ConcreteDependencyProvider(params (Dependency dependency, Object? instance)[] dependencies)
-        => this.dependencies = dependencies.ToDictionary(p => p.dependency, p => p.instance);
+    public ConcreteDependencyProvider() { }
+
+    public ConcreteDependencyProvider(params (Type type, Object instance)[] dependencies)
+        => dependencies.ToList().ForEach(p => AddInstance(p.type, p.instance));
+
+    public ConcreteDependencyProvider(params (Dependency dependency, Object instance)[] dependencies)
+        => dependencies.ToList().ForEach(p => AddInstance(p.dependency, p.instance));
 
     public ConcreteDependencyProvider(params Dependency[] dependencies)
-        => this.dependencies = dependencies.ToDictionary(p => p, p => null as Object);
+        => dependencies.ToList().ForEach(d => Accept(d));
 
     public ConcreteDependencyProvider(params Type[] dependencies)
-        => this.dependencies = dependencies.ToDictionary(t => new Dependency(t, DependencyRuntimeMaturity.OnlyType), t => null as Object);
+        => dependencies.ToList().ForEach(t => Accept(t));
 
-    public DependencyResolution? Query(Dependency type)
+    public Boolean IsEmpty => dependencies.Count == 0;
+
+    public ConcreteDependencyProvider AddInstance(Dependency dep, Object instance) => Add(dep, new DependencyResolution(this, dep, Get: scope => instance));
+    public ConcreteDependencyProvider AddInstance(Type type, Object instance) => AddInstance(new Dependency(type, DependencyRuntimeMaturity.Finished), instance);
+    public ConcreteDependencyProvider Accept(Dependency dep) => Add(dep, new DependencyResolution(this, dep));
+    public ConcreteDependencyProvider Accept(Type type) => Accept(new Dependency(type, DependencyRuntimeMaturity.OnlyType));
+
+    public ConcreteDependencyProvider Add(Dependency dep, DependencyResolution resolution)
     {
-        if (dependencies.TryGetValue(type, out var instance))
+        if (isClosed) throw new Exception($"{nameof(ConcreteDependencyProvider)} has already been used and can't be modified");
+
+        dependencies.Add(dep, resolution);
+
+        return this;
+    }
+
+    public DependencyResolution? Query(Dependency dep)
+    {
+        isClosed = true;
+
+        if (dependencies.TryGetValue(dep, out var resolution))
         {
-            return new DependencyResolution(
-                this,
-                type,
-                null,
-                DependencyBag.Empty,
-                Get: _ => instance ?? throw new InvalidOperationException("There is no instance")
-            );
+            return resolution;
+
+            //return new DependencyResolution(
+            //    this,
+            //    type,
+            //    null,
+            //    DependencyBag.Empty,
+            //    Get: _ => instance ?? throw new InvalidOperationException("There is no instance")
+            //);
         }
         else
         {
