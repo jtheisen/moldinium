@@ -7,7 +7,7 @@ namespace CMinus.Tests;
 [TestClass]
 public class BakeryTests
 {
-    static Bakery BasicFactory = new Bakery("Basic", makeAbstract: false);
+    static Bakery BasicFactory = new Bakery("Basic");
 
     public interface IPropertyTest
     {
@@ -61,26 +61,26 @@ public class BakeryTests
         Assert.AreEqual("bar", test.Value);
     }
 
-    //[TestMethod]
-    //public void EventTypeCreationTest() => BasicFactory.Create<IEventTest>();
+    [TestMethod]
+    public void EventTypeCreationTest() => BasicFactory.Create<IEventTest>();
 
-    //[TestMethod]
-    //public void WithInitTest() => BasicFactory.Create<IPropertyTestWithInit>();
+    [TestMethod]
+    public void WithInitTest() => BasicFactory.Create<IPropertyTestWithInit>();
 
-    //public struct TrivialComplexPropertyImplementation<Value, Container> : IPropertyImplementation<Value, Container, EmptyMixIn>
-    //{
-    //    Value value;
+    public struct TrivialComplexPropertyImplementation<Value, Container> : IPropertyImplementation<Value, Container, EmptyMixIn>
+    {
+        Value value;
 
-    //    public Value Get(Container self, ref EmptyMixIn mixIn) => value;
+        public Value Get(Container self, ref EmptyMixIn mixIn) => value;
 
-    //    public void Set(Container self, ref EmptyMixIn mixIn, Value value) => this.value = value;
-    //}
+        public void Set(Container self, ref EmptyMixIn mixIn, Value value) => this.value = value;
+    }
 
-    //[TestMethod]
-    //public void TrivialComplexTest() => BakeryConfiguration.Create(typeof(TrivialComplexPropertyImplementation<,>))
-    //    .CreateBakery(nameof(TrivialComplexTest))
-    //    .Create<IPropertyTest>()
-    //    .Validate();
+    [TestMethod]
+    public void TrivialComplexTest() => BakeryConfiguration.Create(typeof(TrivialComplexPropertyImplementation<,>))
+        .CreateBakery(nameof(TrivialComplexTest))
+        .Create<IPropertyTest>()
+        .Validate();
 
 
 
@@ -114,57 +114,57 @@ public class BakeryTests
         public void NotifyPropertyChanged(Object o) => backingPropertyChanged?.Invoke(o, new PropertyChangedEventArgs(""));
     }
 
-    //public struct NotifyPropertyChangedPropertyImplementation<Value, Container> : IPropertyImplementation<Value, Container, NotifyPropertChangedMixin>
-    //    where Container : class
-    //{
-    //    Value value;
+    public struct NotifyPropertyChangedPropertyImplementation<Value, Container> : IPropertyImplementation<Value, Container, NotifyPropertChangedMixin>
+        where Container : class
+    {
+        Value value;
 
-    //    public Value Get(Container self, ref NotifyPropertChangedMixin mixIn) => value;
+        public Value Get(Container self, ref NotifyPropertChangedMixin mixIn) => value;
 
-    //    public void Set(Container self, ref NotifyPropertChangedMixin mixIn, Value value)
-    //    {
-    //        this.value = value;
+        public void Set(Container self, ref NotifyPropertChangedMixin mixIn, Value value)
+        {
+            this.value = value;
 
-    //        mixIn.NotifyPropertyChanged(self);
-    //    }
-    //}
+            mixIn.NotifyPropertyChanged(self);
+        }
+    }
 
-    //[TestMethod]
-    //public void NotifyPropertyChangedTest()
-    //{
-    //    var instance = BakeryConfiguration.Create(typeof(NotifyPropertyChangedPropertyImplementation<,>))
-    //        .CreateBakery(nameof(NotifyPropertyChangedTest))
-    //        .Create<IPropertyTest>();
+    [TestMethod]
+    public void NotifyPropertyChangedTest()
+    {
+        var instance = BakeryConfiguration.Create(typeof(NotifyPropertyChangedPropertyImplementation<,>))
+            .CreateBakery(nameof(NotifyPropertyChangedTest))
+            .Create<IPropertyTest>();
 
-    //    var instanceAsNotifyPropertyChanged = instance as INotifyPropertChangedMixin;
+        var instanceAsNotifyPropertyChanged = instance as INotifyPropertChangedMixin;
 
-    //    var changeCount = 0;
+        var changeCount = 0;
 
-    //    Assert.IsNotNull(instanceAsNotifyPropertyChanged);
+        Assert.IsNotNull(instanceAsNotifyPropertyChanged);
 
-    //    Assert.AreEqual(0, instanceAsNotifyPropertyChanged!.ListenerCount);
+        Assert.AreEqual(0, instanceAsNotifyPropertyChanged!.ListenerCount);
 
-    //    PropertyChangedEventHandler handler = (o, e) =>
-    //    {
-    //        Assert.AreSame(instance, o);
+        PropertyChangedEventHandler handler = (o, e) =>
+        {
+            Assert.AreSame(instance, o);
 
-    //        ++changeCount;
-    //    };
+            ++changeCount;
+        };
 
-    //    instanceAsNotifyPropertyChanged!.PropertyChanged += handler;
+        instanceAsNotifyPropertyChanged!.PropertyChanged += handler;
 
-    //    Assert.AreEqual(1, instanceAsNotifyPropertyChanged!.ListenerCount);
+        Assert.AreEqual(1, instanceAsNotifyPropertyChanged!.ListenerCount);
 
-    //    Assert.AreEqual(0, changeCount);
+        Assert.AreEqual(0, changeCount);
 
-    //    instance.Value = "Foo";
+        instance.Value = "Foo";
 
-    //    Assert.AreEqual("Foo", instance.Value);
+        Assert.AreEqual("Foo", instance.Value);
 
-    //    Assert.AreEqual(1, changeCount);
+        Assert.AreEqual(1, changeCount);
 
-    //    instanceAsNotifyPropertyChanged!.PropertyChanged -= handler;
+        instanceAsNotifyPropertyChanged!.PropertyChanged -= handler;
 
-    //    Assert.AreEqual(0, instanceAsNotifyPropertyChanged!.ListenerCount);
-    //}
+        Assert.AreEqual(0, instanceAsNotifyPropertyChanged!.ListenerCount);
+    }
 }

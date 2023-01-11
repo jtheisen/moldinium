@@ -39,6 +39,7 @@ public class CombinedTests
 
         var configuration = new DefaultDependencyProviderConfiguration(
             Baking: DefaultDependencyProviderBakingMode.Basic,
+            BakeAbstract: true,
             EnableOldModliniumModels: true
             //Build: b =>
             //{

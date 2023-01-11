@@ -63,6 +63,7 @@ public class DependencyProviderBuilder
 
 public record DefaultDependencyProviderConfiguration(
     DefaultDependencyProviderBakingMode? Baking = DefaultDependencyProviderBakingMode.Basic,
+    Boolean BakeAbstract = false,
     Boolean EnableOldModliniumModels = false,
     Boolean InitializeInits = true,
     Boolean EnableFactories = true,
@@ -83,11 +84,6 @@ public static class DependencyProvider
             providers.Add(builder.Build());
         }
 
-        if (config.Baking is not null && config.Baking != DefaultDependencyProviderBakingMode.Basic)
-        {
-            throw new NotImplementedException($"The simple bakery is not configurable");
-        }
-
         if (config.Services is IServiceProvider services)
         {
             providers.Add(new ServiceProviderDependencyProvider(services));
@@ -102,7 +98,11 @@ public static class DependencyProvider
 
         if (config.Baking is DefaultDependencyProviderBakingMode bakingMode)
         {
-            providers.Add(new BakeryDependencyProvider(new Bakery("TestBakery")));
+            var componentGenerators = CreateBakeryComponentGenerators(bakingMode);
+
+            var bakeryconfiguration = new BakeryConfiguration(componentGenerators, config.BakeAbstract);
+
+            providers.Add(new BakeryDependencyProvider(new Bakery("TestBakery", bakeryconfiguration)));
         }
 
         if (config.EnableFactories)
@@ -120,10 +120,9 @@ public static class DependencyProvider
         return new CombinedDependencyProvider(providers.ToArray());
     }
 
-    //static BakeryConfiguration CreateBakeryConfiguration(DefaultDependencyProviderBakingMode mode) => mode switch
-    //{
-    //    DefaultDependencyProviderBakingMode.Basic => BakeryConfiguration.Create(typeof(GenericPropertyImplementation<>)),
-    //    DefaultDependencyProviderBakingMode.Tracking => BakeryConfiguration.Create(typeof(TrackedPropertyImplementation<>)),
-    //    _ => throw new NotImplementedException()
-    //};
+    static ComponentGenerators CreateBakeryComponentGenerators(DefaultDependencyProviderBakingMode mode) => mode switch
+    {
+        DefaultDependencyProviderBakingMode.Basic => ComponentGenerators.Create(typeof(GenericPropertyImplementation<>), typeof(GenericEventImplementation<>)),
+        _ => throw new NotImplementedException()
+    };
 }
