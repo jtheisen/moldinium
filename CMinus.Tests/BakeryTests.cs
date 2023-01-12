@@ -69,19 +69,19 @@ public class BakeryTests
 
 
 
-    public struct TrivialComplexPropertyImplementation<Value, Container> : IPropertyImplementation<Value, Container, EmptyMixIn>
+    public struct TrivialComplexPropertyImplementation<Value> : IPropertyImplementation<Value, EmptyMixIn>
     {
         public void Init() { }
 
         Value value;
 
-        public Value Get(Container self, ref EmptyMixIn mixIn) => value;
+        public Value Get(Object self, ref EmptyMixIn mixIn) => value;
 
-        public void Set(Container self, ref EmptyMixIn mixIn, Value value) { this.value = value; }
+        public void Set(Object self, ref EmptyMixIn mixIn, Value value) { this.value = value; }
     }
 
     [TestMethod]
-    public void TrivialComplexTest() => BakeryConfiguration.Create(typeof(TrivialComplexPropertyImplementation<,>))
+    public void TrivialComplexTest() => BakeryConfiguration.Create(typeof(TrivialComplexPropertyImplementation<>))
         .CreateBakery(nameof(TrivialComplexTest))
         .Create<IPropertyTest>()
         .Validate();
@@ -118,8 +118,7 @@ public class BakeryTests
         public void NotifyPropertyChanged(Object o) => backingPropertyChanged?.Invoke(o, new PropertyChangedEventArgs(""));
     }
 
-    public struct NotifyPropertyChangedPropertyImplementation<Value, Container> : IPropertyImplementation<Value, Container, NotifyPropertChangedMixin>
-        where Container : class
+    public struct NotifyPropertyChangedPropertyImplementation<Value> : IPropertyImplementation<Value, NotifyPropertChangedMixin>
     {
         Boolean initialized;
 
@@ -129,9 +128,9 @@ public class BakeryTests
 
         Value value;
 
-        public Value Get(Container self, ref NotifyPropertChangedMixin mixIn) => value;
+        public Value Get(Object self, ref NotifyPropertChangedMixin mixIn) => value;
 
-        public void Set(Container self, ref NotifyPropertChangedMixin mixIn, Value value)
+        public void Set(Object self, ref NotifyPropertChangedMixin mixIn, Value value)
         {
             AssertInitialized();
 
@@ -144,7 +143,7 @@ public class BakeryTests
     [TestMethod]
     public void NotifyPropertyChangedTest()
     {
-        var instance = BakeryConfiguration.Create(typeof(NotifyPropertyChangedPropertyImplementation<,>))
+        var instance = BakeryConfiguration.Create(typeof(NotifyPropertyChangedPropertyImplementation<>))
             .CreateBakery(nameof(NotifyPropertyChangedTest))
             .Create<IPropertyTest>();
 

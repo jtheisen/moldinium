@@ -3,70 +3,55 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection.Emit;
 using System.Reflection;
-using System.Reflection.PortableExecutable;
-using System.Threading;
 
 namespace CMinus;
 
-[AttributeUsage(AttributeTargets.Interface)]
-public class PropertyImplementationInterfaceAttribute : Attribute
+public enum ImplementationTypeArgumentKind
 {
-    public Type PropertyGeneratorType { get; }
-
-    public PropertyImplementationInterfaceAttribute(Type propertyGeneratorType)
-    {
-        PropertyGeneratorType = propertyGeneratorType;
-    }
-}
-
-public enum DelegationParameterType
-{
+    Value,
     Container,
     Mixin
 }
 
-
-
-[AttributeUsage(AttributeTargets.Struct | AttributeTargets.Interface)]
-public class PropertyImplementationStructAttribute : Attribute
+[AttributeUsage(AttributeTargets.GenericParameter)]
+public class TypeKindAttribute : Attribute
 {
-    public PropertyImplementationStructAttribute(params DelegationParameterType[] parameterTypes)
+    public TypeKindAttribute(ImplementationTypeArgumentKind type)
     {
+        Kind = type;
     }
+
+    public ImplementationTypeArgumentKind Kind { get; }
 }
 
 public interface IPropertyImplementation { }
 
-[PropertyImplementationInterface(typeof(BasicPropertyGenerator))]
-public interface IPropertyImplementation<T> : IPropertyImplementation
+public interface IPropertyImplementation<
+    [TypeKind(ImplementationTypeArgumentKind.Value)] Value,
+    [TypeKind(ImplementationTypeArgumentKind.Mixin)] Mixin
+> : IPropertyImplementation
 {
-    T Value { get; set; }
-}
+    Value Get(Object self, ref Mixin mixin);
 
-[PropertyImplementationInterface(typeof(ComplexPropertyGenerator))]
-[PropertyImplementationStruct(DelegationParameterType.Container, DelegationParameterType.Mixin)]
-public interface IPropertyImplementation<Value, Container, MixIn> : IPropertyImplementation
-    where MixIn : struct
-{
-    void Init();
-
-    Value Get(
-        Container self,
-        ref MixIn mixIn
-        );
-
-    void Set(
-        Container self,
-        ref MixIn mixIn,
-        Value value
-        );
+    void Set(Object self, ref Mixin mixin, Value value);
 }
 
 public struct EmptyMixIn { }
 
-public struct GenericPropertyImplementation<T> : IPropertyImplementation<T>
+public interface ISimplePropertyImplementation<[TypeKind(ImplementationTypeArgumentKind.Value)] ValueT> : IPropertyImplementation
 {
-    public T Value { get; set; }
+    ValueT Get();
+
+    void Set(ValueT value);
+}
+
+public struct SimplePropertyImplementation<T> : ISimplePropertyImplementation<T>
+{
+    T value;
+
+    public T Get() => value;
+
+    public void Set(T value) => this.value = value;
 }
 
 public abstract class AbstractGenerator
@@ -108,49 +93,101 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
         var getMethod = property.GetGetMethod();
         var setMethod = property.GetSetMethod();
 
-        if (setMethod is not null)
+        var argumentKinds = GetArgumentKinds();
+
+        argumentKinds[property.PropertyType] = ImplementationTypeArgumentKind.Value;
+
+        var (fieldBuilder, backingGetMethod, backingSetMethod) = GetBackings(typeBuilder, property);
+
         {
-            if (getMethod is null) throw new Exception("A writable property must also be readable");
-
-            var (fieldBuilder, backingGetMethod, backingSetMethod) = GetBackings(typeBuilder, property);
-
             var backingInitMethod = fieldBuilder.FieldType.GetMethod("Init");
 
             if (backingInitMethod is not null)
             {
-                GenerateInitCode(state.ConstructorGenerator, fieldBuilder, backingInitMethod);
+                GenerateWrapperCode(state.ConstructorGenerator, fieldBuilder, backingInitMethod, argumentKinds, mixinFieldBuilder);
             }
+        }
 
-            {
-                var getMethodBuilder = Create(typeBuilder, getMethod, isAbstract: false);
-                var generator = getMethodBuilder.GetILGenerator();
-                GenerateGetterCode(generator, fieldBuilder, backingGetMethod, mixinFieldBuilder);
-                propertyBuilder.SetGetMethod(getMethodBuilder);
-            }
-            {
-                var setMethodBuilder = Create(typeBuilder, setMethod, isAbstract: false);
-                var generator = setMethodBuilder.GetILGenerator();
-                GenerateSetterCode(generator, fieldBuilder, backingSetMethod, mixinFieldBuilder);
-                propertyBuilder.SetSetMethod(setMethodBuilder);
-            }
-        }
-        else if (getMethod is not null)
+        if (getMethod is not null)
         {
-            propertyBuilder.SetGetMethod(Create(typeBuilder, getMethod));
+            var getMethodBuilder = Create(typeBuilder, getMethod, isAbstract: false);
+            var generator = getMethodBuilder.GetILGenerator();
+            GenerateWrapperCode(generator, fieldBuilder, backingGetMethod, argumentKinds, mixinFieldBuilder);
+            propertyBuilder.SetGetMethod(getMethodBuilder);
         }
-        else
+
+        if (setMethod is not null)
         {
-            throw new Exception("A property that is neither readable nor writable was encountered");
+            var setMethodBuilder = Create(typeBuilder, setMethod, isAbstract: false);
+            var generator = setMethodBuilder.GetILGenerator();
+            GenerateWrapperCode(generator, fieldBuilder, backingSetMethod, argumentKinds, mixinFieldBuilder);
+            propertyBuilder.SetSetMethod(setMethodBuilder);
         }
     }
 
-    void GenerateInitCode(ILGenerator generator, FieldBuilder fieldBuilder, MethodInfo backingInitMethod)
+    void GenerateWrapperCode(ILGenerator generator, FieldBuilder fieldBuilder, MethodInfo backingMethod, IDictionary<Type, ImplementationTypeArgumentKind> argumentKinds, FieldBuilder? mixInFieldBuilder)
     {
-        generator.Emit(OpCodes.Ldarg_0);
-        generator.Emit(OpCodes.Ldflda, fieldBuilder);
-        generator.Emit(OpCodes.Call, backingInitMethod);
+        if (!backingMethod.IsStatic)
+        {
+            generator.Emit(OpCodes.Ldarg_0);
+            generator.Emit(OpCodes.Ldflda, fieldBuilder);
+        }
+
+        var parameters = backingMethod.GetParameters();
+
+
+        foreach (var p in parameters)
+        {
+            if (p.ParameterType == typeof(Object))
+            {
+                generator.Emit(OpCodes.Ldarg_0);
+            }
+            else
+            {
+                var (parameterType, byRef) = GetParameterType(p);
+
+                if (!argumentKinds.TryGetValue(parameterType, out var kind))
+                {
+                    throw new Exception($"Dont know how to handle argument {p.Name} of type {p.ParameterType} of property implementation method {backingMethod.Name} on property implementation type {backingMethod.DeclaringType}");
+                }
+
+                switch (kind)
+                {
+                    case ImplementationTypeArgumentKind.Container:
+                        if (byRef) throw new Exception("Object references must be passed by value");
+                        generator.Emit(OpCodes.Ldarg_0);
+                        break;
+                    case ImplementationTypeArgumentKind.Value:
+                        if (byRef) throw new Exception("Values must be passed by value");
+                        generator.Emit(OpCodes.Ldarg_1);
+                        break;
+                    case ImplementationTypeArgumentKind.Mixin:
+                        if (!byRef) throw new Exception("Mixins must be passed by ref");
+                        generator.Emit(OpCodes.Ldarg_0);
+                        generator.Emit(OpCodes.Ldflda, mixInFieldBuilder!);
+                        break;
+                    default:
+                        throw new Exception($"Unkown argument kind {kind}");
+                }
+            }
+        }
+
+        generator.Emit(OpCodes.Call, backingMethod);
+
         generator.Emit(OpCodes.Ret);
     }
+
+    (Type type, Boolean byRef) GetParameterType(ParameterInfo p)
+    {
+        var type = p.ParameterType;
+
+        if (type is null) throw new Exception($"Parameter {p} unexpectedly has no type");
+
+        return type.IsByRef ? ((type.GetElementType() ?? throw new Exception("Can't get element type of ref type")), true) : (type, false);
+    }
+
+    protected virtual IDictionary<Type, ImplementationTypeArgumentKind> GetArgumentKinds()
+        => new Dictionary<Type, ImplementationTypeArgumentKind>();
 
     protected virtual FieldBuilder? EnsureMixin(BakingState state) => null;
 
@@ -164,40 +201,125 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
     protected MethodInfo GetPropertyMethod(PropertyInfo property, Boolean setter)
         => (setter ? property.GetSetMethod() : property.GetGetMethod())
         ?? throw new Exception($"Property {property.Name} on implementation type {property.DeclaringType} must have a {(setter ? "setter" : "getter")} method");
-
-    //protected virtual void GenerateInitCode(ILGenerator generator, FieldBuilder fieldBuilder, MethodInfo backingInitMethod, FieldBuilder? _)
-    //{
-    //    generator.Emit(OpCodes.Ldarg_0);
-    //    generator.Emit(OpCodes.Ldflda, fieldBuilder);
-    //    generator.Emit(OpCodes.Call, backingInitMethod);
-    //    generator.Emit(OpCodes.Ret);
-    //}
-
-    protected virtual void GenerateGetterCode(ILGenerator generator, FieldBuilder fieldBuilder, MethodInfo backingGetMethod, FieldBuilder? _)
-    {
-        generator.Emit(OpCodes.Ldarg_0);
-        generator.Emit(OpCodes.Ldflda, fieldBuilder);
-        generator.Emit(OpCodes.Call, backingGetMethod);
-        generator.Emit(OpCodes.Ret);
-    }
-
-    protected virtual void GenerateSetterCode(ILGenerator generator, FieldBuilder fieldBuilder, MethodInfo backingSetMethod, FieldBuilder? _)
-    {
-        generator.Emit(OpCodes.Ldarg_0);
-        generator.Emit(OpCodes.Ldflda, fieldBuilder);
-        generator.Emit(OpCodes.Ldarg_1);
-        generator.Emit(OpCodes.Call, backingSetMethod);
-        generator.Emit(OpCodes.Ret);
-    }
 }
 
-public abstract class AbstractImplementationTypePropertyGenerator : AbstractPropertyGenerator
+public class GenericPropertyGenerator : AbstractPropertyGenerator
 {
-    protected readonly Type propertyImplementationType;
+    readonly Type propertyImplementationType;
 
-    protected AbstractImplementationTypePropertyGenerator(Type propertyImplementationType)
+    readonly Type? mixinType;
+
+    readonly TypeArgumentInfo[] typeArgumentsInfos;
+
+    struct TypeArgumentInfo
+    {
+        public Type argumentType;
+        public Type parameterType;
+        public ImplementationTypeArgumentKind parameterKind;
+    }
+
+    readonly Dictionary<Type, ImplementationTypeArgumentKind> typeParameterToKindMapping;
+
+    protected override IDictionary<Type, ImplementationTypeArgumentKind> GetArgumentKinds()
+        => typeArgumentsInfos.ToDictionary(i => i.argumentType, i => i.parameterKind);
+
+    protected override FieldBuilder? EnsureMixin(BakingState state) => mixinType is not null ? state.EnsureMixin(state, mixinType) : null;
+
+    public GenericPropertyGenerator(Type propertyImplementationType)
     {
         this.propertyImplementationType = propertyImplementationType;
+
+        var propertyImplementationInterfaceType = propertyImplementationType
+            .GetInterfaces()
+            .Where(i => i != typeof(IPropertyImplementation))
+            .Single($"Expected property implementation type {propertyImplementationType} to implement only a single interface besides {nameof(IPropertyImplementation)}")
+            ;
+
+        var propertyImplementationInterfaceTypeDefinition = propertyImplementationInterfaceType.GetGenericTypeDefinition();
+
+        var typeArguments = propertyImplementationInterfaceType.GetGenericArguments();
+        var typeParameters = propertyImplementationInterfaceTypeDefinition.GetGenericArguments();
+
+        if (typeArguments.Length != typeParameters.Length) throw new Exception("Unexpected have different numbers of type parameters");
+
+        typeParameterToKindMapping = new Dictionary<Type, ImplementationTypeArgumentKind>();
+
+        typeArgumentsInfos = typeParameters.Select((p, i) =>
+        {
+            var a = p.GetCustomAttribute<TypeKindAttribute>();
+
+            if (a is null) throw new Exception($"Expected property implementation interface {p} type paramter {p} to have a {nameof(TypeKindAttribute)}");
+
+            var arg = typeArguments[i];
+
+            switch (a.Kind)
+            {
+                case ImplementationTypeArgumentKind.Value:
+                case ImplementationTypeArgumentKind.Container:
+                    if (!arg.IsGenericParameter) throw new Exception($"Property implementation type {propertyImplementationType} must be itself be generic in type parameter {p} of interface {propertyImplementationInterfaceTypeDefinition}");
+
+                    typeParameterToKindMapping[arg] = a.Kind;
+                    break;
+                default:
+                    break;
+            }
+
+            return new TypeArgumentInfo
+            {
+                parameterType = p,
+                argumentType = arg,
+                parameterKind = a.Kind
+            };
+        }).ToArray();
+
+        var mixinArgumentInfo = typeArgumentsInfos
+            .Where(i => i.parameterKind == ImplementationTypeArgumentKind.Mixin)
+            .ToArray();
+
+
+
+        if (mixinArgumentInfo.Length > 1)
+        {
+            throw new Exception("Multiple mixins are not yet supported");
+        }
+        else if (mixinArgumentInfo.Length > 0)
+        {
+            mixinType = mixinArgumentInfo.Single().argumentType;
+        }
+    }
+
+    Type[] GetTypeArguments(Type declaringType, Type valueType)
+    {
+        var arguments = new List<Type>();
+
+        foreach (var type in propertyImplementationType.GetGenericArguments())
+        {
+            var kind = typeParameterToKindMapping[type];
+
+            switch (kind)
+            {
+                case ImplementationTypeArgumentKind.Value:
+                    arguments.Add(valueType);
+                    break;
+                case ImplementationTypeArgumentKind.Container:
+                    arguments.Add(declaringType);
+                    break;
+                default:
+                    throw new Exception($"Dont know how to handle type parameter {type} of property implementation type {propertyImplementationType}");
+            }
+        }
+
+        return arguments.ToArray();
+    }
+
+    protected override (FieldBuilder fieldBuilder, MethodInfo backingGetMethod, MethodInfo backingSetMethod)
+        GetBackings(TypeBuilder typeBuilder, PropertyInfo property)
+    {
+        var typeArguments = GetTypeArguments(typeof(Object), property.PropertyType);
+
+        var backingEventImplementationType = propertyImplementationType.MakeGenericType(typeArguments);
+        var fieldBuilder = typeBuilder.DefineField($"backing_{property.Name}", backingEventImplementationType, FieldAttributes.Private);
+        return (fieldBuilder, GetMethod(fieldBuilder, "Get"), GetMethod(fieldBuilder, "Set"));
     }
 }
 
@@ -210,21 +332,6 @@ public class UnimplementedPropertyGenerator : AbstractPropertyGenerator
     protected override (FieldBuilder fieldBuilder, MethodInfo backingGetMethod, MethodInfo backingSetMethod)
         GetBackings(TypeBuilder typeBuilder, PropertyInfo property)
         => throw new NotImplementedException();
-}
-
-public class BasicPropertyGenerator : AbstractImplementationTypePropertyGenerator
-{
-    public BasicPropertyGenerator(Type propertyImplementationType) : base(propertyImplementationType) { }
-
-    protected override (FieldBuilder fieldBuilder, MethodInfo backingGetMethod, MethodInfo backingSetMethod)
-        GetBackings(TypeBuilder typeBuilder, PropertyInfo property)
-    {
-        var backingPropertyImplementationType = propertyImplementationType.MakeGenericType(property.PropertyType);
-        var fieldBuilder = typeBuilder.DefineField($"backing_{property.Name}", backingPropertyImplementationType, FieldAttributes.Private);
-        var backingProperty = backingPropertyImplementationType.GetProperty("Value");
-        if (backingProperty is null) throw new Exception($"Property implementation type {backingPropertyImplementationType.Name} must have a 'Value' property");
-        return (fieldBuilder, GetPropertyMethod(backingProperty, false), GetPropertyMethod(backingProperty, true));
-    }
 }
 
 public class DelegatingPropertyGenerator : AbstractPropertyGenerator
@@ -247,114 +354,13 @@ public class DelegatingPropertyGenerator : AbstractPropertyGenerator
     }
 }
 
-public abstract class AbstractWithMixinPropertyGenerator : AbstractImplementationTypePropertyGenerator
-{
-    protected readonly Type semiConcreteInterface;
-    protected readonly Type mixinType;
-
-    public AbstractWithMixinPropertyGenerator(
-        Type propertyImplementationType,
-        Type complexInterfaceBaseType,
-        Int32 expectedGenericParameters,
-        Int32 mixinParameterPosition
-    ) : base(propertyImplementationType)
-    {
-        semiConcreteInterface = propertyImplementationType.GetInterfaces()
-            .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == complexInterfaceBaseType)
-            ?? throw new Exception($"Property implementation type {propertyImplementationType} does not implement {complexInterfaceBaseType}");
-
-        var implementationTypeArguments = propertyImplementationType.GetGenericArguments();
-
-        if (implementationTypeArguments.Length != 2) throw new Exception($"Expected complex property type implementation to have two type parameters and found {implementationTypeArguments.Length}");
-
-        for (var i = 0; i < implementationTypeArguments.Length; ++i)
-        {
-            if (i != mixinParameterPosition && implementationTypeArguments[i] is Type genericArgument && !genericArgument.IsGenericTypeParameter)
-            {
-                throw new Exception($"Expected type paramter #{i} not to be concrete in property implementation type ${propertyImplementationType}");
-            }
-        }
-
-        var semiConcreteInterfaceArguments = semiConcreteInterface.GetGenericArguments();
-
-        if (semiConcreteInterfaceArguments.Length != expectedGenericParameters)
-        {
-            throw new Exception($"Unexpected number of {semiConcreteInterfaceArguments.Length} instead of {expectedGenericParameters} type arguments");
-        }
-
-        mixinType = semiConcreteInterfaceArguments[mixinParameterPosition];
-
-        if (mixinType.IsGenericTypeParameter)
-        {
-            throw new Exception($"Expected type paramter Mixin to be concrete in property implementation type ${propertyImplementationType}");
-        }
-    }
-}
-
-public class ComplexPropertyGenerator : AbstractWithMixinPropertyGenerator
-{
-    public ComplexPropertyGenerator(Type propertyImplementationType)
-        : base(propertyImplementationType, typeof(IPropertyImplementation<,,>), 3, 2)
-    {
-    }
-
-    protected override FieldBuilder? EnsureMixin(BakingState state) => state.EnsureMixin(state, mixinType);
-
-    protected override (FieldBuilder fieldBuilder, MethodInfo backingGetMethod, MethodInfo backingSetMethod)
-        GetBackings(TypeBuilder typeBuilder, PropertyInfo property)
-    {
-        var backingEventImplementationType = propertyImplementationType.MakeGenericType(property.PropertyType, property.DeclaringType!);
-        var fieldBuilder = typeBuilder.DefineField($"backing_{property.Name}", backingEventImplementationType, FieldAttributes.Private);
-        return (fieldBuilder, GetMethod(fieldBuilder, "Get"), GetMethod(fieldBuilder, "Set"));
-    }
-
-    protected override void GenerateGetterCode(ILGenerator generator, FieldBuilder fieldBuilder, MethodInfo backingGetMethod, FieldBuilder? mixInFieldBuilder)
-    {
-        generator.Emit(OpCodes.Ldarg_0);
-        generator.Emit(OpCodes.Ldflda, fieldBuilder);
-
-        generator.Emit(OpCodes.Ldarg_0);
-
-        generator.Emit(OpCodes.Ldarg_0);
-        generator.Emit(OpCodes.Ldflda, mixInFieldBuilder!);
-
-        generator.Emit(OpCodes.Call, backingGetMethod);
-
-        generator.Emit(OpCodes.Ret);
-    }
-
-    protected override void GenerateSetterCode(ILGenerator generator, FieldBuilder fieldBuilder, MethodInfo backingSetMethod, FieldBuilder? mixInFieldBuilder)
-    {
-        generator.Emit(OpCodes.Ldarg_0);
-        generator.Emit(OpCodes.Ldflda, fieldBuilder);
-
-        generator.Emit(OpCodes.Ldarg_0);
-
-        generator.Emit(OpCodes.Ldarg_0);
-        generator.Emit(OpCodes.Ldflda, mixInFieldBuilder!);
-
-        generator.Emit(OpCodes.Ldarg_1);
-
-        generator.Emit(OpCodes.Call, backingSetMethod);
-        generator.Emit(OpCodes.Ret);
-    }
-}
-
 public static class PropertyGenerator
 {
     public static AbstractPropertyGenerator Create(Type propertyImplementationType)
     {
-        var candidates =
-            from i in propertyImplementationType.GetInterfaces()
-            let a = i.GetCustomAttribute<PropertyImplementationInterfaceAttribute>()
-            where a is not null
-            select a;
+        var instance = new GenericPropertyGenerator(propertyImplementationType);
 
-        var attribute = candidates.Single();
-
-        var instance = Activator.CreateInstance(attribute.PropertyGeneratorType, propertyImplementationType);
-
-        return instance as AbstractPropertyGenerator ?? throw new Exception("Activator returned a null or incorrect type");
+        return instance;
     }
 }
 

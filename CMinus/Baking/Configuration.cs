@@ -42,11 +42,11 @@ public record BakeryConfiguration(IBakeryComponentGenerators Generators, Boolean
 {
     public static BakeryConfiguration Create(Type? propertyImplementationType = null, Type? eventImplementationType = null)
         => new BakeryConfiguration(ComponentGenerators.Create(
-            propertyImplementationType ?? typeof(GenericPropertyImplementation<>),
+            propertyImplementationType ?? typeof(SimplePropertyImplementation<>),
             eventImplementationType ?? typeof(GenericEventImplementation<>)));
 
     public static BakeryConfiguration PocGenerationConfiguration
-        = new BakeryConfiguration(ComponentGenerators.Create(typeof(GenericPropertyImplementation<>), typeof(GenericEventImplementation<>)));
+        = new BakeryConfiguration(ComponentGenerators.Create(typeof(SimplePropertyImplementation<>), typeof(GenericEventImplementation<>)));
 
     public Bakery CreateBakery(String name) => new Bakery(name, this);
 }
