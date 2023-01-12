@@ -13,11 +13,14 @@ public class Reflection
 
     public Boolean HasAnyInitSetters { get; }
 
+    public Boolean HasAnyDefaultRequirements { get; }
+
     public Boolean IsDefaultConstructible { get; }
 
     public struct PropertyInfoStruct
     {
         public PropertyInfo info;
+        public Boolean requiresDefault;
         public Boolean hasInitSetter;
     }
 
@@ -27,19 +30,25 @@ public class Reflection
 
         IsDefaultConstructible = CanCreateInstanceUsingDefaultConstructor(type);
 
+        var nullabilityContext = new NullabilityInfoContext();
+
         var props =
             from p in type.GetProperties()
             let set = p.SetMethod
             let rpcm = set?.ReturnParameter.GetRequiredCustomModifiers()
+            let nullabilityInfo = nullabilityContext.Create(p)
+            let hasInitSetter = rpcm?.Contains(typeof(System.Runtime.CompilerServices.IsExternalInit)) ?? false
             select new PropertyInfoStruct
             {
                 info = p,
-                hasInitSetter = rpcm?.Contains(typeof(System.Runtime.CompilerServices.IsExternalInit)) ?? false
+                requiresDefault = nullabilityInfo.ReadState == NullabilityState.Nullable && !hasInitSetter,
+                hasInitSetter = hasInitSetter
             };
 
         Properties = props.ToArray();
 
         HasAnyInitSetters = Properties.Any(p => p.hasInitSetter);
+        HasAnyDefaultRequirements = Properties.Any(p => p.requiresDefault);
     }
 
     static bool CanCreateInstanceUsingDefaultConstructor(Type t) =>

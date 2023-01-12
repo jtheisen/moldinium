@@ -63,13 +63,13 @@ public class CombinedTests
 
         var instance = provider.CreateInstance<ITodoListEntry>();
 
+        instance.Text = "wash the car";
+
+        Assert.AreEqual("wash the car", instance.Text);
+
         instance.Text = "do the dishes";
 
         Assert.AreEqual("do the dishes", instance.Text);
-
-        instance.Text = "do the dishes again";
-
-        Assert.AreEqual("do the dishes again", instance.Text);
 
         var changeCount = 0;
 
@@ -81,7 +81,7 @@ public class CombinedTests
                 ++changeCount;
             });
 
-            Assert.AreEqual("do the dishes again", instance.Text);
+            Assert.AreEqual("do the dishes", instance.Text);
 
             Assert.AreEqual(1, changeCount);
 

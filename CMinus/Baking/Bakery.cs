@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Castle.DynamicProxy.Generators;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -9,7 +10,7 @@ namespace CMinus;
 
 public delegate FieldBuilder MixinEnsurer(BakingState state, Type type);
 
-public record BakingState(TypeBuilder TypeBuilder, MixinEnsurer EnsureMixin)
+public record BakingState(TypeBuilder TypeBuilder, MixinEnsurer EnsureMixin, ILGenerator ConstructorGenerator)
 {
     public readonly Dictionary<Type, FieldBuilder> Mixins = new Dictionary<Type, FieldBuilder>();
 }
@@ -65,11 +66,17 @@ public class Bakery
 
         var typeBuilder = moduleBuilder.DefineType(name, typeAttributes);
 
-        state = new BakingState(typeBuilder, EnsureMixin);
+        var constructorBuilder = typeBuilder.DefineConstructor(MethodAttributes.Public, CallingConventions.Standard, new Type[] { });
+
+        var constructorGenerator = constructorBuilder.GetILGenerator();
+
+        state = new BakingState(typeBuilder, EnsureMixin, constructorGenerator);
 
         try
         {
             ImplementInterface(state, interfaceType, generators);
+
+            constructorGenerator.Emit(OpCodes.Ret);
 
             return typeBuilder.CreateType() ?? throw new Exception("no type?");
         }

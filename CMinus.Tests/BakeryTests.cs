@@ -67,13 +67,17 @@ public class BakeryTests
     [TestMethod]
     public void WithInitTest() => BasicFactory.Create<IPropertyTestWithInit>();
 
+
+
     public struct TrivialComplexPropertyImplementation<Value, Container> : IPropertyImplementation<Value, Container, EmptyMixIn>
     {
+        public void Init() { }
+
         Value value;
 
         public Value Get(Container self, ref EmptyMixIn mixIn) => value;
 
-        public void Set(Container self, ref EmptyMixIn mixIn, Value value) => this.value = value;
+        public void Set(Container self, ref EmptyMixIn mixIn, Value value) { this.value = value; }
     }
 
     [TestMethod]
@@ -117,12 +121,20 @@ public class BakeryTests
     public struct NotifyPropertyChangedPropertyImplementation<Value, Container> : IPropertyImplementation<Value, Container, NotifyPropertChangedMixin>
         where Container : class
     {
+        Boolean initialized;
+
+        public void Init() { initialized = true; }
+
+        void AssertInitialized() { if (!initialized) throw new Exception(); }
+
         Value value;
 
         public Value Get(Container self, ref NotifyPropertChangedMixin mixIn) => value;
 
         public void Set(Container self, ref NotifyPropertChangedMixin mixIn, Value value)
         {
+            AssertInitialized();
+
             this.value = value;
 
             mixIn.NotifyPropertyChanged(self);

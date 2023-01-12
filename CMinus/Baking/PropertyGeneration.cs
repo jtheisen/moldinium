@@ -19,6 +19,22 @@ public class PropertyImplementationInterfaceAttribute : Attribute
     }
 }
 
+public enum DelegationParameterType
+{
+    Container,
+    Mixin
+}
+
+
+
+[AttributeUsage(AttributeTargets.Struct | AttributeTargets.Interface)]
+public class PropertyImplementationStructAttribute : Attribute
+{
+    public PropertyImplementationStructAttribute(params DelegationParameterType[] parameterTypes)
+    {
+    }
+}
+
 public interface IPropertyImplementation { }
 
 [PropertyImplementationInterface(typeof(BasicPropertyGenerator))]
@@ -28,9 +44,12 @@ public interface IPropertyImplementation<T> : IPropertyImplementation
 }
 
 [PropertyImplementationInterface(typeof(ComplexPropertyGenerator))]
+[PropertyImplementationStruct(DelegationParameterType.Container, DelegationParameterType.Mixin)]
 public interface IPropertyImplementation<Value, Container, MixIn> : IPropertyImplementation
     where MixIn : struct
 {
+    void Init();
+
     Value Get(
         Container self,
         ref MixIn mixIn
@@ -95,6 +114,13 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
             var (fieldBuilder, backingGetMethod, backingSetMethod) = GetBackings(typeBuilder, property);
 
+            var backingInitMethod = fieldBuilder.FieldType.GetMethod("Init");
+
+            if (backingInitMethod is not null)
+            {
+                GenerateInitCode(state.ConstructorGenerator, fieldBuilder, backingInitMethod);
+            }
+
             {
                 var getMethodBuilder = Create(typeBuilder, getMethod, isAbstract: false);
                 var generator = getMethodBuilder.GetILGenerator();
@@ -118,6 +144,14 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
         }
     }
 
+    void GenerateInitCode(ILGenerator generator, FieldBuilder fieldBuilder, MethodInfo backingInitMethod)
+    {
+        generator.Emit(OpCodes.Ldarg_0);
+        generator.Emit(OpCodes.Ldflda, fieldBuilder);
+        generator.Emit(OpCodes.Call, backingInitMethod);
+        generator.Emit(OpCodes.Ret);
+    }
+
     protected virtual FieldBuilder? EnsureMixin(BakingState state) => null;
 
     protected abstract (FieldBuilder fieldBuilder, MethodInfo backingGetMethod, MethodInfo backingSetMethod)
@@ -130,6 +164,14 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
     protected MethodInfo GetPropertyMethod(PropertyInfo property, Boolean setter)
         => (setter ? property.GetSetMethod() : property.GetGetMethod())
         ?? throw new Exception($"Property {property.Name} on implementation type {property.DeclaringType} must have a {(setter ? "setter" : "getter")} method");
+
+    //protected virtual void GenerateInitCode(ILGenerator generator, FieldBuilder fieldBuilder, MethodInfo backingInitMethod, FieldBuilder? _)
+    //{
+    //    generator.Emit(OpCodes.Ldarg_0);
+    //    generator.Emit(OpCodes.Ldflda, fieldBuilder);
+    //    generator.Emit(OpCodes.Call, backingInitMethod);
+    //    generator.Emit(OpCodes.Ret);
+    //}
 
     protected virtual void GenerateGetterCode(ILGenerator generator, FieldBuilder fieldBuilder, MethodInfo backingGetMethod, FieldBuilder? _)
     {
