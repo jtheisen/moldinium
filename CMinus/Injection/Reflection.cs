@@ -41,7 +41,7 @@ public class Reflection
             select new PropertyInfoStruct
             {
                 info = p,
-                requiresDefault = nullabilityInfo.ReadState == NullabilityState.Nullable && !hasInitSetter,
+                requiresDefault = nullabilityInfo.ReadState == NullabilityState.NotNull && !hasInitSetter,
                 hasInitSetter = hasInitSetter
             };
 

@@ -8,7 +8,7 @@ using System.Reflection.PortableExecutable;
 
 namespace CMinus;
 
-public delegate FieldBuilder MixinEnsurer(BakingState state, Type type);
+public delegate FieldBuilder MixinEnsurer(BakingState state, Type type, Boolean isPrivate);
 
 public record BakingState(TypeBuilder TypeBuilder, MixinEnsurer EnsureMixin, ILGenerator ConstructorGenerator, IDefaultProvider DefaultProvider)
 {
@@ -112,19 +112,19 @@ public class Bakery
         }
     }
 
-    FieldBuilder EnsureMixin(BakingState state, Type type)
+    FieldBuilder EnsureMixin(BakingState state, Type type, Boolean isPrivate)
     {
         var fieldBuilder = state.Mixins.GetValueOrDefault(type);
 
         if (fieldBuilder is null)
         {
-            CreateMixin(state, type, out fieldBuilder);
+            CreateMixin(state, type, isPrivate, out fieldBuilder);
         }
 
         return fieldBuilder;
     }
 
-    void CreateMixin(BakingState state, Type type, out FieldBuilder fieldBuilder)
+    void CreateMixin(BakingState state, Type type, Boolean isPrivate, out FieldBuilder fieldBuilder)
     {
         var typeBuilder = state.TypeBuilder;
 
@@ -147,9 +147,12 @@ public class Bakery
             new DelegatingEventGenerator(fieldBuilder)
         );
 
-        foreach (var ifc in interfaces)
+        if (!isPrivate)
         {
-            ImplementInterface(state, ifc, nestedGenerators);
+            foreach (var ifc in interfaces)
+            {
+                ImplementInterface(state, ifc, nestedGenerators);
+            }
         }
     }
 

@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection.Emit;
 using System.Reflection;
+using CMinus.Injection;
 
 namespace CMinus;
 
 public enum ImplementationTypeArgumentKind
 {
     Value,
-    Default,
     Mixin
 }
 
@@ -39,25 +39,23 @@ public interface IPropertyImplementation<
 public struct EmptyMixIn { }
 
 public interface ISimplePropertyImplementation<
-    [TypeKind(ImplementationTypeArgumentKind.Value)] ValueT,
-    [TypeKind(ImplementationTypeArgumentKind.Default)] DefaultT
+    [TypeKind(ImplementationTypeArgumentKind.Value)] ValueT
 > : IPropertyImplementation
 {
+    void Init(ValueT def);
+
     ValueT Get();
 
     void Set(ValueT value);
 }
 
-public struct SimplePropertyImplementation<T, D> : ISimplePropertyImplementation<T, D>
-    where D : struct, IDefault<T>
+public struct SimplePropertyImplementation<T> : ISimplePropertyImplementation<T>
 {
-    D def;
-
     T value;
 
-    public void Init()
+    public void Init(T def)
     {
-        value = def.Default;
+        value = def;
     }
 
     public T Get() => value;
@@ -97,7 +95,9 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
     {
         var typeBuilder = state.TypeBuilder;
 
-        var propertyBuilder = typeBuilder.DefineProperty(property.Name, property.Attributes, property.PropertyType, null);
+        var valueType = property.PropertyType;
+
+        var propertyBuilder = typeBuilder.DefineProperty(property.Name, property.Attributes, valueType, null);
 
         var mixinFieldBuilder = EnsureMixin(state);
 
@@ -106,7 +106,7 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
         var argumentKinds = GetArgumentKinds();
 
-        argumentKinds[property.PropertyType] = ImplementationTypeArgumentKind.Value;
+        argumentKinds[valueType] = ImplementationTypeArgumentKind.Value;
 
         var (fieldBuilder, backingGetMethod, backingSetMethod) = GetBackings(state, property);
 
@@ -115,7 +115,27 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
             if (backingInitMethod is not null)
             {
-                GenerateWrapperCode(state.ConstructorGenerator, fieldBuilder, backingInitMethod, argumentKinds, mixinFieldBuilder);
+                var takesDefaultValue = backingInitMethod.GetParameters().Select(p => p.ParameterType).Any(t => t == valueType);
+
+                var info = Reflection.Get(property.DeclaringType ?? throw new Exception("Unexpectedly not having a declaring type"));
+
+                var requiresDefault = info.Properties.Single(p => p.info == property).requiresDefault;
+
+                // If there's an init method taking a default value, we need to pass something even if the property doesn't actually
+                // need a default. In that case, we use a dummy default provider that at least doesn't do any allocation.
+                Type? genericDefaultImplementationType = requiresDefault ? state.DefaultProvider.GetDefaultType(valueType) : typeof(DummyDefault<>);
+
+                if (genericDefaultImplementationType is null) throw new Exception($"Default provider can't handle type {valueType}");
+
+                var defaultType = Defaults.CreateConcreteDefaultImplementationType(genericDefaultImplementationType, valueType);
+
+                var defaultImplementationGetMethod = defaultType.GetProperty(nameof(IDefault<Dummy>.Default))?.GetGetMethod();
+
+                if (defaultImplementationGetMethod is null) throw new Exception("Can't find getter on default value implementation");
+
+                var defaultImplementationFieldBuilder = state.EnsureMixin(state, defaultType, true);
+
+                GenerateWrapperCode(state.ConstructorGenerator, fieldBuilder, backingInitMethod, argumentKinds, mixinFieldBuilder, defaultImplementationFieldBuilder, defaultImplementationGetMethod);
             }
         }
 
@@ -136,7 +156,15 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
         }
     }
 
-    void GenerateWrapperCode(ILGenerator generator, FieldBuilder fieldBuilder, MethodInfo backingMethod, IDictionary<Type, ImplementationTypeArgumentKind> argumentKinds, FieldBuilder? mixInFieldBuilder)
+    void GenerateWrapperCode(
+        ILGenerator generator,
+        FieldBuilder fieldBuilder,
+        MethodInfo backingMethod,
+        IDictionary<Type, ImplementationTypeArgumentKind> argumentKinds,
+        FieldBuilder? mixInFieldBuilder,
+        FieldBuilder? defaultImplementationFieldBuilder = null,
+        MethodInfo? defaultImplementationGetMethod = null
+    )
     {
         if (!backingMethod.IsStatic)
         {
@@ -145,7 +173,6 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
         }
 
         var parameters = backingMethod.GetParameters();
-
 
         foreach (var p in parameters)
         {
@@ -166,7 +193,18 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
                 {
                     case ImplementationTypeArgumentKind.Value:
                         if (byRef) throw new Exception("Values must be passed by value");
-                        generator.Emit(OpCodes.Ldarg_1);
+                        if (defaultImplementationFieldBuilder is not null && defaultImplementationGetMethod is not null)
+                        {
+                            // This means we're wrapping an init method and need to create the default value
+                            generator.Emit(OpCodes.Ldarg_0);
+                            generator.Emit(OpCodes.Ldflda, defaultImplementationFieldBuilder);
+                            generator.Emit(OpCodes.Call, defaultImplementationGetMethod);
+                        }
+                        else
+                        {
+                            // This means we're wrapping a setter method and need to pass the value
+                            generator.Emit(OpCodes.Ldarg_1);
+                        }
                         break;
                     case ImplementationTypeArgumentKind.Mixin:
                         if (!byRef) throw new Exception("Mixins must be passed by ref");
@@ -230,7 +268,7 @@ public class GenericPropertyGenerator : AbstractPropertyGenerator
     protected override IDictionary<Type, ImplementationTypeArgumentKind> GetArgumentKinds()
         => typeArgumentsInfos.ToDictionary(i => i.argumentType, i => i.parameterKind);
 
-    protected override FieldBuilder? EnsureMixin(BakingState state) => mixinType is not null ? state.EnsureMixin(state, mixinType) : null;
+    protected override FieldBuilder? EnsureMixin(BakingState state) => mixinType is not null ? state.EnsureMixin(state, mixinType, false) : null;
 
     public GenericPropertyGenerator(Type propertyImplementationType)
     {
@@ -306,15 +344,6 @@ public class GenericPropertyGenerator : AbstractPropertyGenerator
             {
                 case ImplementationTypeArgumentKind.Value:
                     arguments.Add(valueType);
-                    break;
-                case ImplementationTypeArgumentKind.Default:
-                    var genericDefaultType = state.DefaultProvider.GetDefaultType(valueType);
-
-                    if (genericDefaultType is null) throw new Exception($"Default provider can't handle type {valueType}");
-
-                    var defaultType = Defaults.CreateDefaultStructType(genericDefaultType);
-
-                    arguments.Add(defaultType);
                     break;
                 default:
                     throw new Exception($"Dont know how to handle type parameter {type} of property implementation type {propertyImplementationType}");

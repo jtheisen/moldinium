@@ -7,6 +7,11 @@ public interface IDefault<T>
     T Default { get; }
 }
 
+public struct DummyDefault<T> : IDefault<T>
+{
+    public T Default => default!;
+}
+
 public struct DefaultString : IDefault<String>
 {
     public string Default => String.Empty;
@@ -44,8 +49,8 @@ public class DefaultDefaultProvider : IDefaultProvider
 
 public static class Defaults
 {
-    public static Type CreateDefaultStructType(Type type)
-        => type.IsGenericTypeDefinition ? typeof(IDefault<>).MakeGenericType(type) : type;
+    public static Type CreateConcreteDefaultImplementationType(Type type, Type valueType)
+        => type.IsGenericTypeDefinition ? type.MakeGenericType(valueType) : type;
 
     public static IDefaultProvider GetDefaultDefaultProvider()
         => new DefaultDefaultProvider();
