@@ -119,25 +119,27 @@ class ModelFactoryInterceptor : IInterceptor
 
     class WatchableImplementationPropertyImplementation : PropertyImplementation
     {
-        IWatchable<Object> watchable;
+        CachedComputedWatchable<Object> watchable;
 
         public WatchableImplementationPropertyImplementation(PropertyInfo property, Object target)
             : base(property, target)
         {
-            watchable = Watchable.Eval(Invoke).watchable;
+            watchable = new CachedComputedWatchable<Object>(Invoke);
 
-            (watchable as WatchableValueBase)!.Name = $"{property.DeclaringType!.Name}.{property.Name}";
+            watchable.Name = $"{property.DeclaringType!.Name}.{property.Name}";
 
             watchable.Subscribe(this, Notify);
         }
 
         public override void Get(IInvocation invocation)
         {
-            invocation.ReturnValue = watchable.UntypedValue;
+            invocation.ReturnValue = watchable.Value;
         }
 
         public override void Set(IInvocation invocation)
         {
+            watchable.MarkAsDirty();
+
             invocation.Proceed();
         }
 
@@ -256,6 +258,17 @@ public static class Models
         CheckType(type);
 
         var model = generator.CreateClassProxy(type, new[] { typeof(INotifyPropertyChanged) }, interceptor);
+
+        return model;
+    }
+
+    public static Object Create(Type type, Type implementationType)
+    {
+        CheckType(type);
+
+        var target = Activator.CreateInstance(implementationType);
+
+        var model = generator.CreateClassProxyWithTarget(type, new[] { typeof(INotifyPropertyChanged) }, target, interceptor);
 
         return model;
     }

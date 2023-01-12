@@ -199,6 +199,8 @@ class CachedComputedWatchable<T> : WatchableValueBase, IWatchable<T>
         }
     }
 
+    public void MarkAsDirty() => dirty = true;
+
     void EnsureUpdated(Boolean rethrow)
     {
         Repository.Instance.NoteEvaluation(this);
