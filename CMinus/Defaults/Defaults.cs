@@ -24,8 +24,29 @@ public struct DefaultDefaultConstructible<T, I> : IDefault<T>
     public T Default => new I();
 }
 
+public interface IDefaultProvider
+{
+    Type? GetDefaultType(Type type);
+}
+
+public class DefaultDefaultProvider : IDefaultProvider
+{
+    public Type? GetDefaultType(Type type)
+    {
+        if (type == typeof(String))
+        {
+            return typeof(DefaultString);
+        }
+
+        return null;
+    }
+}
+
 public static class Defaults
 {
-    public static Type CreateDefaultInterfaceType(Type type)
-        => typeof(IDefault<>).MakeGenericType(type);
+    public static Type CreateDefaultStructType(Type type)
+        => type.IsGenericTypeDefinition ? typeof(IDefault<>).MakeGenericType(type) : type;
+
+    public static IDefaultProvider GetDefaultDefaultProvider()
+        => new DefaultDefaultProvider();
 }

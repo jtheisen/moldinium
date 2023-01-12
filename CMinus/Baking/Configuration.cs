@@ -38,15 +38,15 @@ public class ComponentGenerators : IBakeryComponentGenerators
         );
 }
 
-public record BakeryConfiguration(IBakeryComponentGenerators Generators, Boolean MakeAbstract = false)
+public record BakeryConfiguration(IBakeryComponentGenerators Generators, IDefaultProvider DefaultProvider, Boolean MakeAbstract = false)
 {
     public static BakeryConfiguration Create(Type? propertyImplementationType = null, Type? eventImplementationType = null)
         => new BakeryConfiguration(ComponentGenerators.Create(
-            propertyImplementationType ?? typeof(SimplePropertyImplementation<>),
-            eventImplementationType ?? typeof(GenericEventImplementation<>)));
+            propertyImplementationType ?? typeof(SimplePropertyImplementation<,>),
+            eventImplementationType ?? typeof(GenericEventImplementation<>)), Defaults.GetDefaultDefaultProvider());
 
     public static BakeryConfiguration PocGenerationConfiguration
-        = new BakeryConfiguration(ComponentGenerators.Create(typeof(SimplePropertyImplementation<>), typeof(GenericEventImplementation<>)));
+        = new BakeryConfiguration(ComponentGenerators.Create(typeof(SimplePropertyImplementation<,>), typeof(GenericEventImplementation<>)), Defaults.GetDefaultDefaultProvider());
 
     public Bakery CreateBakery(String name) => new Bakery(name, this);
 }

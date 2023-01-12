@@ -10,7 +10,7 @@ namespace CMinus;
 
 public delegate FieldBuilder MixinEnsurer(BakingState state, Type type);
 
-public record BakingState(TypeBuilder TypeBuilder, MixinEnsurer EnsureMixin, ILGenerator ConstructorGenerator)
+public record BakingState(TypeBuilder TypeBuilder, MixinEnsurer EnsureMixin, ILGenerator ConstructorGenerator, IDefaultProvider DefaultProvider)
 {
     public readonly Dictionary<Type, FieldBuilder> Mixins = new Dictionary<Type, FieldBuilder>();
 }
@@ -20,6 +20,7 @@ public class Bakery
     readonly string name;
     readonly BakeryConfiguration configuration;
     readonly IBakeryComponentGenerators generators;
+    readonly IDefaultProvider defaultProvider;
     readonly TypeAttributes typeAttributes;
     readonly ModuleBuilder moduleBuilder;
 
@@ -31,7 +32,8 @@ public class Bakery
     {
         this.name = name;
         this.configuration = configuration ?? BakeryConfiguration.PocGenerationConfiguration;
-        this.generators = this.configuration.Generators;
+        generators = this.configuration.Generators;
+        defaultProvider = this.configuration.DefaultProvider;
 
         var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName(name), AssemblyBuilderAccess.Run);
         moduleBuilder = assemblyBuilder.DefineDynamicModule(name);
@@ -70,7 +72,7 @@ public class Bakery
 
         var constructorGenerator = constructorBuilder.GetILGenerator();
 
-        state = new BakingState(typeBuilder, EnsureMixin, constructorGenerator);
+        state = new BakingState(typeBuilder, EnsureMixin, constructorGenerator, defaultProvider);
 
         try
         {

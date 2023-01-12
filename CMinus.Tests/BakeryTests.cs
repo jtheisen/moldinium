@@ -11,6 +11,8 @@ public class BakeryTests
 
     public interface IPropertyTest
     {
+        String DefaultInitializedValue { get; set; }
+
         String? Value { get; set; }
 
         void SetValue(String value) => Value = value;
@@ -49,6 +51,8 @@ public class BakeryTests
     public void SimpleTest()
     {
         var test = BasicFactory.Create<IPropertyTest>();
+
+        Assert.AreEqual("", test.DefaultInitializedValue);
 
         Assert.AreEqual(null, test.Value);
 

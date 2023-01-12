@@ -9,7 +9,7 @@ namespace CMinus;
 public enum ImplementationTypeArgumentKind
 {
     Value,
-    Container,
+    Default,
     Mixin
 }
 
@@ -38,16 +38,27 @@ public interface IPropertyImplementation<
 
 public struct EmptyMixIn { }
 
-public interface ISimplePropertyImplementation<[TypeKind(ImplementationTypeArgumentKind.Value)] ValueT> : IPropertyImplementation
+public interface ISimplePropertyImplementation<
+    [TypeKind(ImplementationTypeArgumentKind.Value)] ValueT,
+    [TypeKind(ImplementationTypeArgumentKind.Default)] DefaultT
+> : IPropertyImplementation
 {
     ValueT Get();
 
     void Set(ValueT value);
 }
 
-public struct SimplePropertyImplementation<T> : ISimplePropertyImplementation<T>
+public struct SimplePropertyImplementation<T, D> : ISimplePropertyImplementation<T, D>
+    where D : struct, IDefault<T>
 {
+    D def;
+
     T value;
+
+    public void Init()
+    {
+        value = def.Default;
+    }
 
     public T Get() => value;
 
@@ -97,7 +108,7 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
         argumentKinds[property.PropertyType] = ImplementationTypeArgumentKind.Value;
 
-        var (fieldBuilder, backingGetMethod, backingSetMethod) = GetBackings(typeBuilder, property);
+        var (fieldBuilder, backingGetMethod, backingSetMethod) = GetBackings(state, property);
 
         {
             var backingInitMethod = fieldBuilder.FieldType.GetMethod("Init");
@@ -153,10 +164,6 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
                 switch (kind)
                 {
-                    case ImplementationTypeArgumentKind.Container:
-                        if (byRef) throw new Exception("Object references must be passed by value");
-                        generator.Emit(OpCodes.Ldarg_0);
-                        break;
                     case ImplementationTypeArgumentKind.Value:
                         if (byRef) throw new Exception("Values must be passed by value");
                         generator.Emit(OpCodes.Ldarg_1);
@@ -192,7 +199,7 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
     protected virtual FieldBuilder? EnsureMixin(BakingState state) => null;
 
     protected abstract (FieldBuilder fieldBuilder, MethodInfo backingGetMethod, MethodInfo backingSetMethod)
-        GetBackings(TypeBuilder typeBuilder, PropertyInfo property);
+        GetBackings(BakingState state, PropertyInfo property);
 
     protected MethodInfo GetMethod(FieldBuilder fieldBuilder, String name)
         => fieldBuilder.FieldType.GetMethod(name)
@@ -255,14 +262,13 @@ public class GenericPropertyGenerator : AbstractPropertyGenerator
             switch (a.Kind)
             {
                 case ImplementationTypeArgumentKind.Value:
-                case ImplementationTypeArgumentKind.Container:
                     if (!arg.IsGenericParameter) throw new Exception($"Property implementation type {propertyImplementationType} must be itself be generic in type parameter {p} of interface {propertyImplementationInterfaceTypeDefinition}");
-
-                    typeParameterToKindMapping[arg] = a.Kind;
                     break;
                 default:
                     break;
             }
+
+            typeParameterToKindMapping[arg] = a.Kind;
 
             return new TypeArgumentInfo
             {
@@ -288,7 +294,7 @@ public class GenericPropertyGenerator : AbstractPropertyGenerator
         }
     }
 
-    Type[] GetTypeArguments(Type declaringType, Type valueType)
+    Type[] GetTypeArguments(BakingState state, Type declaringType, Type valueType)
     {
         var arguments = new List<Type>();
 
@@ -301,8 +307,14 @@ public class GenericPropertyGenerator : AbstractPropertyGenerator
                 case ImplementationTypeArgumentKind.Value:
                     arguments.Add(valueType);
                     break;
-                case ImplementationTypeArgumentKind.Container:
-                    arguments.Add(declaringType);
+                case ImplementationTypeArgumentKind.Default:
+                    var genericDefaultType = state.DefaultProvider.GetDefaultType(valueType);
+
+                    if (genericDefaultType is null) throw new Exception($"Default provider can't handle type {valueType}");
+
+                    var defaultType = Defaults.CreateDefaultStructType(genericDefaultType);
+
+                    arguments.Add(defaultType);
                     break;
                 default:
                     throw new Exception($"Dont know how to handle type parameter {type} of property implementation type {propertyImplementationType}");
@@ -313,9 +325,11 @@ public class GenericPropertyGenerator : AbstractPropertyGenerator
     }
 
     protected override (FieldBuilder fieldBuilder, MethodInfo backingGetMethod, MethodInfo backingSetMethod)
-        GetBackings(TypeBuilder typeBuilder, PropertyInfo property)
+        GetBackings(BakingState state, PropertyInfo property)
     {
-        var typeArguments = GetTypeArguments(typeof(Object), property.PropertyType);
+        var typeBuilder = state.TypeBuilder;
+
+        var typeArguments = GetTypeArguments(state, typeof(Object), property.PropertyType);
 
         var backingEventImplementationType = propertyImplementationType.MakeGenericType(typeArguments);
         var fieldBuilder = typeBuilder.DefineField($"backing_{property.Name}", backingEventImplementationType, FieldAttributes.Private);
@@ -330,7 +344,7 @@ public class UnimplementedPropertyGenerator : AbstractPropertyGenerator
     public override void GenerateProperty(BakingState state, PropertyInfo property) => throw new NotImplementedException();
 
     protected override (FieldBuilder fieldBuilder, MethodInfo backingGetMethod, MethodInfo backingSetMethod)
-        GetBackings(TypeBuilder typeBuilder, PropertyInfo property)
+        GetBackings(BakingState state, PropertyInfo property)
         => throw new NotImplementedException();
 }
 
@@ -344,7 +358,7 @@ public class DelegatingPropertyGenerator : AbstractPropertyGenerator
     }
 
     protected override (FieldBuilder fieldBuilder, MethodInfo backingGetMethod, MethodInfo backingSetMethod)
-        GetBackings(TypeBuilder typeBuilder, PropertyInfo property)
+        GetBackings(BakingState state, PropertyInfo property)
     {
         var propertyOnImplementation = fieldBuilder.FieldType.GetProperty(property.Name);
 

@@ -100,7 +100,7 @@ public static class DependencyProvider
         {
             var componentGenerators = CreateBakeryComponentGenerators(bakingMode);
 
-            var bakeryconfiguration = new BakeryConfiguration(componentGenerators, config.BakeAbstract);
+            var bakeryconfiguration = new BakeryConfiguration(componentGenerators, Defaults.GetDefaultDefaultProvider(), config.BakeAbstract);
 
             providers.Add(new BakeryDependencyProvider(new Bakery("TestBakery", bakeryconfiguration)));
         }
@@ -122,7 +122,7 @@ public static class DependencyProvider
 
     static ComponentGenerators CreateBakeryComponentGenerators(DefaultDependencyProviderBakingMode mode) => mode switch
     {
-        DefaultDependencyProviderBakingMode.Basic => ComponentGenerators.Create(typeof(SimplePropertyImplementation<>), typeof(GenericEventImplementation<>)),
+        DefaultDependencyProviderBakingMode.Basic => ComponentGenerators.Create(typeof(SimplePropertyImplementation<,>), typeof(GenericEventImplementation<>)),
         _ => throw new NotImplementedException()
     };
 }
