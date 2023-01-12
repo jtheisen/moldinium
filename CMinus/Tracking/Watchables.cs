@@ -199,8 +199,6 @@ class CachedComputedWatchable<T> : WatchableValueBase, IWatchable<T>
         }
     }
 
-    public void MarkAsDirty() => dirty = true;
-
     void EnsureUpdated(Boolean rethrow)
     {
         Repository.Instance.NoteEvaluation(this);
@@ -269,7 +267,7 @@ class CachedComputedWatchable<T> : WatchableValueBase, IWatchable<T>
 
     protected override Object GetUntypedValue() => Value!;
 
-    void InvalidateAndNotify()
+    public void InvalidateAndNotify()
     {
         dirty = true;
         if (alert)

@@ -138,9 +138,9 @@ class ModelFactoryInterceptor : IInterceptor
 
         public override void Set(IInvocation invocation)
         {
-            watchable.MarkAsDirty();
-
             invocation.Proceed();
+
+            watchable.InvalidateAndNotify();
         }
 
         Object Invoke()
