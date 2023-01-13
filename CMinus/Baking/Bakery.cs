@@ -80,7 +80,7 @@ public class AbstractlyBakery : AbstractBakery
     protected readonly ModuleBuilder moduleBuilder;
     protected readonly TypeAttributes typeAttributes;
 
-    public AbstractlyBakery(String name, TypeAttributes typeAttributes = TypeAttributes.Public | TypeAttributes.Abstract)
+    public AbstractlyBakery(String name, TypeAttributes typeAttributes = TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.SequentialLayout)
     {
         this.name = name;
         this.typeAttributes = typeAttributes;
@@ -107,10 +107,10 @@ public class AbstractlyBakery : AbstractBakery
         }
     }
 
-    public override Type Create(Type interfaceOrBaseType)
+    public override Type Create(Type interfaceOrBaseOrMixinType)
     {
-        var name = GetTypeName(interfaceOrBaseType);
-        return moduleBuilder.GetType(name) ?? Create(name, interfaceOrBaseType);
+        var name = GetTypeName(interfaceOrBaseOrMixinType);
+        return moduleBuilder.GetType(name) ?? Create(name, interfaceOrBaseOrMixinType);
     }
 
     protected virtual Type Create(String name, Type interfaceType)
@@ -192,11 +192,11 @@ public class ConcretelyBakery : AbstractlyBakery
         defaultProvider = this.configuration.DefaultProvider;
     }
 
-    protected override Type Create(String name, Type interfaceOrBaseType)
+    protected override Type Create(String name, Type interfaceOrBaseOrMixinType)
     {
         if (state is not null) throw new Exception("Already building a type");
 
-        var baseType = interfaceOrBaseType.IsInterface ? null : interfaceOrBaseType;
+        var baseType = interfaceOrBaseOrMixinType.IsClass ? interfaceOrBaseOrMixinType : null;
 
         var typeBuilder = moduleBuilder.DefineType(name, typeAttributes, baseType);
 
@@ -204,11 +204,18 @@ public class ConcretelyBakery : AbstractlyBakery
 
         var constructorGenerator = constructorBuilder.GetILGenerator();
 
-        state = new BakingState(typeBuilder, EnsureMixin, constructorGenerator, defaultProvider);
+        state = new BakingState(typeBuilder, EnsureDelegatingMixin, constructorGenerator, defaultProvider);
 
         try
         {
-            ImplementBaseOrInterface(state, interfaceOrBaseType, generators);
+            if (interfaceOrBaseOrMixinType.IsValueType)
+            {
+                EnsureImplementedMixin(state, interfaceOrBaseOrMixinType, generators, false);
+            }
+            else
+            {
+                ImplementBaseOrInterface(state, interfaceOrBaseOrMixinType, generators);
+            }
 
             constructorGenerator.Emit(OpCodes.Ret);
 
@@ -247,19 +254,10 @@ public class ConcretelyBakery : AbstractlyBakery
         }
     }
 
-    FieldBuilder EnsureMixin(BakingState state, Type type, Boolean isPrivate)
-    {
-        var fieldBuilder = state.Mixins.GetValueOrDefault(type);
+    FieldBuilder EnsureDelegatingMixin(BakingState state, Type type, Boolean isPrivate)
+        => CreateMixin(state, type, true, isPrivate);
 
-        if (fieldBuilder is null)
-        {
-            CreateMixin(state, type, isPrivate, out fieldBuilder);
-        }
-
-        return fieldBuilder;
-    }
-
-    void CreateMixin(BakingState state, Type type, Boolean isPrivate, out FieldBuilder fieldBuilder)
+    void CreateMixin(BakingState state, Type type, Boolean onlyDelegate, Boolean isPrivate, out FieldBuilder fieldBuilder)
     {
         var typeBuilder = state.TypeBuilder;
 
@@ -277,16 +275,19 @@ public class ConcretelyBakery : AbstractlyBakery
 
         if (interfaces.Length == 0) return;
 
-        var nestedGenerators = new ComponentGenerators(
-            new DelegatingPropertyGenerator(fieldBuilder),
-            new DelegatingEventGenerator(fieldBuilder)
-        );
-
         if (!isPrivate)
         {
+            if (onlyDelegate)
+            {
+                generators = new ComponentGenerators(
+                    new DelegatingPropertyGenerator(fieldBuilder),
+                    new DelegatingEventGenerator(fieldBuilder)
+                );
+            }
+
             foreach (var ifc in interfaces)
             {
-                ImplementBaseOrInterface(state, ifc, nestedGenerators);
+                ImplementBaseOrInterface(state, ifc, generators);
             }
         }
     }

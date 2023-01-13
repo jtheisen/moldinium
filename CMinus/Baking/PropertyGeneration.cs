@@ -333,8 +333,6 @@ public class GenericPropertyGenerator : AbstractPropertyGenerator
             .Where(i => i.parameterKind == ImplementationTypeArgumentKind.Mixin)
             .ToArray();
 
-
-
         if (mixinArgumentInfo.Length > 1)
         {
             throw new Exception("Multiple mixins are not yet supported");
