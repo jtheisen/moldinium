@@ -2,7 +2,7 @@
 
 class Program
 {
-    static Bakery classFactory = new Bakery("Funky");
+    static AbstractlyBakery classFactory = new AbstractlyBakery("Funky");
 
     static void Main(string[] args)
     {

@@ -1,6 +1,8 @@
-﻿using Castle.DynamicProxy.Generators;
+﻿using Castle.Core.Configuration;
+using Castle.DynamicProxy.Generators;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -15,32 +17,9 @@ public record BakingState(TypeBuilder TypeBuilder, MixinEnsurer EnsureMixin, ILG
     public readonly Dictionary<Type, FieldBuilder> Mixins = new Dictionary<Type, FieldBuilder>();
 }
 
-public class Bakery
+public abstract class AbstractBakery
 {
-    readonly string name;
-    readonly BakeryConfiguration configuration;
-    readonly IBakeryComponentGenerators generators;
-    readonly IDefaultProvider defaultProvider;
-    readonly TypeAttributes typeAttributes;
-    readonly ModuleBuilder moduleBuilder;
-
-    BakingState? state;
-
-    public String Name => name;
-
-    public Bakery(String name, BakeryConfiguration? configuration = null)
-    {
-        this.name = name;
-        this.configuration = configuration ?? BakeryConfiguration.PocGenerationConfiguration;
-        generators = this.configuration.Generators;
-        defaultProvider = this.configuration.DefaultProvider;
-
-        var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName(name), AssemblyBuilderAccess.Run);
-        moduleBuilder = assemblyBuilder.DefineDynamicModule(name);
-        typeAttributes = TypeAttributes.Public;
-
-        if (this.configuration.MakeAbstract) typeAttributes |= TypeAttributes.Abstract;
-    }
+    Dictionary<Type, Type> bakedTypes = new Dictionary<Type, Type>();
 
     public T Create<T>()
     {
@@ -56,17 +35,170 @@ public class Bakery
         }
     }
 
-    public Type Resolve(Type interfaceType)
+    public Type Resolve(Type interfaceOrBaseType)
     {
-        var name = "C" + interfaceType.Name;
-        return moduleBuilder.GetType(name) ?? Create(name, interfaceType);
+        if (!bakedTypes.TryGetValue(interfaceOrBaseType, out var bakedType))
+        {
+            bakedTypes[interfaceOrBaseType] = bakedType = Create(interfaceOrBaseType);
+        }
+
+        return bakedType;
     }
 
-    Type Create(String name, Type interfaceType)
+    public abstract Type Create(Type interfaceOrBaseType);
+}
+
+public class DoubleBakery : AbstractBakery
+{
+    AbstractlyBakery abstractlyBakery, concretelyBakery;
+
+    public DoubleBakery(String name)
+        : this(name, BakeryConfiguration.PocGenerationConfiguration) { }
+
+    public DoubleBakery(String name, BakeryConfiguration configuration)
+    {
+        abstractlyBakery = new AbstractlyBakery($"{name} (abstractly)");
+        concretelyBakery = new ConcretelyBakery($"{name} (concretely)", configuration);
+    }
+
+    public override Type Create(Type interfaceType)
+    {
+        if (!interfaceType.IsInterface) throw new Exception($"The DoubleBakery creates only types from interfaces");
+
+        var baseType = abstractlyBakery.Create(interfaceType);
+
+        var concreteType = concretelyBakery.Create(baseType);
+
+        return concreteType;
+    }
+}
+
+public class AbstractlyBakery : AbstractBakery
+{
+    protected readonly string name;
+    protected readonly bool makeAbstract;
+    protected readonly ModuleBuilder moduleBuilder;
+    protected readonly TypeAttributes typeAttributes;
+
+    public AbstractlyBakery(String name, TypeAttributes typeAttributes = TypeAttributes.Public | TypeAttributes.Abstract)
+    {
+        this.name = name;
+        this.typeAttributes = typeAttributes;
+        var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName(name), AssemblyBuilderAccess.Run);
+        moduleBuilder = assemblyBuilder.DefineDynamicModule(name);
+    }
+
+    protected virtual String GetTypeName(Type interfaceOrBaseType)
+        => $"{GetTypePrefix()}{interfaceOrBaseType.Name}";
+
+    String GetTypePrefix()
+    {
+        if (typeAttributes.HasFlag(TypeAttributes.Abstract))
+        {
+            return "A";
+        }
+        else if (typeAttributes.HasFlag(TypeAttributes.SequentialLayout))
+        {
+            return "S";
+        }
+        else
+        {
+            return "C";
+        }
+    }
+
+    public override Type Create(Type interfaceOrBaseType)
+    {
+        var name = GetTypeName(interfaceOrBaseType);
+        return moduleBuilder.GetType(name) ?? Create(name, interfaceOrBaseType);
+    }
+
+    protected virtual Type Create(String name, Type interfaceType)
+    {
+        var typeBuilder = moduleBuilder.DefineType(name, typeAttributes);
+
+        RedeclareInterface(typeBuilder, interfaceType);
+
+        return typeBuilder.CreateType() ?? throw new Exception("TypeBuilder gave no built type");
+    }
+
+    void RedeclareInterface(TypeBuilder typeBuilder, Type type)
+    {
+        typeBuilder.AddInterfaceImplementation(type);
+
+        foreach (var property in type.GetProperties())
+        {
+            var propertyBuilder = typeBuilder.DefineProperty(property.Name, property.Attributes, property.PropertyType, null);
+
+            if (RedeclareMethodIfApplicable(typeBuilder, property.GetGetMethod(), out var getMethodBuilder))
+                propertyBuilder.SetGetMethod(getMethodBuilder);
+            if (RedeclareMethodIfApplicable(typeBuilder, property.GetSetMethod(), out var setMethodBuilder))
+                propertyBuilder.SetSetMethod(setMethodBuilder);
+        }
+
+        foreach (var evt in type.GetEvents())
+        {
+            var eventBuilder = typeBuilder.DefineEvent(evt.Name, evt.Attributes, evt.EventHandlerType ?? throw new Exception($"No event handler type"));
+
+            if (RedeclareMethodIfApplicable(typeBuilder, evt.GetAddMethod(), out var addMethodBuilder))
+                eventBuilder.SetAddOnMethod(addMethodBuilder);
+            if (RedeclareMethodIfApplicable(typeBuilder, evt.GetRemoveMethod(), out var removeMethodBuilder))
+                eventBuilder.SetRemoveOnMethod(removeMethodBuilder);
+        }
+
+        foreach (var method in type.GetMethods())
+        {
+            if (method.IsSpecialName) continue;
+
+            RedeclareMethodIfApplicable(typeBuilder, method, out _);
+        }
+    }
+
+    Boolean RedeclareMethodIfApplicable(TypeBuilder typeBuilder, MethodInfo? method, [MaybeNullWhen(false)] out MethodBuilder methodBuilder)
+    {
+        methodBuilder = null;
+
+        if (method is null || !method.IsAbstract) return false;
+
+        var attributes = method.Attributes & (~MethodAttributes.NewSlot);
+
+        attributes &= ~MethodAttributes.NewSlot;
+        attributes |= ~MethodAttributes.Public;
+
+        methodBuilder = typeBuilder.DefineMethod(method.Name, attributes, method.ReturnType, method.GetParameters().Select(p => p.ParameterType).ToArray());
+
+        return true;
+    }
+}
+
+public class ConcretelyBakery : AbstractlyBakery
+{
+    readonly BakeryConfiguration configuration;
+    readonly IBakeryComponentGenerators generators;
+    readonly IDefaultProvider defaultProvider;
+
+    BakingState? state;
+
+    public String Name => name;
+
+    public ConcretelyBakery(String name)
+        : this(name, BakeryConfiguration.PocGenerationConfiguration) { }
+
+    public ConcretelyBakery(String name, BakeryConfiguration configuration)
+        : base(name, TypeAttributes.Public)
+    {
+        this.configuration = BakeryConfiguration.PocGenerationConfiguration;
+        generators = this.configuration.Generators;
+        defaultProvider = this.configuration.DefaultProvider;
+    }
+
+    protected override Type Create(String name, Type interfaceOrBaseType)
     {
         if (state is not null) throw new Exception("Already building a type");
 
-        var typeBuilder = moduleBuilder.DefineType(name, typeAttributes);
+        var baseType = interfaceOrBaseType.IsInterface ? null : interfaceOrBaseType;
+
+        var typeBuilder = moduleBuilder.DefineType(name, typeAttributes, baseType);
 
         var constructorBuilder = typeBuilder.DefineConstructor(MethodAttributes.Public, CallingConventions.Standard, new Type[] { });
 
@@ -76,7 +208,7 @@ public class Bakery
 
         try
         {
-            ImplementInterface(state, interfaceType, generators);
+            ImplementBaseOrInterface(state, interfaceOrBaseType, generators);
 
             constructorGenerator.Emit(OpCodes.Ret);
 
@@ -88,11 +220,14 @@ public class Bakery
         }
     }
 
-    void ImplementInterface(BakingState state, Type type, IBakeryComponentGenerators generators)
+    void ImplementBaseOrInterface(BakingState state, Type type, IBakeryComponentGenerators generators)
     {
         var typeBuilder = state.TypeBuilder;
 
-        typeBuilder.AddInterfaceImplementation(type);
+        if (type.IsInterface)
+        {
+            typeBuilder.AddInterfaceImplementation(type);
+        }
 
         foreach (var property in type.GetProperties())
         {
@@ -151,7 +286,7 @@ public class Bakery
         {
             foreach (var ifc in interfaces)
             {
-                ImplementInterface(state, ifc, nestedGenerators);
+                ImplementBaseOrInterface(state, ifc, nestedGenerators);
             }
         }
     }

@@ -43,7 +43,7 @@ namespace CMinus.Tests
         {
             provider = new CombinedDependencyProvider(
                 new AcceptingDefaultConstructiblesDependencyProvider(), // We really should only allow "baked" types to be blindly constructed
-                new BakeryDependencyProvider(new Bakery("TestBakery")),
+                new BakeryDependencyProvider(new AbstractlyBakery("TestBakery")),
                 new FactoryDependencyProvider(),
                 new ActivatorDependencyProvider(),
                 new InitSetterDependencyProvider()

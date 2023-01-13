@@ -2,20 +2,20 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.ComponentModel;
 
-namespace CMinus.Tests;
+namespace CMinus.Tests.Baking;
 
 [TestClass]
 public class BakeryTests
 {
-    static Bakery BasicFactory = new Bakery("Basic");
+    static AbstractBakery BasicFactory = new DoubleBakery("Basic");
 
     public interface IPropertyTest
     {
-        String DefaultInitializedValue { get; set; }
+        string DefaultInitializedValue { get; set; }
 
-        String? Value { get; set; }
+        string? Value { get; set; }
 
-        void SetValue(String value) => Value = value;
+        void SetValue(string value) => Value = value;
 
         void Validate()
         {
@@ -33,7 +33,7 @@ public class BakeryTests
 
     public interface IPropertyTestWithInit
     {
-        String Value { get; init; }
+        string Value { get; init; }
 
         void Validate()
         {
@@ -75,13 +75,13 @@ public class BakeryTests
 
     public struct TrivialComplexPropertyImplementation<Value> : IPropertyImplementation<Value, EmptyMixIn>
     {
-        public void Init(Value def) => this.value = def;
+        public void Init(Value def) => value = def;
 
         Value value;
 
-        public Value Get(Object self, ref EmptyMixIn mixIn) => value;
+        public Value Get(object self, ref EmptyMixIn mixIn) => value;
 
-        public void Set(Object self, ref EmptyMixIn mixIn, Value value) { this.value = value; }
+        public void Set(object self, ref EmptyMixIn mixIn, Value value) { this.value = value; }
     }
 
     [TestMethod]
@@ -98,12 +98,12 @@ public class BakeryTests
 
     public interface INotifyPropertChangedMixin : INotifyPropertyChanged
     {
-        Int32 ListenerCount { get; set; }
+        int ListenerCount { get; set; }
     }
 
     public struct NotifyPropertChangedMixin : INotifyPropertChangedMixin
     {
-        public Int32 ListenerCount { get; set; }
+        public int ListenerCount { get; set; }
 
         event PropertyChangedEventHandler? backingPropertyChanged;
 
@@ -123,12 +123,12 @@ public class BakeryTests
             }
         }
 
-        public void NotifyPropertyChanged(Object o) => backingPropertyChanged?.Invoke(o, new PropertyChangedEventArgs(""));
+        public void NotifyPropertyChanged(object o) => backingPropertyChanged?.Invoke(o, new PropertyChangedEventArgs(""));
     }
 
     public struct NotifyPropertyChangedPropertyImplementation<Value> : IPropertyImplementation<Value, NotifyPropertChangedMixin>
     {
-        Boolean initialized;
+        bool initialized;
 
         public void Init(Value def) { initialized = true; value = def; }
 
@@ -136,9 +136,9 @@ public class BakeryTests
 
         Value value;
 
-        public Value Get(Object self, ref NotifyPropertChangedMixin mixIn) => value;
+        public Value Get(object self, ref NotifyPropertChangedMixin mixIn) => value;
 
-        public void Set(Object self, ref NotifyPropertChangedMixin mixIn, Value value)
+        public void Set(object self, ref NotifyPropertChangedMixin mixIn, Value value)
         {
             AssertInitialized();
 

@@ -98,9 +98,9 @@ public interface IDependencyProvider
 
 public class BakeryDependencyProvider : IDependencyProvider
 {
-    private readonly Bakery bakery;
+    private readonly AbstractlyBakery bakery;
 
-    public BakeryDependencyProvider(Bakery bakery)
+    public BakeryDependencyProvider(AbstractlyBakery bakery)
     {
         this.bakery = bakery;
     }
