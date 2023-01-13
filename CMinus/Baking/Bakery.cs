@@ -170,8 +170,8 @@ public class AbstractlyBakery : AbstractBakery
 
         var attributes = method.Attributes & (~MethodAttributes.NewSlot);
         
-        attributes &= ~MethodAttributes.NewSlot;
-        attributes |= ~MethodAttributes.Public;
+        //attributes &= ~MethodAttributes.NewSlot;
+        //attributes |= ~MethodAttributes.Public;
 
         methodBuilder = typeBuilder.DefineMethod(method.Name, attributes, method.ReturnType, method.GetParameters().Select(p => p.ParameterType).ToArray());
 
