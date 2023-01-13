@@ -1,4 +1,6 @@
-﻿using System;
+﻿using CMinus.Injection;
+using System;
+using System.Collections.Generic;
 
 namespace CMinus;
 
@@ -38,13 +40,29 @@ public class DefaultDefaultProvider : IDefaultProvider
 {
     public Type? GetDefaultType(Type type)
     {
-        if (type == typeof(String))
+        if (type.IsValueType)
+        {
+            return typeof(DefaultDefaultConstructible<>);
+        }
+        else if (type == typeof(String))
         {
             return typeof(DefaultString);
         }
 
+        var interfaces = TypeInterfaces.Get(type);
+
+        if (interfaces.DoesTypeImplement(typeof(IDisposable))) return null;
+        if (interfaces.DoesTypeImplement(typeof(IAsyncDisposable))) return null;
+
+        var traits = TypeTraits.Get(type);
+
+        if (interfaces.DoesTypeImplement(typeof(ICollection<>)) && traits.IsDefaultConstructible)
+        {
+            return typeof(DefaultDefaultConstructible<>);
+        }
+
         return null;
-    }
+   }
 }
 
 public static class Defaults

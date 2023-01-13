@@ -9,12 +9,7 @@ namespace CMinus.Tests
     {
         Func<ITodoList, ITodoItem> CreateItem { get; init; }
 
-        List<ITodoItem> Items { get; set; } // FIXME
-
-        void Init()
-        {
-            Items = new List<ITodoItem>(); // FIXME
-        }
+        List<ITodoItem> Items { get; set; }
 
         ITodoItem AddItem(String text)
         {
@@ -59,8 +54,6 @@ namespace CMinus.Tests
         public void TestTodoList()
         {
             var todoList = provider.CreateInstance<ITodoList>();
-
-            todoList.Init();
 
             Assert.AreEqual(0, todoList.Items.Count);
 

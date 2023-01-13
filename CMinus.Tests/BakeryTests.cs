@@ -75,7 +75,7 @@ public class BakeryTests
 
     public struct TrivialComplexPropertyImplementation<Value> : IPropertyImplementation<Value, EmptyMixIn>
     {
-        public void Init() { }
+        public void Init(Value def) => this.value = def;
 
         Value value;
 
@@ -85,12 +85,16 @@ public class BakeryTests
     }
 
     [TestMethod]
-    public void TrivialComplexTest() => BakeryConfiguration.Create(typeof(TrivialComplexPropertyImplementation<>))
-        .CreateBakery(nameof(TrivialComplexTest))
-        .Create<IPropertyTest>()
-        .Validate();
+    public void TrivialComplexTest()
+    {
+        var instance = BakeryConfiguration.Create(typeof(TrivialComplexPropertyImplementation<>))
+            .CreateBakery(nameof(TrivialComplexTest))
+            .Create<IPropertyTest>();
 
+        Assert.AreEqual("", instance.DefaultInitializedValue);
 
+        instance.Validate();
+    }
 
     public interface INotifyPropertChangedMixin : INotifyPropertyChanged
     {
@@ -126,7 +130,7 @@ public class BakeryTests
     {
         Boolean initialized;
 
-        public void Init() { initialized = true; }
+        public void Init(Value def) { initialized = true; value = def; }
 
         void AssertInitialized() { if (!initialized) throw new Exception(); }
 
@@ -150,6 +154,8 @@ public class BakeryTests
         var instance = BakeryConfiguration.Create(typeof(NotifyPropertyChangedPropertyImplementation<>))
             .CreateBakery(nameof(NotifyPropertyChangedTest))
             .Create<IPropertyTest>();
+
+        Assert.AreEqual("", instance.DefaultInitializedValue);
 
         var instanceAsNotifyPropertyChanged = instance as INotifyPropertChangedMixin;
 

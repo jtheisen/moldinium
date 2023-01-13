@@ -31,6 +31,8 @@ public interface IPropertyImplementation<
     [TypeKind(ImplementationTypeArgumentKind.Mixin)] Mixin
 > : IPropertyImplementation
 {
+    void Init(Value def);
+
     Value Get(Object self, ref Mixin mixin);
 
     void Set(Object self, ref Mixin mixin, Value value);
@@ -117,7 +119,7 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
             {
                 var takesDefaultValue = backingInitMethod.GetParameters().Select(p => p.ParameterType).Any(t => t == valueType);
 
-                var info = Reflection.Get(property.DeclaringType ?? throw new Exception("Unexpectedly not having a declaring type"));
+                var info = TypeProperties.Get(property.DeclaringType ?? throw new Exception("Unexpectedly not having a declaring type"));
 
                 var requiresDefault = info.Properties.Single(p => p.info == property).requiresDefault;
 
@@ -135,7 +137,7 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
                 var defaultImplementationFieldBuilder = state.EnsureMixin(state, defaultType, true);
 
-                GenerateWrapperCode(state.ConstructorGenerator, fieldBuilder, backingInitMethod, argumentKinds, mixinFieldBuilder, defaultImplementationFieldBuilder, defaultImplementationGetMethod);
+                GenerateWrapperCode(state.ConstructorGenerator, MethodType.Constructor, fieldBuilder, backingInitMethod, argumentKinds, mixinFieldBuilder, defaultImplementationFieldBuilder, defaultImplementationGetMethod);
             }
         }
 
@@ -143,7 +145,7 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
         {
             var getMethodBuilder = Create(typeBuilder, getMethod, isAbstract: false);
             var generator = getMethodBuilder.GetILGenerator();
-            GenerateWrapperCode(generator, fieldBuilder, backingGetMethod, argumentKinds, mixinFieldBuilder);
+            GenerateWrapperCode(generator, MethodType.Get, fieldBuilder, backingGetMethod, argumentKinds, mixinFieldBuilder);
             propertyBuilder.SetGetMethod(getMethodBuilder);
         }
 
@@ -151,13 +153,14 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
         {
             var setMethodBuilder = Create(typeBuilder, setMethod, isAbstract: false);
             var generator = setMethodBuilder.GetILGenerator();
-            GenerateWrapperCode(generator, fieldBuilder, backingSetMethod, argumentKinds, mixinFieldBuilder);
+            GenerateWrapperCode(generator, MethodType.Set, fieldBuilder, backingSetMethod, argumentKinds, mixinFieldBuilder);
             propertyBuilder.SetSetMethod(setMethodBuilder);
         }
     }
 
     void GenerateWrapperCode(
         ILGenerator generator,
+        MethodType methodType,
         FieldBuilder fieldBuilder,
         MethodInfo backingMethod,
         IDictionary<Type, ImplementationTypeArgumentKind> argumentKinds,
@@ -193,18 +196,25 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
                 {
                     case ImplementationTypeArgumentKind.Value:
                         if (byRef) throw new Exception("Values must be passed by value");
-                        if (defaultImplementationFieldBuilder is not null && defaultImplementationGetMethod is not null)
+
+                        switch (methodType)
                         {
-                            // This means we're wrapping an init method and need to create the default value
-                            generator.Emit(OpCodes.Ldarg_0);
-                            generator.Emit(OpCodes.Ldflda, defaultImplementationFieldBuilder);
-                            generator.Emit(OpCodes.Call, defaultImplementationGetMethod);
+                            case MethodType.Constructor:
+                                if (defaultImplementationFieldBuilder is null || defaultImplementationGetMethod is null)
+                                {
+                                    throw new Exception("Expected to have a fieldBuilder with a get method");
+                                }
+                                generator.Emit(OpCodes.Ldarg_0);
+                                generator.Emit(OpCodes.Ldflda, defaultImplementationFieldBuilder);
+                                generator.Emit(OpCodes.Call, defaultImplementationGetMethod);
+                                break;
+                            case MethodType.Set:
+                                generator.Emit(OpCodes.Ldarg_1);
+                                break;
+                            default:
+                                break;
                         }
-                        else
-                        {
-                            // This means we're wrapping a setter method and need to pass the value
-                            generator.Emit(OpCodes.Ldarg_1);
-                        }
+
                         break;
                     case ImplementationTypeArgumentKind.Mixin:
                         if (!byRef) throw new Exception("Mixins must be passed by ref");
@@ -219,7 +229,10 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
         generator.Emit(OpCodes.Call, backingMethod);
 
-        generator.Emit(OpCodes.Ret);
+        if (methodType != MethodType.Constructor)
+        {
+            generator.Emit(OpCodes.Ret);
+        }
     }
 
     (Type type, Boolean byRef) GetParameterType(ParameterInfo p)

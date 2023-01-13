@@ -168,9 +168,9 @@ public class AcceptingDefaultConstructiblesDependencyProvider : IDependencyProvi
     {
         if (dep.Maturity != DependencyRuntimeMaturity.OnlyType) return null;
 
-        var reflection = Reflection.Get(dep.Type);
+        var traits = TypeTraits.Get(dep.Type);
 
-        if (!reflection.IsDefaultConstructible) return null;
+        if (!traits.IsDefaultConstructible) return null;
 
         return new DependencyResolution(
             this,
@@ -188,9 +188,9 @@ public class ActivatorDependencyProvider : IDependencyProvider
     {
         if (dep.Maturity != DependencyRuntimeMaturity.UntouchedInstance) return null;
 
-        var reflection = Reflection.Get(dep.Type);
+        var traits = TypeTraits.Get(dep.Type);
 
-        if (!reflection.IsDefaultConstructible) return null;
+        if (!traits.IsDefaultConstructible) return null;
 
         return new DependencyResolution(
             this,
@@ -208,7 +208,7 @@ public class InitSetterDependencyProvider : IDependencyProvider
     {
         if (dep.Maturity != DependencyRuntimeMaturity.InitSettersSetInstance) return null;
 
-        var reflection = Reflection.Get(dep.Type);
+        var reflection = TypeProperties.Get(dep.Type);
 
         var dependencies =
             from p in reflection.Properties

@@ -1,21 +1,62 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
 namespace CMinus.Injection;
 
-public class Reflection
+public class TypeTraits
 {
-    public Type Type { get; }
+    public Boolean IsDefaultConstructible { get; }
 
+    private TypeTraits(Type type)
+    {
+        IsDefaultConstructible = CanCreateInstanceUsingDefaultConstructor(type);
+    }
+
+    static bool CanCreateInstanceUsingDefaultConstructor(Type t) =>
+        t.IsValueType || !t.IsAbstract && t.GetConstructor(Type.EmptyTypes) != null;
+
+    static ConcurrentDictionary<Type, TypeTraits> cache = new ConcurrentDictionary<Type, TypeTraits>();
+    public static TypeTraits Get(Type type) => cache.GetOrAdd(type, t => new TypeTraits(t));
+}
+
+public class TypeInterfaces
+{
+    HashSet<Type> interfaces;
+
+    TypeInterfaces(Type type)
+    {
+        interfaces = new HashSet<Type>();
+
+        foreach (var i in type.GetInterfaces())
+        {
+            if (i.IsGenericType)
+            {
+                interfaces.Add(i.GetGenericTypeDefinition());
+            }
+            else
+            {
+                interfaces.Add(i);
+            }
+        }
+    }
+
+    public Boolean DoesTypeImplement(Type i)
+        => interfaces.Contains(i);
+
+    static ConcurrentDictionary<Type, TypeInterfaces> cache = new ConcurrentDictionary<Type, TypeInterfaces>();
+    public static TypeInterfaces Get(Type type) => cache.GetOrAdd(type, t => new TypeInterfaces(t));
+}
+
+public class TypeProperties
+{
     public PropertyInfoStruct[] Properties { get; }
 
     public Boolean HasAnyInitSetters { get; }
 
     public Boolean HasAnyDefaultRequirements { get; }
-
-    public Boolean IsDefaultConstructible { get; }
 
     public struct PropertyInfoStruct
     {
@@ -24,12 +65,8 @@ public class Reflection
         public Boolean hasInitSetter;
     }
 
-	public Reflection(Type type)
+	public TypeProperties(Type type)
 	{
-        Type = type;
-
-        IsDefaultConstructible = CanCreateInstanceUsingDefaultConstructor(type);
-
         var nullabilityContext = new NullabilityInfoContext();
 
         var props =
@@ -51,10 +88,6 @@ public class Reflection
         HasAnyDefaultRequirements = Properties.Any(p => p.requiresDefault);
     }
 
-    static bool CanCreateInstanceUsingDefaultConstructor(Type t) =>
-        t.IsValueType || !t.IsAbstract && t.GetConstructor(Type.EmptyTypes) != null;
-
-    static ConcurrentDictionary<Type, Reflection> cache = new ConcurrentDictionary<Type, Reflection>();
-
-    public static Reflection Get(Type type) => cache.GetOrAdd(type, t => new Reflection(t));
+    static ConcurrentDictionary<Type, TypeProperties> cache = new ConcurrentDictionary<Type, TypeProperties>();
+    public static TypeProperties Get(Type type) => cache.GetOrAdd(type, t => new TypeProperties(t));
 }
