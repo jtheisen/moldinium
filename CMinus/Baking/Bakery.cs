@@ -80,7 +80,7 @@ public class AbstractlyBakery : AbstractBakery
     protected readonly ModuleBuilder moduleBuilder;
     protected readonly TypeAttributes typeAttributes;
 
-    public AbstractlyBakery(String name, TypeAttributes typeAttributes = TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.SequentialLayout)
+    public AbstractlyBakery(String name, TypeAttributes typeAttributes = TypeAttributes.Public | TypeAttributes.Abstract)
     {
         this.name = name;
         this.typeAttributes = typeAttributes;
@@ -118,6 +118,14 @@ public class AbstractlyBakery : AbstractBakery
         var typeBuilder = moduleBuilder.DefineType(name, typeAttributes);
 
         RedeclareInterface(typeBuilder, interfaceType);
+
+        if (!typeAttributes.HasFlag(TypeAttributes.Abstract))
+        {
+            //foreach (var method in typeBuilder.metho)
+            //{
+            //    if (method.IsAbstract) throw new Exception();
+            //}
+        }
 
         return typeBuilder.CreateType() ?? throw new Exception("TypeBuilder gave no built type");
     }
@@ -161,7 +169,7 @@ public class AbstractlyBakery : AbstractBakery
         if (method is null || !method.IsAbstract) return false;
 
         var attributes = method.Attributes & (~MethodAttributes.NewSlot);
-
+        
         attributes &= ~MethodAttributes.NewSlot;
         attributes |= ~MethodAttributes.Public;
 
@@ -210,7 +218,7 @@ public class ConcretelyBakery : AbstractlyBakery
         {
             if (interfaceOrBaseOrMixinType.IsValueType)
             {
-                EnsureImplementedMixin(state, interfaceOrBaseOrMixinType, generators, false);
+                EnsureImplementedMixin(state, interfaceOrBaseOrMixinType, false);
             }
             else
             {
@@ -254,8 +262,23 @@ public class ConcretelyBakery : AbstractlyBakery
         }
     }
 
+    FieldBuilder EnsureImplementedMixin(BakingState state, Type type, Boolean isPrivate)
+        => EnsureMixin(state, type, false, isPrivate);
+
     FieldBuilder EnsureDelegatingMixin(BakingState state, Type type, Boolean isPrivate)
-        => CreateMixin(state, type, true, isPrivate);
+        => EnsureMixin(state, type, true, isPrivate);
+
+    FieldBuilder EnsureMixin(BakingState state, Type type, Boolean onlyDelegate, Boolean isPrivate)
+    {
+        var fieldBuilder = state.Mixins.GetValueOrDefault(type);
+
+        if (fieldBuilder is null)
+        {
+            CreateMixin(state, type, onlyDelegate, isPrivate, out fieldBuilder);
+        }
+
+        return fieldBuilder;
+    }
 
     void CreateMixin(BakingState state, Type type, Boolean onlyDelegate, Boolean isPrivate, out FieldBuilder fieldBuilder)
     {
@@ -277,17 +300,16 @@ public class ConcretelyBakery : AbstractlyBakery
 
         if (!isPrivate)
         {
-            if (onlyDelegate)
-            {
-                generators = new ComponentGenerators(
+            var nestedGenerators = onlyDelegate
+                ? new ComponentGenerators(
                     new DelegatingPropertyGenerator(fieldBuilder),
                     new DelegatingEventGenerator(fieldBuilder)
-                );
-            }
+                )
+                : generators;
 
             foreach (var ifc in interfaces)
             {
-                ImplementBaseOrInterface(state, ifc, generators);
+                ImplementBaseOrInterface(state, ifc, nestedGenerators);
             }
         }
     }

@@ -87,6 +87,11 @@ public abstract class AbstractGenerator
             parameters.Select(p => p.GetOptionalCustomModifiers()).ToArray()
         );
 
+        if (methodTemplate.DeclaringType!.IsClass)
+        {
+            typeBuilder.DefineMethodOverride(methodBuilder, methodTemplate);
+        }
+
         return methodBuilder;
     }
 }
