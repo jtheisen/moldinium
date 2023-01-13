@@ -1,6 +1,9 @@
 ﻿using CMinus.Injection;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
+using System.Reflection;
 
 namespace CMinus;
 
@@ -61,8 +64,28 @@ public class DefaultDefaultProvider : IDefaultProvider
             return typeof(DefaultDefaultConstructible<>);
         }
 
+        var genericTypeDefinition = type.GetGenericTypeDefinition();
+        var arguments = type.GetGenericArguments();
+
+        if (interfacesForTrackableList.Contains(genericTypeDefinition) && arguments.Length <= 1)
+        {
+            var typeArgument = arguments.Length == 1 ? arguments[0] : typeof(Object);
+
+            var implementationType = typeof(WatchableList<>).MakeGenericType(typeArgument);
+
+            var defaultImplementationType = typeof(DefaultDefaultConstructible<,>).MakeGenericType(type, implementationType);
+
+            return defaultImplementationType;
+        }
+
         return null;
-   }
+    }
+
+    static readonly Type[] interfacesForTrackableList = new[]
+    {
+        typeof(IList<>),
+        typeof(ICollection<>)
+    };
 }
 
 public static class Defaults
