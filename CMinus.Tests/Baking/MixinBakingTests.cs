@@ -5,88 +5,8 @@ using System.ComponentModel;
 namespace CMinus.Tests.Baking;
 
 [TestClass]
-public class BakeryTests
+public class MixinBakingTests : BakingTetsBase
 {
-    static AbstractBakery BasicFactory = new DoubleBakery("Basic");
-
-    public interface IHasStringPropertyWithInit
-    {
-        String Value { get; init; }
-    }
-
-    public interface IHasPropertyWithDefault
-    {
-        String Value { get; set; }
-    }
-
-    public interface IHasNullableProperty
-    {
-        String? Value { get; set; }
-
-        void SetValue(String value) => Value = value;
-
-        void Validate()
-        {
-            Assert.AreEqual(null, Value);
-
-            Value = "foo";
-
-            Assert.AreEqual("foo", Value);
-
-            Value = "bar";
-
-            Assert.AreEqual("bar", Value);
-        }
-    }
-
-    public interface IHasEvent
-    {
-        event Action Event;
-    }
-
-    [TestMethod]
-    public void SimpleTest()
-    {
-        var test = BasicFactory.Create<IHasNullableProperty>();
-
-        Assert.AreEqual(null, test.Value);
-
-        test.Value = "foo";
-
-        Assert.AreEqual("foo", test.Value);
-
-        test.SetValue("bar");
-
-        Assert.AreEqual("bar", test.Value);
-    }
-
-    [TestMethod]
-    public void DefaultValueTest()
-    {
-        var test = BasicFactory.Create<IHasPropertyWithDefault>();
-
-        Assert.AreEqual("", test.Value);
-    }
-
-    [TestMethod]
-    public void EventTypeCreationTest() => BasicFactory.Create<IHasEvent>();
-
-
-    [TestMethod]
-    public void WithInitTest() => BasicFactory.Create<IHasStringPropertyWithInit>();
-
-    public abstract class AHasStringPropertyWithInit
-    {
-        public abstract String Value { get; init; }
-    }
-
-    [TestMethod]
-    public void WithInitWithManualAbstractBaseTest()
-        => BakeryConfiguration.Create().CreateBakery("Concrete").Create<AHasStringPropertyWithInit>();
-
-
-
-
     public struct TrivialComplexPropertyImplementation<Value> : IPropertyImplementation<Value, EmptyMixIn>
     {
         public void Init(Value def) => value = def;
