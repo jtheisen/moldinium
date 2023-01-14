@@ -9,13 +9,21 @@ public class BakeryTests
 {
     static AbstractBakery BasicFactory = new DoubleBakery("Basic");
 
-    public interface IPropertyTest
+    public interface IHasStringPropertyWithInit
     {
-        string DefaultInitializedValue { get; set; }
+        String Value { get; init; }
+    }
 
-        string? Value { get; set; }
+    public interface IHasPropertyWithDefault
+    {
+        String Value { get; set; }
+    }
 
-        void SetValue(string value) => Value = value;
+    public interface IHasNullableProperty
+    {
+        String? Value { get; set; }
+
+        void SetValue(String value) => Value = value;
 
         void Validate()
         {
@@ -31,18 +39,7 @@ public class BakeryTests
         }
     }
 
-    public interface IPropertyTestWithInit
-    {
-        string Value { get; init; }
-
-        void Validate()
-        {
-            // TODO: this should give a "" default
-            Assert.AreEqual(null, Value);
-        }
-    }
-
-    public interface IEventTest
+    public interface IHasEvent
     {
         event Action Event;
     }
@@ -50,9 +47,7 @@ public class BakeryTests
     [TestMethod]
     public void SimpleTest()
     {
-        var test = BasicFactory.Create<IPropertyTest>();
-
-        //Assert.AreEqual("", test.DefaultInitializedValue);
+        var test = BasicFactory.Create<IHasNullableProperty>();
 
         Assert.AreEqual(null, test.Value);
 
@@ -68,16 +63,27 @@ public class BakeryTests
     [TestMethod]
     public void DefaultValueTest()
     {
-        var test = BasicFactory.Create<IPropertyTest>();
+        var test = BasicFactory.Create<IHasPropertyWithDefault>();
 
-        Assert.AreEqual("", test.DefaultInitializedValue);
+        Assert.AreEqual("", test.Value);
     }
 
     [TestMethod]
-    public void EventTypeCreationTest() => BasicFactory.Create<IEventTest>();
+    public void EventTypeCreationTest() => BasicFactory.Create<IHasEvent>();
+
 
     [TestMethod]
-    public void WithInitTest() => BasicFactory.Create<IPropertyTestWithInit>();
+    public void WithInitTest() => BasicFactory.Create<IHasStringPropertyWithInit>();
+
+    public abstract class AHasStringPropertyWithInit
+    {
+        public abstract String Value { get; init; }
+    }
+
+    [TestMethod]
+    public void WithInitWithManualAbstractBaseTest()
+        => BakeryConfiguration.Create().CreateBakery("Concrete").Create<IHasStringPropertyWithInit>();
+
 
 
 
@@ -95,13 +101,16 @@ public class BakeryTests
     [TestMethod]
     public void TrivialComplexTest()
     {
-        var instance = BakeryConfiguration.Create(typeof(TrivialComplexPropertyImplementation<>))
-            .CreateBakery(nameof(TrivialComplexTest))
-            .Create<IPropertyTest>();
+        var bakery = BakeryConfiguration.Create(typeof(TrivialComplexPropertyImplementation<>))
+            .CreateBakery(nameof(TrivialComplexTest));
 
-        Assert.AreEqual("", instance.DefaultInitializedValue);
+        {
+            var instance = bakery.Create<IHasPropertyWithDefault>();
 
-        instance.Validate();
+            Assert.AreEqual("", instance.Value);
+        }
+
+        bakery.Create<IHasNullableProperty>().Validate();
     }
 
     public interface INotifyPropertChangedMixin : INotifyPropertyChanged
@@ -160,10 +169,8 @@ public class BakeryTests
     public void NotifyPropertyChangedTest()
     {
         var instance = BakeryConfiguration.Create(typeof(NotifyPropertyChangedPropertyImplementation<>))
-            .CreateBakery(nameof(NotifyPropertyChangedTest))
-            .Create<IPropertyTest>();
-
-        Assert.AreEqual("", instance.DefaultInitializedValue);
+            .CreateDoubleBakery(nameof(NotifyPropertyChangedTest))
+            .Create<IHasNullableProperty>();
 
         var instanceAsNotifyPropertyChanged = instance as INotifyPropertChangedMixin;
 

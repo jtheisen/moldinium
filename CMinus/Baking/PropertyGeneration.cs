@@ -67,11 +67,16 @@ public struct SimplePropertyImplementation<T> : ISimplePropertyImplementation<T>
 
 public abstract class AbstractGenerator
 {
-    protected MethodBuilder Create(TypeBuilder typeBuilder, MethodInfo methodTemplate, Boolean isAbstract = true)
+    protected MethodBuilder Create(
+        TypeBuilder typeBuilder,
+        MethodInfo methodTemplate,
+        MethodAttributes toAdd = MethodAttributes.Public,
+        MethodAttributes toRemove = MethodAttributes.Abstract
+    )
     {
-        var attributes = methodTemplate.Attributes | MethodAttributes.Public;
-
-        if (!isAbstract) attributes &= ~MethodAttributes.Abstract;
+        var attributes = methodTemplate.Attributes;
+        attributes |= toAdd;
+        attributes &= ~toRemove;
 
         var parameters = methodTemplate.GetParameters();
 
@@ -148,7 +153,7 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
         if (getMethod is not null)
         {
-            var getMethodBuilder = Create(typeBuilder, getMethod, isAbstract: false);
+            var getMethodBuilder = Create(typeBuilder, getMethod, toRemove: MethodAttributes.Abstract);
             var generator = getMethodBuilder.GetILGenerator();
             GenerateWrapperCode(generator, MethodType.Get, fieldBuilder, backingGetMethod, argumentKinds, mixinFieldBuilder);
             propertyBuilder.SetGetMethod(getMethodBuilder);
@@ -156,7 +161,7 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
         if (setMethod is not null)
         {
-            var setMethodBuilder = Create(typeBuilder, setMethod, isAbstract: false);
+            var setMethodBuilder = Create(typeBuilder, setMethod, toRemove: MethodAttributes.Abstract);
             var generator = setMethodBuilder.GetILGenerator();
             GenerateWrapperCode(generator, MethodType.Set, fieldBuilder, backingSetMethod, argumentKinds, mixinFieldBuilder);
             propertyBuilder.SetSetMethod(setMethodBuilder);

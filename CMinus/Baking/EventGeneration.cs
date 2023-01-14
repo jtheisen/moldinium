@@ -62,13 +62,13 @@ public abstract class AbstractEventGenerator : AbstractGenerator
         if (backingRemoveMethod is null) throw new Exception($"Event implementation type must have a '{backingRemoveMethodName}' method");
 
         {
-            var addMethodBuilder = Create(typeBuilder, addMethod, isAbstract: false);
+            var addMethodBuilder = Create(typeBuilder, addMethod, toRemove: MethodAttributes.Abstract);
             var generator = addMethodBuilder.GetILGenerator();
             GenerateWrapperCode(generator, fieldBuilder, backingAddMethod);
             eventBuilder.SetAddOnMethod(addMethodBuilder);
         }
         {
-            var removeMethodBuilder = Create(typeBuilder, removeMethod, isAbstract: false);
+            var removeMethodBuilder = Create(typeBuilder, removeMethod, toRemove: MethodAttributes.Abstract);
             var generator = removeMethodBuilder.GetILGenerator();
             GenerateWrapperCode(generator, fieldBuilder, backingRemoveMethod);
             eventBuilder.SetRemoveOnMethod(removeMethodBuilder);

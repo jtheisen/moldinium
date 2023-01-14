@@ -49,6 +49,8 @@ public record BakeryConfiguration(IBakeryComponentGenerators Generators, IDefaul
         = new BakeryConfiguration(ComponentGenerators.Create(typeof(SimplePropertyImplementation<>), typeof(GenericEventImplementation<>)), Defaults.GetDefaultDefaultProvider());
 
     public AbstractlyBakery CreateBakery(String name) => new ConcretelyBakery(name, this);
+
+    public AbstractBakery CreateDoubleBakery(String name) => new DoubleBakery(name, this);
 }
 
 public class MixInGenerator
