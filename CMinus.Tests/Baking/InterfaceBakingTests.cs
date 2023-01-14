@@ -52,7 +52,7 @@ public class BakeryTests
     {
         var test = BasicFactory.Create<IPropertyTest>();
 
-        Assert.AreEqual("", test.DefaultInitializedValue);
+        //Assert.AreEqual("", test.DefaultInitializedValue);
 
         Assert.AreEqual(null, test.Value);
 
@@ -63,6 +63,14 @@ public class BakeryTests
         test.SetValue("bar");
 
         Assert.AreEqual("bar", test.Value);
+    }
+
+    [TestMethod]
+    public void DefaultValueTest()
+    {
+        var test = BasicFactory.Create<IPropertyTest>();
+
+        Assert.AreEqual("", test.DefaultInitializedValue);
     }
 
     [TestMethod]

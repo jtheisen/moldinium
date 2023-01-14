@@ -122,11 +122,11 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
             if (backingInitMethod is not null)
             {
-                var takesDefaultValue = backingInitMethod.GetParameters().Select(p => p.ParameterType).Any(t => t == valueType);
-
                 var info = TypeProperties.Get(property.DeclaringType ?? throw new Exception("Unexpectedly not having a declaring type"));
 
                 var requiresDefault = info.Properties.Single(p => p.info == property).requiresDefault;
+
+                var takesDefaultValue = backingInitMethod.GetParameters().Select(p => p.ParameterType).Any(t => t == valueType);
 
                 // If there's an init method taking a default value, we need to pass something even if the property doesn't actually
                 // need a default. In that case, we use a dummy default provider that at least doesn't do any allocation.

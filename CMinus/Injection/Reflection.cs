@@ -6,6 +6,9 @@ using System.Reflection;
 
 namespace CMinus.Injection;
 
+[AttributeUsage(AttributeTargets.Class)]
+public class RequiresDefaultAttribute : Attribute { }
+
 public class TypeTraits
 {
     public Boolean IsDefaultConstructible { get; }
@@ -75,10 +78,12 @@ public class TypeProperties
             let rpcm = set?.ReturnParameter.GetRequiredCustomModifiers()
             let nullabilityInfo = nullabilityContext.Create(p)
             let hasInitSetter = rpcm?.Contains(typeof(System.Runtime.CompilerServices.IsExternalInit)) ?? false
+            let requiresDefaultPerNullabilityInfo = nullabilityInfo.ReadState == NullabilityState.NotNull && !hasInitSetter
+            let requiresDefaultPerAttribute = p.GetCustomAttribute<RequiresDefaultAttribute>() is not null
             select new PropertyInfoStruct
             {
                 info = p,
-                requiresDefault = nullabilityInfo.ReadState == NullabilityState.NotNull && !hasInitSetter,
+                requiresDefault = requiresDefaultPerAttribute || requiresDefaultPerNullabilityInfo,
                 hasInitSetter = hasInitSetter
             };
 

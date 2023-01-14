@@ -1,5 +1,6 @@
 ﻿using Castle.Core.Configuration;
 using Castle.DynamicProxy.Generators;
+using CMinus.Injection;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -119,14 +120,6 @@ public class AbstractlyBakery : AbstractBakery
 
         RedeclareInterface(typeBuilder, interfaceType);
 
-        if (!typeAttributes.HasFlag(TypeAttributes.Abstract))
-        {
-            //foreach (var method in typeBuilder.metho)
-            //{
-            //    if (method.IsAbstract) throw new Exception();
-            //}
-        }
-
         return typeBuilder.CreateType() ?? throw new Exception("TypeBuilder gave no built type");
     }
 
@@ -137,6 +130,17 @@ public class AbstractlyBakery : AbstractBakery
         foreach (var property in type.GetProperties())
         {
             var propertyBuilder = typeBuilder.DefineProperty(property.Name, property.Attributes, property.PropertyType, null);
+
+            var info = TypeProperties.Get(property.DeclaringType ?? throw new Exception("Unexpectedly not having a declaring type"));
+
+            var requiresDefault = info.Properties.Single(p => p.info == property).requiresDefault;
+
+            if (requiresDefault)
+            {
+                var attributeConstructor = typeof(RequiresDefaultAttribute).GetConstructor(new Type[] { })!;
+
+                propertyBuilder.SetCustomAttribute(new CustomAttributeBuilder(attributeConstructor, new Object[] { }));
+            }
 
             if (RedeclareMethodIfApplicable(typeBuilder, property.GetGetMethod(), out var getMethodBuilder))
                 propertyBuilder.SetGetMethod(getMethodBuilder);
@@ -168,7 +172,7 @@ public class AbstractlyBakery : AbstractBakery
 
         if (method is null || !method.IsAbstract) return false;
 
-        var attributes = method.Attributes & (~MethodAttributes.NewSlot);
+        var attributes = method.Attributes;
         
         //attributes &= ~MethodAttributes.NewSlot;
         //attributes |= ~MethodAttributes.Public;
