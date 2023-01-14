@@ -10,7 +10,8 @@ namespace CMinus;
 public enum ImplementationTypeArgumentKind
 {
     Value,
-    Mixin
+    Mixin,
+    NestedPropertyImplementation
 }
 
 [AttributeUsage(AttributeTargets.GenericParameter)]
@@ -25,6 +26,19 @@ public class TypeKindAttribute : Attribute
 }
 
 public interface IPropertyImplementation { }
+
+/* Difficulties with wrapping
+ * 
+ * - Creating delegates to the nested implementation is possible but difficult if the nested method is virtual
+ * - Creating structs that delegate to the nested implementation is also difficult, but likely the way to implement the former
+ */
+
+public interface INestedPropertyImplementation<Value>
+{
+    Value Get();
+
+    void Set(Value value);
+}
 
 public interface IPropertyImplementation<
     [TypeKind(ImplementationTypeArgumentKind.Value)] Value,
