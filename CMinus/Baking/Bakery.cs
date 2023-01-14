@@ -258,6 +258,8 @@ public class ConcretelyBakery : AbstractlyBakery
             typeBuilder.AddInterfaceImplementation(type);
         }
 
+        var props = type.GetProperties().ToArray();
+
         foreach (var property in type.GetProperties())
         {
             generators.GetPropertyGenerator(property).GenerateProperty(state, property);

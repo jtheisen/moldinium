@@ -61,33 +61,129 @@ public class WrappingTests : BakingTetsBase
         instance.Validate();
     }
 
-    public interface IWrappingPropertyImplementation<
+
+    public interface ITrivialWrappingPropertyImplementation<
         [TypeKind(ImplementationTypeArgumentKind.Value)] Value
     > : IPropertyImplementation
     {
-        Boolean BeforeGet([MaybeNullWhen(true)] out Value value);
-        void AfterGet(ref Value value);
-        Boolean BeforeSet(ref Value value);
-        void AfterSet(ref Value value);
+        Boolean BeforeGet();
+        void AfterGet();
+        Boolean BeforeSet();
+        void AfterSet();
     }
 
-    //public struct WrappingPropertyImplementation<Value> : IWrappingPropertyImplementation<Value>
-    //{
+    public struct TrivialWrappingPropertyImplementation<Value> : ITrivialWrappingPropertyImplementation<Value>
+    {
+        public void AfterGet() { }
+
+        public void AfterSet() { }
+
+        public bool BeforeGet() => true;
+
+        public bool BeforeSet() => true;
+    }
+
+    [TestMethod]
+    public void TrivialPropertyWrappingTest()
+    {
+        var instance = BakeryConfiguration.Create(typeof(TrivialWrappingPropertyImplementation<>))
+            .CreateDoubleBakery("Wrapping")
+            .Create<IWithImplementedProperty>();
+
+        instance.Validate();
+    }
 
 
-    //    public Boolean BeforeGet(ref Value value);
-    //    public void AfterGet(ref Value value);
-    //    public Boolean BeforeSet(ref Value value);
-    //    public void AfterSet(ref Value value);
-    //}
 
-    //[TestMethod]
-    //public void PropertyWrappingTest()
-    //{
-    //    var instance = BakeryConfiguration.Create(typeof(WrappingPropertyImplementation<>))
-    //        .CreateDoubleBakery("Wrapping")
-    //        .Create<IWithImplementedProperty>();
 
-    //    instance.Validate();
-    //}
+
+    public enum WrappingPropertyNotificationEventType
+    {
+        BeforeGet,
+        AfterGet,
+        BeforeSet,
+        AfterSet
+    }
+
+    public interface IWrappingPropertyNotificationMixin
+    {
+        event Action<WrappingPropertyNotificationEventType, Object?> OnEvent;
+    }
+
+    public struct WrappingPropertyNotificationMixin : IWrappingPropertyNotificationMixin
+    {
+        public event Action<WrappingPropertyNotificationEventType, Object?> OnEvent;
+
+        public void Notify(WrappingPropertyNotificationEventType type, Object? value)
+        {
+            OnEvent?.Invoke(type, value);
+        }
+    }
+
+    public interface IWrappingPropertyImplementation<
+        [TypeKind(ImplementationTypeArgumentKind.Value)] Value,
+        [TypeKind(ImplementationTypeArgumentKind.Mixin)] Mixin
+    > : IPropertyImplementation
+    {
+        Boolean BeforeGet([MaybeNullWhen(true)] ref Value value, ref Mixin mixin);
+        void AfterGet(ref Value value, ref Mixin mixin);
+        Boolean BeforeSet(ref Value value, ref Mixin mixin);
+        void AfterSet(ref Value value, ref Mixin mixin);
+    }
+
+    public struct WrappingPropertyImplementation<Value> : IWrappingPropertyImplementation<Value, WrappingPropertyNotificationMixin>
+    {
+        public Boolean BeforeGet(ref Value value, ref WrappingPropertyNotificationMixin mixin)
+        {
+            mixin.Notify(WrappingPropertyNotificationEventType.BeforeGet, value);
+
+            return true;
+        }
+
+        public void AfterGet(ref Value value, ref WrappingPropertyNotificationMixin mixin)
+        {
+            mixin.Notify(WrappingPropertyNotificationEventType.AfterGet, value);
+        }
+
+        public Boolean BeforeSet(ref Value value, ref WrappingPropertyNotificationMixin mixin)
+        {
+            mixin.Notify(WrappingPropertyNotificationEventType.BeforeSet, value);
+
+            return true;
+        }
+
+        public void AfterSet(ref Value value, ref WrappingPropertyNotificationMixin mixin)
+        {
+            mixin.Notify(WrappingPropertyNotificationEventType.AfterSet, value);
+        }
+    }
+
+    [TestMethod]
+    public void PropertyWrappingTest()
+    {
+        var instance = BakeryConfiguration.Create(typeof(WrappingPropertyImplementation<>))
+            .CreateDoubleBakery("Wrapping")
+            .Create<IWithImplementedProperty>();
+
+        instance.Validate();
+
+        var events = new List<(WrappingPropertyNotificationEventType type, Object? value)>();
+
+        var observable = instance as IWrappingPropertyNotificationMixin;
+
+        Assert.IsNotNull(observable);
+
+        if (observable is null) throw new Exception();
+
+        observable.OnEvent += (t, v) =>
+        {
+            events.Add((t, v));
+        };
+
+        Assert.AreEqual(0, events.Count);
+
+        instance.Value = "foo";
+
+        Assert.AreEqual(2, events.Count);
+    }
 }

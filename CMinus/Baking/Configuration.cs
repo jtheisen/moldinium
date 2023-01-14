@@ -57,10 +57,12 @@ public class MixInGenerator
 {
 }
 
-public enum MethodType
+public enum CodeGenerationContextType
 {
     Other,
     Constructor,
+    Wrapper,
+    Nested,
     Get,
     Set,
     Add,

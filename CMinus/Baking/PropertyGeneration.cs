@@ -139,6 +139,8 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
         var (fieldBuilder, backingGetMethod, backingSetMethod) = GetPropertyImplementation(state, property);
 
+        var methodCreator = new MethodCreation(typeBuilder, argumentKinds, fieldBuilder, mixinFieldBuilder);
+
         {
             var backingInitMethod = fieldBuilder.FieldType.GetMethod("Init");
 
@@ -164,113 +166,41 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
                 var defaultImplementationFieldBuilder = state.EnsureMixin(state, defaultType, true);
 
-                GenerateWrapperCode(state.ConstructorGenerator, MethodType.Constructor, fieldBuilder, backingInitMethod, argumentKinds, mixinFieldBuilder, defaultImplementationFieldBuilder, defaultImplementationGetMethod);
+                methodCreator.GenerateImplementationCode(
+                    state.ConstructorGenerator,
+                    CodeGenerationContextType.Constructor,
+                    fieldBuilder, backingInitMethod,
+                    defaultImplementationFieldBuilder,
+                    defaultImplementationGetMethod
+                );
             }
         }
 
         if (getMethod is not null)
         {
-            var getMethodBuilder = Create(typeBuilder, getMethod, toRemove: MethodAttributes.Abstract);
-            var generator = getMethodBuilder.GetILGenerator();
-            if (backingGetMethod.Method is null) throw new NotImplementedException(); // FIXME
-            GenerateWrapperCode(generator, MethodType.Get, fieldBuilder, backingGetMethod.Method, argumentKinds, mixinFieldBuilder);
+            var getMethodBuilder = methodCreator.CreatePropertyMethod(
+                CodeGenerationContextType.Get,
+                getMethod, getMethod.GetBaseDefinition(),
+                backingGetMethod,
+                valueType,
+                toRemove: MethodAttributes.Abstract
+            );
+
             propertyBuilder.SetGetMethod(getMethodBuilder);
         }
 
         if (setMethod is not null)
         {
-            var setMethodBuilder = Create(typeBuilder, setMethod, toRemove: MethodAttributes.Abstract);
-            var generator = setMethodBuilder.GetILGenerator();
-            if (backingSetMethod.Method is null) throw new NotImplementedException();
-            GenerateWrapperCode(generator, MethodType.Set, fieldBuilder, backingSetMethod.Method, argumentKinds, mixinFieldBuilder);
+            var setMethodBuilder = methodCreator.CreatePropertyMethod(
+                CodeGenerationContextType.Set,
+                setMethod, setMethod.GetBaseDefinition(),
+                backingSetMethod,
+                valueType,
+                toRemove: MethodAttributes.Abstract
+            );
+
             propertyBuilder.SetSetMethod(setMethodBuilder);
         }
-    }
-
-    void GenerateWrapperCode(
-        ILGenerator generator,
-        MethodType methodType,
-        FieldBuilder fieldBuilder,
-        MethodInfo backingMethod,
-        IDictionary<Type, ImplementationTypeArgumentKind> argumentKinds,
-        FieldBuilder? mixInFieldBuilder,
-        FieldBuilder? defaultImplementationFieldBuilder = null,
-        MethodInfo? defaultImplementationGetMethod = null
-    )
-    {
-        if (!backingMethod.IsStatic)
-        {
-            generator.Emit(OpCodes.Ldarg_0);
-            generator.Emit(OpCodes.Ldflda, fieldBuilder);
-        }
-
-        var parameters = backingMethod.GetParameters();
-
-        foreach (var p in parameters)
-        {
-            if (p.ParameterType == typeof(Object))
-            {
-                generator.Emit(OpCodes.Ldarg_0);
-            }
-            else
-            {
-                var (parameterType, byRef) = GetParameterType(p);
-
-                if (!argumentKinds.TryGetValue(parameterType, out var kind))
-                {
-                    throw new Exception($"Dont know how to handle argument {p.Name} of type {p.ParameterType} of property implementation method {backingMethod.Name} on property implementation type {backingMethod.DeclaringType}");
-                }
-
-                switch (kind)
-                {
-                    case ImplementationTypeArgumentKind.Value:
-                        if (byRef) throw new Exception("Values must be passed by value");
-
-                        switch (methodType)
-                        {
-                            case MethodType.Constructor:
-                                if (defaultImplementationFieldBuilder is null || defaultImplementationGetMethod is null)
-                                {
-                                    throw new Exception("Expected to have a fieldBuilder with a get method");
-                                }
-                                generator.Emit(OpCodes.Ldarg_0);
-                                generator.Emit(OpCodes.Ldflda, defaultImplementationFieldBuilder);
-                                generator.Emit(OpCodes.Call, defaultImplementationGetMethod);
-                                break;
-                            case MethodType.Set:
-                                generator.Emit(OpCodes.Ldarg_1);
-                                break;
-                            default:
-                                break;
-                        }
-
-                        break;
-                    case ImplementationTypeArgumentKind.Mixin:
-                        if (!byRef) throw new Exception("Mixins must be passed by ref");
-                        generator.Emit(OpCodes.Ldarg_0);
-                        generator.Emit(OpCodes.Ldflda, mixInFieldBuilder!);
-                        break;
-                    default:
-                        throw new Exception($"Unkown argument kind {kind}");
-                }
-            }
-        }
-
-        generator.Emit(OpCodes.Call, backingMethod);
-
-        if (methodType != MethodType.Constructor)
-        {
-            generator.Emit(OpCodes.Ret);
-        }
-    }
-
-    (Type type, Boolean byRef) GetParameterType(ParameterInfo p)
-    {
-        var type = p.ParameterType;
-
-        if (type is null) throw new Exception($"Parameter {p} unexpectedly has no type");
-
-        return type.IsByRef ? ((type.GetElementType() ?? throw new Exception("Can't get element type of ref type")), true) : (type, false);
     }
 
     protected virtual IDictionary<Type, ImplementationTypeArgumentKind> GetArgumentKinds()
@@ -278,18 +208,33 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
     protected virtual FieldBuilder? EnsureMixin(BakingState state) => null;
 
-    protected record MethodImplementation(MethodInfo? Method = null, MethodInfo? BeforeMethod = null, MethodInfo? AfterMethod = null)
-    {
-        public static implicit operator MethodImplementation(MethodInfo method) => new MethodImplementation(method);
-    }
-
-    protected record PropertyImplementation(FieldBuilder FieldBuilder, MethodImplementation Get, MethodImplementation Set);
-
     protected abstract PropertyImplementation GetPropertyImplementation(BakingState state, PropertyInfo property);
 
     protected MethodInfo GetMethod(FieldBuilder fieldBuilder, String name)
         => fieldBuilder.FieldType.GetMethod(name)
         ?? throw new Exception($"Property implementation type {fieldBuilder.FieldType} must have a '{name}' method");
+
+    protected MethodImplementation GetMethodImplementation(FieldBuilder fieldBuilder, String name)
+    {
+        var type = fieldBuilder.FieldType;
+
+        var method = type.GetMethod(name);
+        var beforeMethod = type.GetMethod("Before" + name);
+        var afterMethod = type.GetMethod("After" + name);
+
+        var haveBeforeOrAfter = beforeMethod is not null || afterMethod is not null;
+
+        if (method is not null)
+        {
+            if (haveBeforeOrAfter) throw new Exception($"Property implementation type can't define both a {name} method and the respective Before and After methods");
+        }
+        else if (!haveBeforeOrAfter)
+        {
+            throw new Exception($"Property implementation {type} must define either {name} or at least one of the respective Before and After methods");
+        }
+
+        return new MethodImplementation(method, beforeMethod, afterMethod);
+    }
 
     protected MethodInfo GetPropertyMethod(PropertyInfo property, Boolean setter)
         => (setter ? property.GetSetMethod() : property.GetGetMethod())
@@ -407,7 +352,14 @@ public class GenericPropertyGenerator : AbstractPropertyGenerator
 
         var backingEventImplementationType = propertyImplementationType.MakeGenericType(typeArguments);
         var fieldBuilder = typeBuilder.DefineField($"backing_{property.Name}", backingEventImplementationType, FieldAttributes.Private);
-        return new PropertyImplementation(fieldBuilder, GetMethod(fieldBuilder, "Get"), GetMethod(fieldBuilder, "Set"));
+
+        var implementation = new PropertyImplementation(
+            fieldBuilder,
+            GetMethodImplementation(fieldBuilder, "Get"),
+            GetMethodImplementation(fieldBuilder, "Set")
+        );
+
+        return implementation;
     }
 }
 
