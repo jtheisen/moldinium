@@ -82,7 +82,7 @@ public class BakeryTests
 
     [TestMethod]
     public void WithInitWithManualAbstractBaseTest()
-        => BakeryConfiguration.Create().CreateBakery("Concrete").Create<IHasStringPropertyWithInit>();
+        => BakeryConfiguration.Create().CreateBakery("Concrete").Create<AHasStringPropertyWithInit>();
 
 
 

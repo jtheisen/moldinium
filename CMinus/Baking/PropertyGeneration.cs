@@ -80,6 +80,8 @@ public abstract class AbstractGenerator
 
         var parameters = methodTemplate.GetParameters();
 
+        var rcms = methodTemplate.ReturnParameter.GetRequiredCustomModifiers();
+
         var methodBuilder = typeBuilder.DefineMethod(
             methodTemplate.Name,
             attributes,

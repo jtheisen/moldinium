@@ -166,18 +166,28 @@ public class AbstractlyBakery : AbstractBakery
         }
     }
 
-    Boolean RedeclareMethodIfApplicable(TypeBuilder typeBuilder, MethodInfo? method, [MaybeNullWhen(false)] out MethodBuilder methodBuilder)
+    // can be merged with the method declarer in the generation classes
+    Boolean RedeclareMethodIfApplicable(TypeBuilder typeBuilder, MethodInfo? methodTemplate, [MaybeNullWhen(false)] out MethodBuilder methodBuilder)
     {
         methodBuilder = null;
 
-        if (method is null || !method.IsAbstract) return false;
+        if (methodTemplate is null || !methodTemplate.IsAbstract) return false;
 
-        var attributes = method.Attributes;
-        
-        //attributes &= ~MethodAttributes.NewSlot;
-        //attributes |= ~MethodAttributes.Public;
+        var attributes = methodTemplate.Attributes;
 
-        methodBuilder = typeBuilder.DefineMethod(method.Name, attributes, method.ReturnType, method.GetParameters().Select(p => p.ParameterType).ToArray());
+        var parameters = methodTemplate.GetParameters();
+
+        methodBuilder = typeBuilder.DefineMethod(
+            methodTemplate.Name,
+            attributes,
+            methodTemplate.CallingConvention,
+            methodTemplate.ReturnType,
+            methodTemplate.ReturnParameter.GetRequiredCustomModifiers(),
+            methodTemplate.ReturnParameter.GetOptionalCustomModifiers(),
+            parameters.Select(p => p.ParameterType).ToArray(),
+            parameters.Select(p => p.GetRequiredCustomModifiers()).ToArray(),
+            parameters.Select(p => p.GetOptionalCustomModifiers()).ToArray()
+        );
 
         return true;
     }
