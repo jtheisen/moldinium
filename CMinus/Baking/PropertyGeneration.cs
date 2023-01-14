@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection.Emit;
 using System.Reflection;
 using CMinus.Injection;
+using Castle.DynamicProxy.Generators.Emitters.SimpleAST;
 
 namespace CMinus;
 
@@ -136,7 +137,7 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
         argumentKinds[valueType] = ImplementationTypeArgumentKind.Value;
 
-        var (fieldBuilder, backingGetMethod, backingSetMethod) = GetBackings(state, property);
+        var (fieldBuilder, backingGetMethod, backingSetMethod) = GetPropertyImplementation(state, property);
 
         {
             var backingInitMethod = fieldBuilder.FieldType.GetMethod("Init");
@@ -171,7 +172,8 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
         {
             var getMethodBuilder = Create(typeBuilder, getMethod, toRemove: MethodAttributes.Abstract);
             var generator = getMethodBuilder.GetILGenerator();
-            GenerateWrapperCode(generator, MethodType.Get, fieldBuilder, backingGetMethod, argumentKinds, mixinFieldBuilder);
+            if (backingGetMethod.Method is null) throw new NotImplementedException(); // FIXME
+            GenerateWrapperCode(generator, MethodType.Get, fieldBuilder, backingGetMethod.Method, argumentKinds, mixinFieldBuilder);
             propertyBuilder.SetGetMethod(getMethodBuilder);
         }
 
@@ -179,7 +181,8 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
         {
             var setMethodBuilder = Create(typeBuilder, setMethod, toRemove: MethodAttributes.Abstract);
             var generator = setMethodBuilder.GetILGenerator();
-            GenerateWrapperCode(generator, MethodType.Set, fieldBuilder, backingSetMethod, argumentKinds, mixinFieldBuilder);
+            if (backingSetMethod.Method is null) throw new NotImplementedException();
+            GenerateWrapperCode(generator, MethodType.Set, fieldBuilder, backingSetMethod.Method, argumentKinds, mixinFieldBuilder);
             propertyBuilder.SetSetMethod(setMethodBuilder);
         }
     }
@@ -275,8 +278,14 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
     protected virtual FieldBuilder? EnsureMixin(BakingState state) => null;
 
-    protected abstract (FieldBuilder fieldBuilder, MethodInfo backingGetMethod, MethodInfo backingSetMethod)
-        GetBackings(BakingState state, PropertyInfo property);
+    protected record MethodImplementation(MethodInfo? Method = null, MethodInfo? BeforeMethod = null, MethodInfo? AfterMethod = null)
+    {
+        public static implicit operator MethodImplementation(MethodInfo method) => new MethodImplementation(method);
+    }
+
+    protected record PropertyImplementation(FieldBuilder FieldBuilder, MethodImplementation Get, MethodImplementation Set);
+
+    protected abstract PropertyImplementation GetPropertyImplementation(BakingState state, PropertyInfo property);
 
     protected MethodInfo GetMethod(FieldBuilder fieldBuilder, String name)
         => fieldBuilder.FieldType.GetMethod(name)
@@ -390,8 +399,7 @@ public class GenericPropertyGenerator : AbstractPropertyGenerator
         return arguments.ToArray();
     }
 
-    protected override (FieldBuilder fieldBuilder, MethodInfo backingGetMethod, MethodInfo backingSetMethod)
-        GetBackings(BakingState state, PropertyInfo property)
+    protected override PropertyImplementation GetPropertyImplementation(BakingState state, PropertyInfo property)
     {
         var typeBuilder = state.TypeBuilder;
 
@@ -399,7 +407,7 @@ public class GenericPropertyGenerator : AbstractPropertyGenerator
 
         var backingEventImplementationType = propertyImplementationType.MakeGenericType(typeArguments);
         var fieldBuilder = typeBuilder.DefineField($"backing_{property.Name}", backingEventImplementationType, FieldAttributes.Private);
-        return (fieldBuilder, GetMethod(fieldBuilder, "Get"), GetMethod(fieldBuilder, "Set"));
+        return new PropertyImplementation(fieldBuilder, GetMethod(fieldBuilder, "Get"), GetMethod(fieldBuilder, "Set"));
     }
 }
 
@@ -409,8 +417,8 @@ public class UnimplementedPropertyGenerator : AbstractPropertyGenerator
 
     public override void GenerateProperty(BakingState state, PropertyInfo property) => throw new NotImplementedException();
 
-    protected override (FieldBuilder fieldBuilder, MethodInfo backingGetMethod, MethodInfo backingSetMethod)
-        GetBackings(BakingState state, PropertyInfo property)
+    protected override PropertyImplementation
+        GetPropertyImplementation(BakingState state, PropertyInfo property)
         => throw new NotImplementedException();
 }
 
@@ -423,14 +431,14 @@ public class DelegatingPropertyGenerator : AbstractPropertyGenerator
         this.fieldBuilder = targetFieldBuilder;
     }
 
-    protected override (FieldBuilder fieldBuilder, MethodInfo backingGetMethod, MethodInfo backingSetMethod)
-        GetBackings(BakingState state, PropertyInfo property)
+    protected override PropertyImplementation
+        GetPropertyImplementation(BakingState state, PropertyInfo property)
     {
         var propertyOnImplementation = fieldBuilder.FieldType.GetProperty(property.Name);
 
         if (propertyOnImplementation is null) throw new Exception($"Implementing type {fieldBuilder.FieldType} unexpectedly has no property named {property.Name}");
 
-        return (fieldBuilder, GetPropertyMethod(propertyOnImplementation, false), GetPropertyMethod(propertyOnImplementation, true));
+        return new PropertyImplementation(fieldBuilder, GetPropertyMethod(propertyOnImplementation, false), GetPropertyMethod(propertyOnImplementation, true));
     }
 }
 

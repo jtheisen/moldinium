@@ -71,25 +71,23 @@ public class WrappingTests : BakingTetsBase
         void AfterSet(ref Value value);
     }
 
-    public struct WrappingPropertyImplementation<Value> : IWrappingPropertyImplementation<Value>
-    {
+    //public struct WrappingPropertyImplementation<Value> : IWrappingPropertyImplementation<Value>
+    //{
 
 
-        public Boolean BeforeGet(ref Value value);
-        public void AfterGet(ref Value value);
-        public Boolean BeforeSet(ref Value value);
-        public void AfterSet(ref Value value);
-    }
+    //    public Boolean BeforeGet(ref Value value);
+    //    public void AfterGet(ref Value value);
+    //    public Boolean BeforeSet(ref Value value);
+    //    public void AfterSet(ref Value value);
+    //}
 
-    [TestMethod]
-    public void PropertyWrappingTest()
-    {
-        var instance = BakeryConfiguration.Create(typeof(WrappingPropertyImplementation<>))
-            .CreateDoubleBakery("Wrapping")
-            .Create<IWithImplementedProperty>();
+    //[TestMethod]
+    //public void PropertyWrappingTest()
+    //{
+    //    var instance = BakeryConfiguration.Create(typeof(WrappingPropertyImplementation<>))
+    //        .CreateDoubleBakery("Wrapping")
+    //        .Create<IWithImplementedProperty>();
 
-        Dictionary<String, String>
-
-        instance.Validate();
-    }
+    //    instance.Validate();
+    //}
 }
