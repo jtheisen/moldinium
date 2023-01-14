@@ -199,7 +199,7 @@ public class ConcretelyBakery : AbstractlyBakery
     public ConcretelyBakery(String name, BakeryConfiguration configuration)
         : base(name, TypeAttributes.Public)
     {
-        this.configuration = BakeryConfiguration.PocGenerationConfiguration;
+        this.configuration = configuration;
         generators = this.configuration.Generators;
         defaultProvider = this.configuration.DefaultProvider;
     }
