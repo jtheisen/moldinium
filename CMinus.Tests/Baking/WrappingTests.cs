@@ -9,6 +9,13 @@ namespace CMinus.Tests.Baking;
 [TestClass]
 public class WrappingTests : BakingTetsBase
 {
+    public interface IWithCountingProperty
+    {
+        Int32 Counter { get; set; }
+
+        Int32 Value { get => Counter++; set => Counter = value; }
+    }
+
     public interface IWithImplementedProperty
     {
         String? BackingValue { get; set; }
@@ -83,6 +90,16 @@ public class WrappingTests : BakingTetsBase
         public bool BeforeSet() => true;
     }
 
+    [TestMethod]
+    public void TrivialPropertyWrappingTest()
+    {
+        var instance = BakeryConfiguration.Create(propertyWrappingType: typeof(TrivialWrappingPropertyImplementation<>))
+            .CreateBakery("Wrapping")
+            .Create<IWithImplementedProperty>();
+
+        instance.Validate();
+    }
+
     public struct TrivialDontDelegateWrappingPropertyImplementation<Value> : ITrivialWrappingPropertyImplementation<Value>
     {
         public void AfterGet() { }
@@ -92,16 +109,6 @@ public class WrappingTests : BakingTetsBase
         public bool BeforeGet() => false;
 
         public bool BeforeSet() => false;
-    }
-
-    [TestMethod]
-    public void TrivialPropertyWrappingTest()
-    {
-        var instance = BakeryConfiguration.Create(propertyWrappingType: typeof(TrivialWrappingPropertyImplementation<>))
-            .CreateBakery("Wrapping")
-            .Create<IWithImplementedProperty>();
-
-        instance.Validate();
     }
 
     [TestMethod]
@@ -117,8 +124,6 @@ public class WrappingTests : BakingTetsBase
 
         Assert.IsNull(instance.Value);
     }
-
-
 
 
     public enum WrappingPropertyNotificationEventType
@@ -155,7 +160,7 @@ public class WrappingTests : BakingTetsBase
         void AfterSet(ref Value value, ref Mixin mixin);
     }
 
-    public struct WrappingPropertyImplementation<Value> : IWrappingPropertyImplementation<Value, WrappingPropertyNotificationMixin>
+    public struct EventWrappingPropertyImplementation<Value> : IWrappingPropertyImplementation<Value, WrappingPropertyNotificationMixin>
     {
         public Boolean BeforeGet(ref Value value, ref WrappingPropertyNotificationMixin mixin)
         {
@@ -183,9 +188,9 @@ public class WrappingTests : BakingTetsBase
     }
 
     [TestMethod]
-    public void PropertyWrappingTest()
+    public void PropertyEventWrappingTest()
     {
-        var instance = BakeryConfiguration.Create(propertyWrappingType: typeof(WrappingPropertyImplementation<>))
+        var instance = BakeryConfiguration.Create(propertyWrappingType: typeof(EventWrappingPropertyImplementation<>))
             .CreateBakery("Wrapping")
             .Create<IWithImplementedProperty>();
 
@@ -209,5 +214,97 @@ public class WrappingTests : BakingTetsBase
         instance.Value = "foo";
 
         Assert.AreEqual(2, events.Count);
+    }
+
+    public interface ICachingPropertyMixin
+    {
+        Boolean IsValid { get; set; }
+
+        Boolean LockSetter { get; set; }
+    }
+
+    public struct CachingPropertyMixin : ICachingPropertyMixin
+    {
+        public Boolean IsValid { get; set; }
+
+        public Boolean LockSetter { get; set; }
+    }
+
+    public struct CachingWrappingPropertyImplementation<Value> : IWrappingPropertyImplementation<Value, CachingPropertyMixin>
+    {
+        Value cache;
+
+        public Boolean BeforeGet(ref Value value, ref CachingPropertyMixin mixin)
+        {
+            if (!mixin.IsValid)
+            {
+                return true;
+            }
+            else
+            {
+                value = cache;
+
+                return false;
+            }
+        }
+
+        public void AfterGet(ref Value value, ref CachingPropertyMixin mixin)
+        {
+            cache = value;
+
+            mixin.IsValid = true;
+        }
+
+        public Boolean BeforeSet(ref Value value, ref CachingPropertyMixin mixin)
+        {
+            return !mixin.LockSetter;
+        }
+
+        public void AfterSet(ref Value value, ref CachingPropertyMixin mixin)
+        {
+            mixin.IsValid = false;
+        }
+    }
+
+    [TestMethod]
+    public void PropertyCacheWrappingTest()
+    {
+        var instance = BakeryConfiguration.Create(propertyWrappingType: typeof(CachingWrappingPropertyImplementation<>))
+            .CreateBakery("Wrapping")
+            .Create<IWithCountingProperty>();
+
+        var cacheControl = instance as ICachingPropertyMixin;
+
+        Assert.IsNotNull(cacheControl);
+
+        if (cacheControl is null) throw new Exception();
+
+        Assert.AreEqual(cacheControl.IsValid, false);
+
+        Assert.AreEqual(instance.Value, 0);
+
+        Assert.AreEqual(cacheControl.IsValid, true);
+
+        Assert.AreEqual(instance.Value, 0);
+
+        cacheControl.IsValid = false;
+
+        Assert.AreEqual(instance.Value, 1);
+
+        instance.Value = 42;
+
+        Assert.AreEqual(instance.Value, 42);
+
+        Assert.AreEqual(instance.Value, 42);
+
+        cacheControl.IsValid = false;
+
+        Assert.AreEqual(instance.Value, 43);
+
+        cacheControl.LockSetter = true;
+
+        instance.Value = 0;
+
+        Assert.AreEqual(instance.Value, 43);
     }
 }
