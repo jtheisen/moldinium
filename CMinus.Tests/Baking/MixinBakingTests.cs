@@ -89,7 +89,7 @@ public class MixinBakingTests : BakingTetsBase
     public void NotifyPropertyChangedTest()
     {
         var instance = BakeryConfiguration.Create(typeof(NotifyPropertyChangedPropertyImplementation<>))
-            .CreateDoubleBakery(nameof(NotifyPropertyChangedTest))
+            .CreateBakery(nameof(NotifyPropertyChangedTest))
             .Create<IHasNullableProperty>();
 
         var instanceAsNotifyPropertyChanged = instance as INotifyPropertChangedMixin;

@@ -49,31 +49,6 @@ public abstract class AbstractBakery
     public abstract Type Create(Type interfaceOrBaseType);
 }
 
-public class DoubleBakery : AbstractBakery
-{
-    AbstractlyBakery abstractlyBakery, concretelyBakery;
-
-    public DoubleBakery(String name)
-        : this(name, BakeryConfiguration.PocGenerationConfiguration) { }
-
-    public DoubleBakery(String name, BakeryConfiguration configuration)
-    {
-        abstractlyBakery = new AbstractlyBakery($"{name} (abstractly)");
-        concretelyBakery = new ConcretelyBakery($"{name} (concretely)", configuration);
-    }
-
-    public override Type Create(Type interfaceType)
-    {
-        if (!interfaceType.IsInterface) throw new Exception($"The DoubleBakery creates only types from interfaces");
-
-        var baseType = abstractlyBakery.Create(interfaceType);
-
-        var concreteType = concretelyBakery.Create(baseType);
-
-        return concreteType;
-    }
-}
-
 public class AbstractlyBakery : AbstractBakery
 {
     protected readonly string name;
@@ -198,7 +173,7 @@ public class AbstractlyBakery : AbstractBakery
     }
 }
 
-public class ConcretelyBakery : AbstractlyBakery
+public class Bakery : AbstractlyBakery
 {
     readonly BakeryConfiguration configuration;
     readonly IBakeryComponentGenerators generators;
@@ -208,10 +183,10 @@ public class ConcretelyBakery : AbstractlyBakery
 
     public String Name => name;
 
-    public ConcretelyBakery(String name)
+    public Bakery(String name)
         : this(name, BakeryConfiguration.PocGenerationConfiguration) { }
 
-    public ConcretelyBakery(String name, BakeryConfiguration configuration)
+    public Bakery(String name, BakeryConfiguration configuration)
         : base(name, TypeAttributes.Public)
     {
         this.configuration = configuration;
@@ -267,7 +242,7 @@ public class ConcretelyBakery : AbstractlyBakery
 
         foreach (var property in type.GetProperties())
         {
-            generators.GetPropertyGenerator(property).GenerateProperty(state, property);
+            generators.GetPropertyGenerator(property)?.GenerateProperty(state, property);
         }
 
         foreach (var evt in type.GetEvents())

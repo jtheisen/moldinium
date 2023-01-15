@@ -9,7 +9,7 @@ public interface IBakeryComponentGenerators
 {
     MixInGenerator[] GetMixInGenerators(Type type);
 
-    AbstractPropertyGenerator GetPropertyGenerator(PropertyInfo property);
+    AbstractPropertyGenerator? GetPropertyGenerator(PropertyInfo property);
 
     AbstractEventGenerator GetEventGenerator(EventInfo evt);
 }
@@ -17,12 +17,12 @@ public interface IBakeryComponentGenerators
 public class ComponentGenerators : IBakeryComponentGenerators
 {
     private readonly AbstractPropertyGenerator propertyImplementationGenerator;
-    private readonly AbstractPropertyGenerator propertyWrapperGenerator;
+    private readonly AbstractPropertyGenerator? propertyWrapperGenerator;
     private readonly AbstractEventGenerator eventGenerator;
 
     public ComponentGenerators(
         AbstractPropertyGenerator propertyImplementationGenerator,
-        AbstractPropertyGenerator propertyWrapperGenerator,
+        AbstractPropertyGenerator? propertyWrapperGenerator,
         AbstractEventGenerator eventGenerator)
     {
         this.propertyImplementationGenerator = propertyImplementationGenerator;
@@ -32,7 +32,7 @@ public class ComponentGenerators : IBakeryComponentGenerators
 
     public MixInGenerator[] GetMixInGenerators(Type type) => new MixInGenerator[] { };
 
-    public AbstractPropertyGenerator GetPropertyGenerator(PropertyInfo property)
+    public AbstractPropertyGenerator? GetPropertyGenerator(PropertyInfo property)
     {
         var getter = CheckMethod(property.GetGetMethod());
         var setter = CheckMethod(property.GetSetMethod());
@@ -59,7 +59,14 @@ public class ComponentGenerators : IBakeryComponentGenerators
 
         if (getter.implemented)
         {
-            return propertyWrapperGenerator;
+            if (propertyWrapperGenerator is not null)
+            {
+                return propertyWrapperGenerator;
+            }
+            else
+            {
+                return null;
+            }
         }
         else
         {
@@ -78,10 +85,10 @@ public class ComponentGenerators : IBakeryComponentGenerators
     public static ComponentGenerators Create(Type propertyImplementationType, Type eventImplementationType)
         => Create(propertyImplementationType, typeof(TrivialPropertyWrapper), eventImplementationType);
 
-    public static ComponentGenerators Create(Type propertyImplementationType, Type propertyWrapperType, Type eventImplementationType)
+    public static ComponentGenerators Create(Type propertyImplementationType, Type? propertyWrapperType, Type eventImplementationType)
         => new ComponentGenerators(
             PropertyGenerator.Create(propertyImplementationType),
-            PropertyGenerator.Create(propertyWrapperType),
+            propertyWrapperType is not null ? PropertyGenerator.Create(propertyWrapperType) : null,
             EventGenerator.Create(eventImplementationType)
         );
 }
@@ -91,15 +98,13 @@ public record BakeryConfiguration(IBakeryComponentGenerators Generators, IDefaul
     public static BakeryConfiguration Create(Type? propertyImplementationType = null, Type? propertyWrappingType = null, Type? eventImplementationType = null)
         => new BakeryConfiguration(ComponentGenerators.Create(
             propertyImplementationType ?? typeof(SimplePropertyImplementation<>),
-            propertyWrappingType ?? typeof(TrivialPropertyWrapper),
+            propertyWrappingType,
             eventImplementationType ?? typeof(GenericEventImplementation<>)), Defaults.GetDefaultDefaultProvider());
 
     public static BakeryConfiguration PocGenerationConfiguration
         = new BakeryConfiguration(ComponentGenerators.Create(typeof(SimplePropertyImplementation<>), typeof(GenericEventImplementation<>)), Defaults.GetDefaultDefaultProvider());
 
-    public AbstractlyBakery CreateBakery(String name) => new ConcretelyBakery(name, this);
-
-    public AbstractBakery CreateDoubleBakery(String name) => new DoubleBakery(name, this);
+    public AbstractlyBakery CreateBakery(String name) => new Bakery(name, this);
 }
 
 public class MixInGenerator
