@@ -308,6 +308,7 @@ public class MethodCreation
                                 generator.Emit(OpCodes.Call, defaultImplementationGetMethod);
                                 break;
                             case CodeGenerationContextType.Set:
+                            case CodeGenerationContextType.Get:
                                 switch (valueAt)
                                 {
                                     case ValueAt.FirstArgumentPassedByValue:
@@ -321,7 +322,7 @@ public class MethodCreation
                                 }
                                 break;
                             default:
-                                throw new Exception($"Internal error: unhandled {valueAt}");
+                                throw new Exception($"Internal error: unhandled {methodType}");
                         }
 
                         break;

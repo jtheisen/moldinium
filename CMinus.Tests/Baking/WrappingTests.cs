@@ -185,7 +185,7 @@ public class WrappingTests : BakingTetsBase
     [TestMethod]
     public void PropertyWrappingTest()
     {
-        var instance = BakeryConfiguration.Create(typeof(WrappingPropertyImplementation<>))
+        var instance = BakeryConfiguration.Create(propertyWrappingType: typeof(WrappingPropertyImplementation<>))
             .CreateBakery("Wrapping")
             .Create<IWithImplementedProperty>();
 
