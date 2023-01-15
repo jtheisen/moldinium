@@ -83,16 +83,36 @@ public class WrappingTests : BakingTetsBase
         public bool BeforeSet() => true;
     }
 
+    public struct TrivialDontDelegateWrappingPropertyImplementation<Value> : ITrivialWrappingPropertyImplementation<Value>
+    {
+        public void AfterGet() { }
+
+        public void AfterSet() { }
+
+        public bool BeforeGet() => false;
+
+        public bool BeforeSet() => false;
+    }
+
     [TestMethod]
     public void TrivialPropertyWrappingTest()
     {
         var instance = BakeryConfiguration.Create(typeof(TrivialWrappingPropertyImplementation<>))
-            .CreateDoubleBakery("Wrapping")
+            .CreateBakery("Wrapping")
             .Create<IWithImplementedProperty>();
 
         instance.Validate();
     }
 
+    [TestMethod]
+    public void TrivialDontDelegatePropertyWrappingTest()
+    {
+        var instance = BakeryConfiguration.Create(propertyWrappingType: typeof(TrivialDontDelegateWrappingPropertyImplementation<>))
+            .CreateBakery("Wrapping")
+            .Create<IWithImplementedProperty>();
+
+        instance.Validate();
+    }
 
 
 
@@ -162,7 +182,7 @@ public class WrappingTests : BakingTetsBase
     public void PropertyWrappingTest()
     {
         var instance = BakeryConfiguration.Create(typeof(WrappingPropertyImplementation<>))
-            .CreateDoubleBakery("Wrapping")
+            .CreateBakery("Wrapping")
             .Create<IWithImplementedProperty>();
 
         instance.Validate();

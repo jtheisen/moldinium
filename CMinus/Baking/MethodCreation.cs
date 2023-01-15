@@ -8,10 +8,14 @@ using System.Reflection.PortableExecutable;
 
 namespace CMinus;
 
-public record MethodImplementation(MethodInfo? Method = null, MethodInfo? BeforeMethod = null, MethodInfo? AfterMethod = null)
+public record MethodImplementation
 {
-    public static implicit operator MethodImplementation(MethodInfo method) => new MethodImplementation(method);
+    public static implicit operator MethodImplementation(MethodInfo method) => new DirectMethodImplementation(method);
 }
+
+public record DirectMethodImplementation(MethodInfo Method) : MethodImplementation { }
+
+public record WrappingMethodImplementation(MethodInfo? BeforeMethod = null, MethodInfo? AfterMethod = null) : MethodImplementation;
 
 public record PropertyImplementation(FieldBuilder FieldBuilder, MethodImplementation Get, MethodImplementation Set);
 
@@ -81,98 +85,113 @@ public class MethodCreation
     {
         var methodBuilder = Declare(typeBuilder, methodTemplate, toAdd, toRemove);
         var generator = methodBuilder.GetILGenerator();
-        GeneratePropertyMethodImplementationCode(generator, implementation, contextType, valueType, wrappedMethod);
+        GeneratePropertyMethodImplementationCode(generator, methodBuilder, implementation, contextType, valueType, wrappedMethod);
         return methodBuilder;
     }
 
     public void GeneratePropertyMethodImplementationCode(
         ILGenerator generator,
+        MethodBuilder methodBuilder,
         MethodImplementation methodImplementation,
         CodeGenerationContextType contextType,
         Type valueType,
         MethodInfo? wrappedMethod = null
     )
     {
-        var haveBefore = methodImplementation.BeforeMethod is not null;
-        var haveAfter = methodImplementation.AfterMethod is not null;
-
-        if (methodImplementation.Method is MethodInfo backingMethod)
+        if (methodImplementation is DirectMethodImplementation directMethodImplementation)
         {
-            if (haveBefore || haveAfter) throw new Exception("Internal error: didn't expect to have a before or after method");
-
-            GenerateImplementationCode(generator, contextType, implementationFieldBuilder, backingMethod);
+            GenerateImplementationCode(generator, contextType, implementationFieldBuilder, directMethodImplementation.Method);
         }
-        else if (haveBefore || haveAfter)
+        else if (methodImplementation is WrappingMethodImplementation wrappingMethodImplementation)
         {
             GenerateWrappingPropertyImplementationCode(
                 generator,
+                methodBuilder,
                 valueType,
-                methodImplementation.BeforeMethod,
-                methodImplementation.AfterMethod,
+                wrappingMethodImplementation.BeforeMethod,
+                wrappingMethodImplementation.AfterMethod,
                 wrappedMethod
             );
         }
         else
         {
-            if (haveBefore || haveAfter) throw new Exception("Internal error: no method implementation given");
+            throw new Exception($"Unknown method implementation {methodImplementation.GetType()}");
         }
     }
 
     void GenerateWrappingPropertyImplementationCode(
         ILGenerator generator,
+        MethodBuilder methodBuilder,
         Type propertyType,
         MethodInfo? backingTryMethod,
         MethodInfo? backingPostMethod,
         MethodInfo? wrappedMethod
         )
     {
-        if (propertyType.IsValueType)
+        //if (propertyType.IsValueType)
+        //{
+        //    generator.DeclareLocal(propertyType);
+        //}
+        //else
+        //{
+        //    generator.DeclareLocal(propertyType, pinned: true);
+        //}
+
+        //generator.Emit(OpCodes.Ldloca_S);
+        //generator.Emit(OpCodes.Initobj);
+
+        ////var label = generator.DefineLabel();
+
+        ////if (backingTryMethod is not null)
+        ////{
+        ////    GenerateImplementationCode(
+        ////        generator,
+        ////        CodeGenerationContextType.Wrapper,
+        ////        implementationFieldBuilder,
+        ////        backingTryMethod);
+
+        ////    //generator.Emit(OpCodes.Stloc_1);
+        ////    //generator.Emit(OpCodes.Ldloc_1);
+        ////    generator.Emit(OpCodes.Brfalse_S, label);
+        ////    //generator.Emit(OpCodes.Nop);
+        ////}
+
+        ////if (wrappedMethod is not null)
+        ////{
+        ////    GenerateImplementationCode(
+        ////        generator,
+        ////        CodeGenerationContextType.Nested,
+        ////        fieldBuilder: null,
+        ////        wrappedMethod);
+
+        ////    // FIXME: if getter, put the return into the variable
+        ////}
+
+        ////if (backingPostMethod is not null)
+        ////{
+        ////    GenerateImplementationCode(
+        ////        generator,
+        ////        CodeGenerationContextType.Wrapper,
+        ////        implementationFieldBuilder,
+        ////        backingPostMethod);
+        ////}
+
+        ////generator.MarkLabel(label);
+
+        //if (methodBuilder.ReturnType != typeof(void))
+        //{
+        //    generator.Emit(OpCodes.Ldloc_0, 0);
+        //}
+
+        if (methodBuilder.ReturnType != typeof(void))
         {
             generator.DeclareLocal(propertyType);
-        }
-        else
-        {
-            generator.DeclareLocal(propertyType, pinned: true);
-        }
-
-        generator.Emit(OpCodes.Ldloca_S, 0);
-        generator.Emit(OpCodes.Initobj);
-
-        var label = generator.DefineLabel();
-
-        if (backingTryMethod is not null)
-        {
-            GenerateImplementationCode(
-                generator,
-                CodeGenerationContextType.Wrapper,
-                implementationFieldBuilder,
-                backingTryMethod);
-
-            //generator.Emit(OpCodes.Stloc_1);
-            //generator.Emit(OpCodes.Ldloc_1);
-            generator.Emit(OpCodes.Brfalse_S, label);
-            //generator.Emit(OpCodes.Nop);
+            generator.Emit(OpCodes.Ldloca_S, 0);
+            generator.Emit(OpCodes.Initobj);
+            generator.Emit(OpCodes.Ldloc_0);
         }
 
-        if (wrappedMethod is not null)
-        {
-            GenerateImplementationCode(
-                generator,
-                CodeGenerationContextType.Nested,
-                fieldBuilder: null,
-                wrappedMethod);
-        }
-
-        if (backingPostMethod is not null)
-        {
-            GenerateImplementationCode(
-                generator,
-                CodeGenerationContextType.Wrapper,
-                implementationFieldBuilder,
-                backingPostMethod);
-        }
-
-        generator.MarkLabel(label);
+        generator.Emit(OpCodes.Ret);
     }
 
     public void GenerateImplementationCode(
@@ -242,7 +261,7 @@ public class MethodCreation
                                 generator.Emit(OpCodes.Ldloca_S, 0);
                                 break;
                             default:
-                                break;
+                                throw new Exception($"Passing the value to {backingMethod} is not valid");
                         }
 
                         break;

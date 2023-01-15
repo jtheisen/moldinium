@@ -171,9 +171,14 @@ public class AbstractlyBakery : AbstractBakery
     {
         methodBuilder = null;
 
-        if (methodTemplate is null || !methodTemplate.IsAbstract) return false;
+        if (methodTemplate is null) return false;
 
         var attributes = methodTemplate.Attributes;
+
+        //if (!methodTemplate.DeclaringType!.IsInterface) throw new Exception($"Expecting to derive an interface");
+
+        //// Implemented interface methods don't show as abstract here
+        //attributes |= MethodAttributes.Abstract;
 
         var parameters = methodTemplate.GetParameters();
 
@@ -318,6 +323,7 @@ public class ConcretelyBakery : AbstractlyBakery
         {
             var nestedGenerators = onlyDelegate
                 ? new ComponentGenerators(
+                    new DelegatingPropertyGenerator(fieldBuilder),
                     new DelegatingPropertyGenerator(fieldBuilder),
                     new DelegatingEventGenerator(fieldBuilder)
                 )

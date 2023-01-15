@@ -5,7 +5,7 @@ namespace CMinus.Tests.Baking;
 
 public class BakingTetsBase
 {
-    protected static readonly AbstractBakery BasicFactory = new DoubleBakery("Basic");
+    protected static readonly AbstractBakery BasicFactory = new ConcretelyBakery("Basic");
 
     public interface IHasStringPropertyWithInit
     {

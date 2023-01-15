@@ -28,18 +28,7 @@ public class TypeKindAttribute : Attribute
 
 public interface IPropertyImplementation { }
 
-/* Difficulties with wrapping
- * 
- * - Creating delegates to the nested implementation is possible but difficult if the nested method is virtual
- * - Creating structs that delegate to the nested implementation is also difficult, but likely the way to implement the former
- */
-
-public interface INestedPropertyImplementation<Value>
-{
-    Value Get();
-
-    void Set(Value value);
-}
+public interface IPropertyWrapper : IPropertyImplementation { }
 
 public interface IPropertyImplementation<
     [TypeKind(ImplementationTypeArgumentKind.Value)] Value,
@@ -79,6 +68,10 @@ public struct SimplePropertyImplementation<T> : ISimplePropertyImplementation<T>
 
     public void Set(T value) => this.value = value;
 }
+
+public interface ITrivialPropertyWrapper : IPropertyWrapper { }
+
+public struct TrivialPropertyWrapper : ITrivialPropertyWrapper { }
 
 public abstract class AbstractGenerator
 {
@@ -227,13 +220,17 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
         if (method is not null)
         {
             if (haveBeforeOrAfter) throw new Exception($"Property implementation type can't define both a {name} method and the respective Before and After methods");
-        }
-        else if (!haveBeforeOrAfter)
-        {
-            throw new Exception($"Property implementation {type} must define either {name} or at least one of the respective Before and After methods");
-        }
 
-        return new MethodImplementation(method, beforeMethod, afterMethod);
+            return method;
+        }
+        else if (haveBeforeOrAfter || TypeInterfaces.Get(type).DoesTypeImplement(typeof(IPropertyWrapper)))
+        {
+            return new WrappingMethodImplementation(beforeMethod, afterMethod);
+        }
+        else
+        {
+            throw new Exception($"Property implementation {type} must define either {name}, one of the respective Before and After methods or implement {nameof(IPropertyWrapper)}");
+        }
     }
 
     protected MethodInfo GetPropertyMethod(PropertyInfo property, Boolean setter)
@@ -269,11 +266,13 @@ public class GenericPropertyGenerator : AbstractPropertyGenerator
 
         var propertyImplementationInterfaceType = propertyImplementationType
             .GetInterfaces()
-            .Where(i => i != typeof(IPropertyImplementation))
+            .Where(i => i != typeof(IPropertyImplementation) && i != typeof(IPropertyWrapper))
             .Single($"Expected property implementation type {propertyImplementationType} to implement only a single interface besides {nameof(IPropertyImplementation)}")
             ;
 
-        var propertyImplementationInterfaceTypeDefinition = propertyImplementationInterfaceType.GetGenericTypeDefinition();
+        var propertyImplementationInterfaceTypeDefinition = propertyImplementationInterfaceType.IsGenericType
+            ? propertyImplementationInterfaceType.GetGenericTypeDefinition()
+            : propertyImplementationInterfaceType;
 
         var typeArguments = propertyImplementationInterfaceType.GetGenericArguments();
         var typeParameters = propertyImplementationInterfaceTypeDefinition.GetGenericArguments();
@@ -350,8 +349,11 @@ public class GenericPropertyGenerator : AbstractPropertyGenerator
 
         var typeArguments = GetTypeArguments(state, typeof(Object), property.PropertyType);
 
-        var backingEventImplementationType = propertyImplementationType.MakeGenericType(typeArguments);
-        var fieldBuilder = typeBuilder.DefineField($"backing_{property.Name}", backingEventImplementationType, FieldAttributes.Private);
+        var backingPropertyImplementationType = propertyImplementationType.IsGenericTypeDefinition
+            ? propertyImplementationType.MakeGenericType(typeArguments)
+            : propertyImplementationType;
+
+        var fieldBuilder = typeBuilder.DefineField($"backing_{property.Name}", backingPropertyImplementationType, FieldAttributes.Private);
 
         var implementation = new PropertyImplementation(
             fieldBuilder,
