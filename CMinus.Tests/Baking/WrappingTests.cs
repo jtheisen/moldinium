@@ -74,19 +74,12 @@ public class WrappingTests : BakingTetsBase
     > : IPropertyImplementation
     {
         Boolean BeforeGet();
-        void AfterGet();
         Boolean BeforeSet();
-        void AfterSet();
     }
 
     public struct TrivialWrappingPropertyImplementation<Value> : ITrivialWrappingPropertyImplementation<Value>
     {
-        public void AfterGet() { }
-
-        public void AfterSet() { }
-
         public bool BeforeGet() => true;
-
         public bool BeforeSet() => true;
     }
 
@@ -102,12 +95,7 @@ public class WrappingTests : BakingTetsBase
 
     public struct TrivialDontDelegateWrappingPropertyImplementation<Value> : ITrivialWrappingPropertyImplementation<Value>
     {
-        public void AfterGet() { }
-
-        public void AfterSet() { }
-
         public bool BeforeGet() => false;
-
         public bool BeforeSet() => false;
     }
 
@@ -130,8 +118,10 @@ public class WrappingTests : BakingTetsBase
     {
         BeforeGet,
         AfterGet,
+        AfterErrorGet,
         BeforeSet,
-        AfterSet
+        AfterSet,
+        AfterErrorSet
     }
 
     public interface IWrappingPropertyNotificationMixin
@@ -155,9 +145,13 @@ public class WrappingTests : BakingTetsBase
     > : IPropertyImplementation
     {
         Boolean BeforeGet([MaybeNullWhen(true)] ref Value value, ref Mixin mixin);
-        void AfterGet(ref Value value, ref Mixin mixin);
         Boolean BeforeSet(ref Value value, ref Mixin mixin);
+
+        void AfterGet(ref Value value, ref Mixin mixin);
         void AfterSet(ref Value value, ref Mixin mixin);
+
+        Boolean AfterErrorGet(Exception exception, ref Value value, ref Mixin mixin);
+        Boolean AfterErrorSet(Exception exception, ref Value value, ref Mixin mixin);
     }
 
     public struct EventWrappingPropertyImplementation<Value> : IWrappingPropertyImplementation<Value, WrappingPropertyNotificationMixin>
@@ -184,6 +178,20 @@ public class WrappingTests : BakingTetsBase
         public void AfterSet(ref Value value, ref WrappingPropertyNotificationMixin mixin)
         {
             mixin.Notify(WrappingPropertyNotificationEventType.AfterSet, value);
+        }
+
+        public Boolean AfterErrorGet(Exception exception, ref Value value, ref WrappingPropertyNotificationMixin mixin)
+        {
+            mixin.Notify(WrappingPropertyNotificationEventType.AfterErrorGet, exception);
+
+            return true;
+        }
+
+        public Boolean AfterErrorSet(Exception exception, ref Value value, ref WrappingPropertyNotificationMixin mixin)
+        {
+            mixin.Notify(WrappingPropertyNotificationEventType.AfterErrorSet, exception);
+
+            return true;
         }
     }
 
@@ -233,6 +241,7 @@ public class WrappingTests : BakingTetsBase
     public struct CachingWrappingPropertyImplementation<Value> : IWrappingPropertyImplementation<Value, CachingPropertyMixin>
     {
         Value cache;
+        Exception exception;
 
         public Boolean BeforeGet(ref Value value, ref CachingPropertyMixin mixin)
         {
@@ -263,6 +272,20 @@ public class WrappingTests : BakingTetsBase
         public void AfterSet(ref Value value, ref CachingPropertyMixin mixin)
         {
             mixin.IsValid = false;
+        }
+
+        public Boolean AfterErrorGet(Exception exception, ref Value value, ref CachingPropertyMixin mixin)
+        {
+            this.exception = exception;
+
+            return true;
+        }
+
+        public Boolean AfterErrorSet(Exception exception, ref Value value, ref CachingPropertyMixin mixin)
+        {
+            this.exception = exception;
+
+            return true;
         }
     }
 

@@ -15,7 +15,11 @@ public record MethodImplementation
 
 public record DirectMethodImplementation(MethodInfo Method) : MethodImplementation { }
 
-public record WrappingMethodImplementation(MethodInfo? BeforeMethod = null, MethodInfo? AfterMethod = null) : MethodImplementation;
+public record WrappingMethodImplementation(
+    MethodInfo? BeforeMethod = null,
+    MethodInfo? AfterMethod = null,
+    MethodInfo? AfterOnErrorMethod = null
+) : MethodImplementation;
 
 public record PropertyImplementation(FieldBuilder FieldBuilder, MethodImplementation Get, MethodImplementation Set);
 
@@ -114,6 +118,7 @@ public class MethodCreation
                 valueType,
                 wrappingMethodImplementation.BeforeMethod,
                 wrappingMethodImplementation.AfterMethod,
+                wrappingMethodImplementation.AfterOnErrorMethod,
                 wrappedMethod
             );
         }
@@ -124,66 +129,104 @@ public class MethodCreation
     }
 
     void GenerateWrappingPropertyImplementationCode(
-        ILGenerator generator,
+        ILGenerator il,
         MethodBuilder methodBuilder,
         Type propertyType,
         MethodInfo? backingTryMethod,
-        MethodInfo? backingPostMethod,
+        MethodInfo? backingAfterMethod,
+        MethodInfo? backingAfterErrorMethod,
         MethodInfo? wrappedMethod
         )
     {
         if (propertyType.IsValueType)
         {
-            generator.DeclareLocal(propertyType);
+            il.DeclareLocal(propertyType);
         }
         else
         {
-            generator.DeclareLocal(propertyType, pinned: true);
+            il.DeclareLocal(propertyType, pinned: true);
         }
 
-        generator.Emit(OpCodes.Ldloca_S, 0);
-        generator.Emit(OpCodes.Initobj, propertyType);
+        il.Emit(OpCodes.Ldloca_S, 0);
+        il.Emit(OpCodes.Initobj, propertyType);
 
-        var label = generator.DefineLabel();
+        il.DeclareLocal(typeof(Exception));
+
+        il.Emit(OpCodes.Ldnull);
+        il.Emit(OpCodes.Stloc_1);
+
+        var exitLabel = il.DefineLabel();
 
         if (backingTryMethod is not null)
         {
             GenerateImplementationCode(
-                generator,
+                il,
                 implementationFieldBuilder,
                 backingTryMethod,
                 ValueAt.FirstLocalPassedByRef
             );
 
-            generator.Emit(OpCodes.Brfalse_S, label);
+            il.Emit(OpCodes.Brfalse_S, exitLabel);
         }
 
         if (wrappedMethod is not null)
         {
-            if (GenerateNestedCallCode(generator, wrappedMethod))
+            var tryBlockLabel = il.BeginExceptionBlock();
+
+            if (GenerateNestedCallCode(il, wrappedMethod))
             {
-                generator.Emit(OpCodes.Stloc_0);
+                il.Emit(OpCodes.Stloc_0);
             }
+
+            il.Emit(OpCodes.Leave, tryBlockLabel);
+
+            il.BeginCatchBlock(typeof(Exception));
+
+            il.Emit(OpCodes.Stloc_1);
+
+            if (backingAfterErrorMethod is not null)
+            {
+                GenerateImplementationCode(
+                    il,
+                    implementationFieldBuilder,
+                    backingAfterErrorMethod,
+                    ValueAt.FirstLocalPassedByRef
+                );
+
+                var dontRethrowLabel = il.DefineLabel();
+
+                il.Emit(OpCodes.Brfalse_S, dontRethrowLabel);
+                il.Emit(OpCodes.Rethrow);
+
+                il.MarkLabel(dontRethrowLabel);
+            }
+
+            il.EndExceptionBlock();
         }
 
-        if (backingPostMethod is not null)
+        if (backingAfterMethod is not null)
         {
+            il.Emit(OpCodes.Ldloc_1);
+            il.Emit(OpCodes.Ldnull);
+            il.Emit(OpCodes.Ceq);
+            il.Emit(OpCodes.Brfalse_S, exitLabel);
+
             GenerateImplementationCode(
-                generator,
+                il,
                 implementationFieldBuilder,
-                backingPostMethod,
+                backingAfterMethod,
                 ValueAt.FirstLocalPassedByRef
             );
         }
 
-        generator.MarkLabel(label);
+        il.MarkLabel(exitLabel);
 
         if (methodBuilder.ReturnType != typeof(void))
         {
-            generator.Emit(OpCodes.Ldloc_0, 0);
+            il.Emit(OpCodes.Ldloc_0, 0);
         }
 
-        generator.Emit(OpCodes.Ret);
+        il.Emit(OpCodes.Ret);
     }
 
     Boolean GenerateNestedCallCode(
@@ -247,6 +290,10 @@ public class MethodCreation
             if (p.ParameterType == typeof(Object))
             {
                 generator.Emit(OpCodes.Ldarg_0);
+            }
+            else if (p.ParameterType == typeof(Exception))
+            {
+                generator.Emit(OpCodes.Ldloc_1);
             }
             else
             {

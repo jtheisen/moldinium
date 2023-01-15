@@ -164,7 +164,7 @@ public class RethrowException : Exception
     }
 }
 
-class CachedComputedWatchable2<T> : IWatchable
+class CachedBeforeAndAfterComputedWatchable<T> : IWatchable
 {
     Boolean dirty = true;
 

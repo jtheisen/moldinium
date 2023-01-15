@@ -212,8 +212,13 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
         var method = type.GetMethod(name);
         var beforeMethod = type.GetMethod("Before" + name);
         var afterMethod = type.GetMethod("After" + name);
+        var afterOnErrorMethod = type.GetMethod("AfterError" + name);
 
-        var haveBeforeOrAfter = beforeMethod is not null || afterMethod is not null;
+        var haveAfterMethod = afterMethod is not null;
+        var haveAfterOnErrorMethod = afterOnErrorMethod is not null;
+
+
+        var haveBeforeOrAfter = beforeMethod is not null || haveAfterMethod || haveAfterOnErrorMethod;
 
         if (method is not null)
         {
@@ -223,12 +228,25 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
         }
         else if (haveBeforeOrAfter || TypeInterfaces.Get(type).DoesTypeImplement(typeof(IPropertyWrapper)))
         {
-            return new WrappingMethodImplementation(beforeMethod, afterMethod);
+            if (haveAfterMethod != haveAfterOnErrorMethod) throw new Exception($"Property implementation {type} must define either neither or both of the After methods");
+
+            AssertReturnType(beforeMethod, typeof(Boolean));
+            AssertReturnType(afterMethod, typeof(void));
+            AssertReturnType(afterOnErrorMethod, typeof(Boolean));
+
+            return new WrappingMethodImplementation(beforeMethod, afterMethod, afterOnErrorMethod);
         }
         else
         {
             throw new Exception($"Property implementation {type} must define either {name}, one of the respective Before and After methods or implement {nameof(IPropertyWrapper)}");
         }
+    }
+
+    void AssertReturnType(MethodInfo? method, Type type)
+    {
+        if (method is null) return;
+
+        if (method.ReturnType != type) throw new Exception($"Property implementation {method.DeclaringType} must define the method {method} with a return type of {type}");
     }
 
     protected MethodInfo GetPropertyMethod(PropertyInfo property, Boolean setter)
