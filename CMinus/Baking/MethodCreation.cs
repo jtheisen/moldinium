@@ -128,68 +128,68 @@ public class MethodCreation
         MethodInfo? wrappedMethod
         )
     {
-        //if (propertyType.IsValueType)
+        if (propertyType.IsValueType)
+        {
+            generator.DeclareLocal(propertyType);
+        }
+        else
+        {
+            generator.DeclareLocal(propertyType, pinned: true);
+        }
+
+        generator.Emit(OpCodes.Ldloca_S, 0);
+        generator.Emit(OpCodes.Initobj, propertyType);
+
+        //var label = generator.DefineLabel();
+
+        //if (backingTryMethod is not null)
         //{
-        //    generator.DeclareLocal(propertyType);
+        //    GenerateImplementationCode(
+        //        generator,
+        //        CodeGenerationContextType.Wrapper,
+        //        implementationFieldBuilder,
+        //        backingTryMethod);
+
+        //    //generator.Emit(OpCodes.Stloc_1);
+        //    //generator.Emit(OpCodes.Ldloc_1);
+        //    generator.Emit(OpCodes.Brfalse_S, label);
+        //    //generator.Emit(OpCodes.Nop);
         //}
-        //else
+
+        //if (wrappedMethod is not null)
         //{
-        //    generator.DeclareLocal(propertyType, pinned: true);
+        //    GenerateImplementationCode(
+        //        generator,
+        //        CodeGenerationContextType.Nested,
+        //        fieldBuilder: null,
+        //        wrappedMethod);
+
+        //    // FIXME: if getter, put the return into the variable
         //}
 
-        //generator.Emit(OpCodes.Ldloca_S);
-        //generator.Emit(OpCodes.Initobj);
-
-        ////var label = generator.DefineLabel();
-
-        ////if (backingTryMethod is not null)
-        ////{
-        ////    GenerateImplementationCode(
-        ////        generator,
-        ////        CodeGenerationContextType.Wrapper,
-        ////        implementationFieldBuilder,
-        ////        backingTryMethod);
-
-        ////    //generator.Emit(OpCodes.Stloc_1);
-        ////    //generator.Emit(OpCodes.Ldloc_1);
-        ////    generator.Emit(OpCodes.Brfalse_S, label);
-        ////    //generator.Emit(OpCodes.Nop);
-        ////}
-
-        ////if (wrappedMethod is not null)
-        ////{
-        ////    GenerateImplementationCode(
-        ////        generator,
-        ////        CodeGenerationContextType.Nested,
-        ////        fieldBuilder: null,
-        ////        wrappedMethod);
-
-        ////    // FIXME: if getter, put the return into the variable
-        ////}
-
-        ////if (backingPostMethod is not null)
-        ////{
-        ////    GenerateImplementationCode(
-        ////        generator,
-        ////        CodeGenerationContextType.Wrapper,
-        ////        implementationFieldBuilder,
-        ////        backingPostMethod);
-        ////}
-
-        ////generator.MarkLabel(label);
-
-        //if (methodBuilder.ReturnType != typeof(void))
+        //if (backingPostMethod is not null)
         //{
-        //    generator.Emit(OpCodes.Ldloc_0, 0);
+        //    GenerateImplementationCode(
+        //        generator,
+        //        CodeGenerationContextType.Wrapper,
+        //        implementationFieldBuilder,
+        //        backingPostMethod);
         //}
+
+        //generator.MarkLabel(label);
 
         if (methodBuilder.ReturnType != typeof(void))
         {
-            generator.DeclareLocal(propertyType);
-            generator.Emit(OpCodes.Ldloca_S, 0);
-            generator.Emit(OpCodes.Initobj);
-            generator.Emit(OpCodes.Ldloc_0);
+            generator.Emit(OpCodes.Ldloc_0, 0);
         }
+
+        //if (methodBuilder.ReturnType != typeof(void))
+        //{
+        //    generator.DeclareLocal(propertyType);
+        //    generator.Emit(OpCodes.Ldloca_S, 0);
+        //    generator.Emit(OpCodes.Initobj, propertyType);
+        //    generator.Emit(OpCodes.Ldloc_0);
+        //}
 
         generator.Emit(OpCodes.Ret);
     }
