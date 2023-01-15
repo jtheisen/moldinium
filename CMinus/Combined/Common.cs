@@ -4,11 +4,9 @@ using System.Collections.Generic;
 
 namespace CMinus;
 
-public struct TrackedPropertyImplementation<T>
+public struct TrackingWrappedPropertyImplementation<T>
 {
-    Var<T> variable;
 
-    public T Value { get => variable.Value; set => variable.Value = value; }
 }
 
 [Flags]
