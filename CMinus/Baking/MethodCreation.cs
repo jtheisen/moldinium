@@ -127,6 +127,23 @@ public class MethodCreation
         }
     }
 
+    void GenerateWrappingPropertyImplementationCode2(
+        ILGenerator generator,
+        CodeGenerationContextType contextType,
+        MethodBuilder methodBuilder,
+        Type propertyType,
+        MethodInfo? backingTryMethod,
+        MethodInfo? backingPostMethod,
+        MethodInfo? wrappedMethod
+    )
+    {
+        if (wrappedMethod is null) throw new Exception();
+
+        GenerateNestedCallCode(generator, wrappedMethod);
+
+        generator.Emit(OpCodes.Ret);
+    }
+
     void GenerateWrappingPropertyImplementationCode(
         ILGenerator generator,
         CodeGenerationContextType contextType,
@@ -198,20 +215,20 @@ public class MethodCreation
         MethodInfo nestedMethod
         )
     {
-        if (!nestedMethod.IsStatic)
+        var isStatic = nestedMethod.IsStatic;
+
+        if (!isStatic)
         {
             generator.Emit(OpCodes.Ldarg_0);
         }
 
         var parameters = nestedMethod.GetParameters();
 
+        var parameterOffset = isStatic ? 0 : 1;
+
         for (var i = 0; i < parameters.Length; ++i)
         {
-            //var p = parameters[i];
-
-            //var byRef = p.ParameterType.IsByRef;
-
-            generator.Emit(OpCodes.Ldarg, i);
+            generator.Emit(OpCodes.Ldarg, i + parameterOffset);
         }
 
         generator.Emit(OpCodes.Call, nestedMethod);

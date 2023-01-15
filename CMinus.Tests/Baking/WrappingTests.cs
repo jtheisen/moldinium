@@ -97,7 +97,7 @@ public class WrappingTests : BakingTetsBase
     [TestMethod]
     public void TrivialPropertyWrappingTest()
     {
-        var instance = BakeryConfiguration.Create(typeof(TrivialWrappingPropertyImplementation<>))
+        var instance = BakeryConfiguration.Create(propertyWrappingType: typeof(TrivialWrappingPropertyImplementation<>))
             .CreateBakery("Wrapping")
             .Create<IWithImplementedProperty>();
 
