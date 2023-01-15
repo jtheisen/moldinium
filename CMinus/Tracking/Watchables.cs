@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Linq;
+using System.Xml.Linq;
 
 namespace CMinus;
 
@@ -160,6 +161,170 @@ public class RethrowException : Exception
     internal RethrowException(Exception innerException)
         : base("The value evaluation threw the inner exception last time it was attempted, and the dependencies didn't change since.", innerException)
     {
+    }
+}
+
+class CachedComputedWatchable2<T> : IWatchable
+{
+    Boolean dirty = true;
+
+    T cache = default!;
+
+    Exception? exception;
+
+    SerialWatchSubscription? subscriptions = new SerialWatchSubscription();
+
+    Boolean alert = false;
+
+    IDisposable? loggingScope;
+
+    Boolean isInSubscribingEvaluation;
+
+    Int32 evaluationNestingLevel;
+
+    Action? watchers;
+    Int32 noOfWatchers = 0;
+
+    internal String Name { get; set; } = "<unnamed>";
+
+    public IWatchSubscription Subscribe(Object? agent, Action watcher)
+    {
+        Repository.logger?.WriteLine($"{agent} subscribing to {this}");
+
+        watchers += watcher;
+
+        if (noOfWatchers++ == 0)
+            Activate();
+
+        return WatchSubscription.Create(this, () =>
+        {
+            Repository.logger?.WriteLine($"{agent} unsubscribing from {this}");
+
+            watchers -= watcher;
+            if (--noOfWatchers == 0)
+                Relax();
+        });
+    }
+
+    protected Boolean IsWatched => noOfWatchers > 0;
+
+    public Boolean BeforeGet(ref T value)
+    {
+        Repository.Instance.NoteEvaluation(this);
+
+        var needEvaluation = dirty || !alert;
+
+        if (needEvaluation)
+        {
+            if (evaluationNestingLevel > 0) throw new Exception("Attempting to enter a nested evaluation");
+
+            if (IsWatched)
+            {
+                loggingScope = Repository.logger?.WriteLineWithScope($"{this} is watched and dirty, so we're evaluating watched.");
+
+                Repository.Instance.BeginEvaluation(Name, evaluationNestingLevel++);
+
+                isInSubscribingEvaluation = true;
+            }
+            else if (alert)
+            {
+                loggingScope = Repository.logger?.WriteLineWithScope($"{this} is dirty but unwatched, so we're evaluating unwatched.");
+            }
+            else
+            {
+                loggingScope = Repository.logger?.WriteLineWithScope($"{this} is not alert, so we're evaluating.");
+            }
+        }
+        else if (exception is not null)
+        {
+            throw new RethrowException(exception);
+        }
+        else
+        {
+            value = cache;
+        }
+
+        return needEvaluation;
+    }
+
+    public void AfterGet(ref T value)
+    {
+        if (isInSubscribingEvaluation)
+        {
+            Repository.Instance.EndEvaluationAndSubscribe(Name, --evaluationNestingLevel, value, ref subscriptions, InvalidateAndNotify);
+
+            isInSubscribingEvaluation = false;
+        }
+
+        loggingScope?.Dispose();
+
+        loggingScope = null;
+
+        cache = value;
+
+        exception = null;
+
+        dirty = false;
+    }
+
+    public Boolean AfterGetOnError(Exception exception)
+    {
+        if (isInSubscribingEvaluation)
+        {
+            Repository.Instance.EndEvaluationWithExceptionAndSubscribe<T>(Name, --evaluationNestingLevel, exception, ref subscriptions, InvalidateAndNotify);
+
+            isInSubscribingEvaluation = false;
+        }
+
+        loggingScope?.Dispose();
+
+        loggingScope = null;
+
+        cache = default!;
+
+        this.exception = exception;
+
+        dirty = false;
+
+        return true;
+    }
+
+    public void AfterSet() => InvalidateAndNotify();
+
+    public void AfterSetOnError() => InvalidateAndNotify();
+
+    protected void Activate()
+    {
+        Repository.logger?.WriteLine($"{this} is activated, let's look what we missed.");
+
+        dirty = true;
+        alert = true;
+    }
+
+    protected void Relax()
+    {
+        alert = false;
+
+        if (subscriptions != null)
+        {
+            Repository.logger?.WriteLine($"{this} is relaxing.");
+
+            subscriptions.Subscription = null;
+        }
+    }
+
+    void Notify()
+    {
+        watchers?.Invoke();
+    }
+
+    public void InvalidateAndNotify()
+    {
+        dirty = true;
+        if (alert)
+        {
+            Notify();
+        }
     }
 }
 
@@ -413,6 +578,8 @@ class Repository
 
     class EvaluationRecord
     {
+        internal Object? evaluator;
+        internal Int32 id;
         internal List<IWatchable> evaluatedWatchables = new List<IWatchable>();
     }
 
@@ -422,7 +589,7 @@ class Repository
     {
         logger?.BeginEvaluationFrame(evaluator);
 
-        evaluationStack.Push(new EvaluationRecord());
+        evaluationStack.Push(new EvaluationRecord { evaluator = evaluator });
 
         try
         {
@@ -468,6 +635,55 @@ class Repository
 
             throw;
         }
+    }
+
+    internal void BeginEvaluation(Object evaluator, Int32 id)
+    {
+        logger?.BeginEvaluationFrame(evaluator);
+
+        evaluationStack.Push(new EvaluationRecord { evaluator = evaluator, id = id });
+    }
+
+    void EndEvaluation<TSource>(Object evaluator, Int32 id, TSource result, out IEnumerable<IWatchable> dependencies)
+    {
+        var frame = evaluationStack.Pop();
+
+        if (!Object.ReferenceEquals(evaluator, frame.evaluator) || id != frame.id)
+        {
+            throw new Exception($"EndEvaluation didn't match the current frame");
+        }
+
+        dependencies = frame.evaluatedWatchables;
+
+        logger?.CloseEvaluationFrameWithResult(result!, frame.evaluatedWatchables);
+    }
+
+    void EndEvaluationWithException<TSource>(Object evaluator, Int32 id, Exception exception, out IEnumerable<IWatchable> dependencies)
+    {
+        var frame = evaluationStack.Pop();
+
+        if (!Object.ReferenceEquals(evaluator, frame.evaluator) || id != frame.id)
+        {
+            throw new Exception($"EndEvaluation didn't match the current frame");
+        }
+
+        dependencies = frame.evaluatedWatchables;
+
+        logger?.CloseEvaluationFrameWithException(exception, frame.evaluatedWatchables);
+    }
+
+    internal void EndEvaluationAndSubscribe<TSource>(Object evaluator, Int32 id, TSource result, ref SerialWatchSubscription? subscriptions, Action onChange)
+    {
+        EndEvaluation<TSource>(evaluator, id, result, out var dependecies);
+
+        SubscribeAll(evaluator, ref subscriptions, dependecies, onChange);
+    }
+
+    internal void EndEvaluationWithExceptionAndSubscribe<TSource>(Object evaluator, Int32 id, Exception exception, ref SerialWatchSubscription? subscriptions, Action onChange)
+    {
+        EndEvaluationWithException<TSource>(evaluator, id, exception, out var dependecies);
+
+        SubscribeAll(evaluator, ref subscriptions, dependecies, onChange);
     }
 
     internal TResult EvaluateAndSubscribe<TResult>(Object evaluator, ref SerialWatchSubscription? subscriptions, Func<TResult> evaluation, Action onChange)

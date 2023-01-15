@@ -45,23 +45,3 @@ public interface ITrackedComputedPropertyImplementation<
     void Set(Value value, Action<Value> nestedGetter);
 }
 
-public struct TrackedComputedPropertyImplementation<Value> : ITrackedComputedPropertyImplementation<Value>
-{
-    CachedComputedWatchable<Value>? watchable;
-
-    public void Init(Value def, Func<Value> nestedGetter, Action<Value> nestedSetter)
-    {
-        watchable = new CachedComputedWatchable<Value>(nestedGetter);
-
-        nestedSetter(def);
-    }
-
-    public Value Get() => watchable!.Value;
-
-    public void Set(Value value, Action<Value> nestedGetter)
-    {
-        nestedGetter(value);
-
-        watchable!.InvalidateAndNotify();
-    }
-}
