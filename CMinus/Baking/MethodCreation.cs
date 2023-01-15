@@ -100,12 +100,20 @@ public class MethodCreation
     {
         if (methodImplementation is DirectMethodImplementation directMethodImplementation)
         {
-            GenerateImplementationCode(generator, contextType, implementationFieldBuilder, directMethodImplementation.Method);
+            GenerateImplementationCode(
+                generator,
+                contextType,
+                implementationFieldBuilder,
+                directMethodImplementation.Method,
+                ValueAt.FirstArgumentPassedByValue,
+                addRet: true
+            );
         }
         else if (methodImplementation is WrappingMethodImplementation wrappingMethodImplementation)
         {
             GenerateWrappingPropertyImplementationCode(
                 generator,
+                contextType,
                 methodBuilder,
                 valueType,
                 wrappingMethodImplementation.BeforeMethod,
@@ -121,6 +129,7 @@ public class MethodCreation
 
     void GenerateWrappingPropertyImplementationCode(
         ILGenerator generator,
+        CodeGenerationContextType contextType,
         MethodBuilder methodBuilder,
         Type propertyType,
         MethodInfo? backingTryMethod,
@@ -140,58 +149,81 @@ public class MethodCreation
         generator.Emit(OpCodes.Ldloca_S, 0);
         generator.Emit(OpCodes.Initobj, propertyType);
 
-        //var label = generator.DefineLabel();
+        var label = generator.DefineLabel();
 
-        //if (backingTryMethod is not null)
-        //{
-        //    GenerateImplementationCode(
-        //        generator,
-        //        CodeGenerationContextType.Wrapper,
-        //        implementationFieldBuilder,
-        //        backingTryMethod);
+        if (backingTryMethod is not null)
+        {
+            GenerateImplementationCode(
+                generator,
+                contextType,
+                implementationFieldBuilder,
+                backingTryMethod,
+                ValueAt.FirstLocalPassedByRef
+            );
 
-        //    //generator.Emit(OpCodes.Stloc_1);
-        //    //generator.Emit(OpCodes.Ldloc_1);
-        //    generator.Emit(OpCodes.Brfalse_S, label);
-        //    //generator.Emit(OpCodes.Nop);
-        //}
+            generator.Emit(OpCodes.Brfalse_S, label);
+        }
 
-        //if (wrappedMethod is not null)
-        //{
-        //    GenerateImplementationCode(
-        //        generator,
-        //        CodeGenerationContextType.Nested,
-        //        fieldBuilder: null,
-        //        wrappedMethod);
+        if (wrappedMethod is not null)
+        {
+            if (GenerateNestedCallCode(generator, wrappedMethod))
+            {
+                generator.Emit(OpCodes.Stloc_0);
+            }
+        }
 
-        //    // FIXME: if getter, put the return into the variable
-        //}
+        if (backingPostMethod is not null)
+        {
+            GenerateImplementationCode(
+                generator,
+                contextType,
+                implementationFieldBuilder,
+                backingPostMethod,
+                ValueAt.FirstLocalPassedByRef
+            );
+        }
 
-        //if (backingPostMethod is not null)
-        //{
-        //    GenerateImplementationCode(
-        //        generator,
-        //        CodeGenerationContextType.Wrapper,
-        //        implementationFieldBuilder,
-        //        backingPostMethod);
-        //}
-
-        //generator.MarkLabel(label);
+        generator.MarkLabel(label);
 
         if (methodBuilder.ReturnType != typeof(void))
         {
             generator.Emit(OpCodes.Ldloc_0, 0);
         }
 
-        //if (methodBuilder.ReturnType != typeof(void))
-        //{
-        //    generator.DeclareLocal(propertyType);
-        //    generator.Emit(OpCodes.Ldloca_S, 0);
-        //    generator.Emit(OpCodes.Initobj, propertyType);
-        //    generator.Emit(OpCodes.Ldloc_0);
-        //}
-
         generator.Emit(OpCodes.Ret);
+    }
+
+    Boolean GenerateNestedCallCode(
+        ILGenerator generator,
+        MethodInfo nestedMethod
+        )
+    {
+        if (!nestedMethod.IsStatic)
+        {
+            generator.Emit(OpCodes.Ldarg_0);
+        }
+
+        var parameters = nestedMethod.GetParameters();
+
+        for (var i = 0; i < parameters.Length; ++i)
+        {
+            //var p = parameters[i];
+
+            //var byRef = p.ParameterType.IsByRef;
+
+            generator.Emit(OpCodes.Ldarg, i);
+        }
+
+        generator.Emit(OpCodes.Call, nestedMethod);
+
+        return nestedMethod.ReturnType != typeof(void);
+    }
+
+    public enum ValueAt
+    {
+        NoValue,
+        FirstArgumentPassedByValue,
+        FirstLocalPassedByRef
     }
 
     public void GenerateImplementationCode(
@@ -199,8 +231,10 @@ public class MethodCreation
         CodeGenerationContextType methodType,
         FieldBuilder? fieldBuilder,
         MethodInfo backingMethod,
+        ValueAt valueAt,
         FieldBuilder? defaultImplementationFieldBuilder = null,
-        MethodInfo? defaultImplementationGetMethod = null
+        MethodInfo? defaultImplementationGetMethod = null,
+        Boolean addRet = false
     )
     {
         if (!backingMethod.IsStatic)
@@ -233,14 +267,16 @@ public class MethodCreation
                 switch (kind)
                 {
                     case ImplementationTypeArgumentKind.Value:
-                        switch (methodType)
+                        switch (valueAt)
                         {
-                            case CodeGenerationContextType.Wrapper:
+                            case ValueAt.FirstLocalPassedByRef:
                                 if (!byRef) throw new Exception($"Value types to before and after methods need to be passed by ref");
                                 break;
-                            default:
+                            case ValueAt.FirstArgumentPassedByValue:
                                 if (byRef) throw new Exception($"Value types need to be passed by value");
                                 break;
+                            default:
+                                throw new Exception($"Internal error: unhandled {valueAt}");
                         }
 
                         switch (methodType)
@@ -255,13 +291,20 @@ public class MethodCreation
                                 generator.Emit(OpCodes.Call, defaultImplementationGetMethod);
                                 break;
                             case CodeGenerationContextType.Set:
-                                generator.Emit(OpCodes.Ldarg_1);
-                                break;
-                            case CodeGenerationContextType.Wrapper:
-                                generator.Emit(OpCodes.Ldloca_S, 0);
+                                switch (valueAt)
+                                {
+                                    case ValueAt.FirstArgumentPassedByValue:
+                                        generator.Emit(OpCodes.Ldarg_1);
+                                        break;
+                                    case ValueAt.FirstLocalPassedByRef:
+                                        generator.Emit(OpCodes.Ldloca_S, 0);
+                                        break;
+                                    default:
+                                        throw new Exception("Internal error: No value here");
+                                }
                                 break;
                             default:
-                                throw new Exception($"Passing the value to {backingMethod} is not valid");
+                                throw new Exception($"Internal error: unhandled {valueAt}");
                         }
 
                         break;
@@ -279,7 +322,7 @@ public class MethodCreation
 
         generator.Emit(OpCodes.Call, backingMethod);
 
-        if (methodType != CodeGenerationContextType.Constructor)
+        if (addRet)
         {
             generator.Emit(OpCodes.Ret);
         }

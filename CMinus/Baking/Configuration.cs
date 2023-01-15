@@ -110,8 +110,6 @@ public enum CodeGenerationContextType
 {
     Other,
     Constructor,
-    Wrapper,
-    Nested,
     Get,
     Set,
     Add,

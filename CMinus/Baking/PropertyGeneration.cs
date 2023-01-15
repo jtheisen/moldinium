@@ -163,6 +163,7 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
                     state.ConstructorGenerator,
                     CodeGenerationContextType.Constructor,
                     fieldBuilder, backingInitMethod,
+                    MethodCreation.ValueAt.FirstArgumentPassedByValue,
                     defaultImplementationFieldBuilder,
                     defaultImplementationGetMethod
                 );

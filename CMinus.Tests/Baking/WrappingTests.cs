@@ -111,7 +111,11 @@ public class WrappingTests : BakingTetsBase
             .CreateBakery("Wrapping")
             .Create<IWithImplementedProperty>();
 
-        instance.Validate();
+        Assert.IsNull(instance.Value);
+
+        instance.Value = "foo";
+
+        Assert.IsNull(instance.Value);
     }
 
 
