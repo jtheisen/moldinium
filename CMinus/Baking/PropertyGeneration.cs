@@ -161,9 +161,8 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
                 methodCreator.GenerateImplementationCode(
                     state.ConstructorGenerator,
-                    CodeGenerationContextType.Constructor,
                     fieldBuilder, backingInitMethod,
-                    MethodCreation.ValueAt.FirstArgumentPassedByValue,
+                    MethodCreation.ValueAt.GetFromDefaultImplementationPassedByValue,
                     defaultImplementationFieldBuilder,
                     defaultImplementationGetMethod
                 );
@@ -173,7 +172,6 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
         if (getMethod is not null)
         {
             var getMethodBuilder = methodCreator.CreatePropertyMethod(
-                CodeGenerationContextType.Get,
                 getMethod, getMethod.GetBaseDefinition(),
                 backingGetMethod,
                 valueType,
@@ -186,7 +184,6 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
         if (setMethod is not null)
         {
             var setMethodBuilder = methodCreator.CreatePropertyMethod(
-                CodeGenerationContextType.Set,
                 setMethod, setMethod.GetBaseDefinition(),
                 backingSetMethod,
                 valueType,

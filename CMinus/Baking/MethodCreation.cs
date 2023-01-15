@@ -74,7 +74,6 @@ public class MethodCreation
     }
 
     public MethodBuilder CreatePropertyMethod(
-        CodeGenerationContextType contextType,
         MethodInfo methodTemplate,
         MethodInfo wrappedMethod,
         MethodImplementation implementation,
@@ -85,7 +84,7 @@ public class MethodCreation
     {
         var methodBuilder = Declare(typeBuilder, methodTemplate, toAdd, toRemove);
         var generator = methodBuilder.GetILGenerator();
-        GeneratePropertyMethodImplementationCode(generator, methodBuilder, implementation, contextType, valueType, wrappedMethod);
+        GeneratePropertyMethodImplementationCode(generator, methodBuilder, implementation, valueType, wrappedMethod);
         return methodBuilder;
     }
 
@@ -93,7 +92,6 @@ public class MethodCreation
         ILGenerator generator,
         MethodBuilder methodBuilder,
         MethodImplementation methodImplementation,
-        CodeGenerationContextType contextType,
         Type valueType,
         MethodInfo? wrappedMethod = null
     )
@@ -102,7 +100,6 @@ public class MethodCreation
         {
             GenerateImplementationCode(
                 generator,
-                contextType,
                 implementationFieldBuilder,
                 directMethodImplementation.Method,
                 ValueAt.FirstArgumentPassedByValue,
@@ -113,7 +110,6 @@ public class MethodCreation
         {
             GenerateWrappingPropertyImplementationCode(
                 generator,
-                contextType,
                 methodBuilder,
                 valueType,
                 wrappingMethodImplementation.BeforeMethod,
@@ -127,26 +123,8 @@ public class MethodCreation
         }
     }
 
-    void GenerateWrappingPropertyImplementationCode2(
-        ILGenerator generator,
-        CodeGenerationContextType contextType,
-        MethodBuilder methodBuilder,
-        Type propertyType,
-        MethodInfo? backingTryMethod,
-        MethodInfo? backingPostMethod,
-        MethodInfo? wrappedMethod
-    )
-    {
-        if (wrappedMethod is null) throw new Exception();
-
-        GenerateNestedCallCode(generator, wrappedMethod);
-
-        generator.Emit(OpCodes.Ret);
-    }
-
     void GenerateWrappingPropertyImplementationCode(
         ILGenerator generator,
-        CodeGenerationContextType contextType,
         MethodBuilder methodBuilder,
         Type propertyType,
         MethodInfo? backingTryMethod,
@@ -172,7 +150,6 @@ public class MethodCreation
         {
             GenerateImplementationCode(
                 generator,
-                contextType,
                 implementationFieldBuilder,
                 backingTryMethod,
                 ValueAt.FirstLocalPassedByRef
@@ -193,7 +170,6 @@ public class MethodCreation
         {
             GenerateImplementationCode(
                 generator,
-                contextType,
                 implementationFieldBuilder,
                 backingPostMethod,
                 ValueAt.FirstLocalPassedByRef
@@ -240,12 +216,12 @@ public class MethodCreation
     {
         NoValue,
         FirstArgumentPassedByValue,
-        FirstLocalPassedByRef
+        FirstLocalPassedByRef,
+        GetFromDefaultImplementationPassedByValue
     }
 
     public void GenerateImplementationCode(
         ILGenerator generator,
-        CodeGenerationContextType methodType,
         FieldBuilder? fieldBuilder,
         MethodInfo backingMethod,
         ValueAt valueAt,
@@ -286,43 +262,26 @@ public class MethodCreation
                     case ImplementationTypeArgumentKind.Value:
                         switch (valueAt)
                         {
-                            case ValueAt.FirstLocalPassedByRef:
-                                if (!byRef) throw new Exception($"Value types to before and after methods need to be passed by ref");
-                                break;
                             case ValueAt.FirstArgumentPassedByValue:
                                 if (byRef) throw new Exception($"Value types need to be passed by value");
+                                generator.Emit(OpCodes.Ldarg_1);
                                 break;
-                            default:
-                                throw new Exception($"Internal error: unhandled {valueAt}");
-                        }
-
-                        switch (methodType)
-                        {
-                            case CodeGenerationContextType.Constructor:
+                            case ValueAt.FirstLocalPassedByRef:
+                                if (!byRef) throw new Exception($"Value types to before and after methods need to be passed by ref");
+                                generator.Emit(OpCodes.Ldloca_S, 0);
+                                break;
+                            case ValueAt.GetFromDefaultImplementationPassedByValue:
+                                if (byRef) throw new Exception($"Value types need to be passed by value");
                                 if (defaultImplementationFieldBuilder is null || defaultImplementationGetMethod is null)
                                 {
-                                    throw new Exception("Expected to have a fieldBuilder with a get method");
+                                    throw new Exception("Expected to have a fieldBuilder for a default implementation with a get method");
                                 }
                                 generator.Emit(OpCodes.Ldarg_0);
                                 generator.Emit(OpCodes.Ldflda, defaultImplementationFieldBuilder);
                                 generator.Emit(OpCodes.Call, defaultImplementationGetMethod);
                                 break;
-                            case CodeGenerationContextType.Set:
-                            case CodeGenerationContextType.Get:
-                                switch (valueAt)
-                                {
-                                    case ValueAt.FirstArgumentPassedByValue:
-                                        generator.Emit(OpCodes.Ldarg_1);
-                                        break;
-                                    case ValueAt.FirstLocalPassedByRef:
-                                        generator.Emit(OpCodes.Ldloca_S, 0);
-                                        break;
-                                    default:
-                                        throw new Exception("Internal error: No value here");
-                                }
-                                break;
                             default:
-                                throw new Exception($"Internal error: unhandled {methodType}");
+                                throw new Exception("Internal error: No value here");
                         }
 
                         break;

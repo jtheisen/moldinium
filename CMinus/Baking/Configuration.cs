@@ -105,13 +105,3 @@ public record BakeryConfiguration(IBakeryComponentGenerators Generators, IDefaul
 public class MixInGenerator
 {
 }
-
-public enum CodeGenerationContextType
-{
-    Other,
-    Constructor,
-    Get,
-    Set,
-    Add,
-    Remove
-}
