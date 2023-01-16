@@ -60,8 +60,35 @@ public class WrappingTests : BakingTetsBase
         }
     }
 
+    public class TestException : Exception { }
+
+    public interface IWithThrowingProperty
+    {
+        Boolean DoThrowOnGet { get; set; }
+        Boolean DoThrowOnSet { get; set; }
+
+        Int32 BackingValue { get; set; }
+
+        Int32 Value
+        {
+            get
+            {
+                if (DoThrowOnGet) throw new TestException();
+
+                return BackingValue;
+            }
+
+            set
+            {
+                if (DoThrowOnSet) throw new TestException();
+
+                BackingValue = value;
+            }
+        }
+    }
+
     [TestMethod]
-    public void PropertyNoWrappingTest()
+    public void NoWrappingTest()
     {
         var instance = BasicFactory.Create<IWithImplementedProperty>();
 
@@ -100,7 +127,7 @@ public class WrappingTests : BakingTetsBase
     }
 
     [TestMethod]
-    public void TrivialDontDelegatePropertyWrappingTest()
+    public void TrivialDontDelegateTest()
     {
         var instance = BakeryConfiguration.Create(propertyWrappingType: typeof(TrivialDontDelegateWrappingPropertyImplementation<>))
             .CreateBakery("Wrapping")
@@ -139,6 +166,24 @@ public class WrappingTests : BakingTetsBase
         }
     }
 
+    public interface IDelegatingWrappingPropertyMixin
+    {
+        Object GetWrappingMethods { get; set; }
+        Object SetWrappingMethods { get; set; }
+    }
+
+    public struct DelegatingWrappingPropertyMixin : IDelegatingWrappingPropertyMixin
+    {
+        public Object GetWrappingMethods { get; set; }
+        public Object SetWrappingMethods { get; set; }
+    }
+
+    public record WrappingMethods<T>(OnBefore<T>? Before = null, OnAfter<T>? After = null, OnAfterError<T>? AfterError = null);
+
+    public delegate Boolean OnBefore<T>(ref T value);
+    public delegate void OnAfter<T>(ref T value);
+    public delegate Boolean OnAfterError<T>(Exception exception);
+
     public interface IWrappingPropertyImplementation<
         [TypeKind(ImplementationTypeArgumentKind.Value)] Value,
         [TypeKind(ImplementationTypeArgumentKind.Mixin)] Mixin
@@ -152,6 +197,39 @@ public class WrappingTests : BakingTetsBase
 
         Boolean AfterErrorGet(Exception exception, ref Value value, ref Mixin mixin);
         Boolean AfterErrorSet(Exception exception, ref Value value, ref Mixin mixin);
+    }
+
+    public struct DelegatingWrappingPropertyImplementation<Value> : IWrappingPropertyImplementation<Value, DelegatingWrappingPropertyMixin>
+    {
+        public Boolean BeforeGet(ref Value value, ref DelegatingWrappingPropertyMixin mixin)
+        {
+            return (mixin.GetWrappingMethods as WrappingMethods<Value>)?.Before?.Invoke(ref value) ?? true;
+        }
+
+        public void AfterGet(ref Value value, ref DelegatingWrappingPropertyMixin mixin)
+        {
+            (mixin.GetWrappingMethods as WrappingMethods<Value>)?.After?.Invoke(ref value);
+        }
+
+        public Boolean BeforeSet(ref Value value, ref DelegatingWrappingPropertyMixin mixin)
+        {
+            return (mixin.SetWrappingMethods as WrappingMethods<Value>)?.Before?.Invoke(ref value) ?? true;
+        }
+
+        public void AfterSet(ref Value value, ref DelegatingWrappingPropertyMixin mixin)
+        {
+            (mixin.SetWrappingMethods as WrappingMethods<Value>)?.After?.Invoke(ref value);
+        }
+
+        public Boolean AfterErrorGet(Exception exception, ref Value value, ref DelegatingWrappingPropertyMixin mixin)
+        {
+            return (mixin.GetWrappingMethods as WrappingMethods<Value>)?.AfterError?.Invoke(exception) ?? true;
+        }
+
+        public Boolean AfterErrorSet(Exception exception, ref Value value, ref DelegatingWrappingPropertyMixin mixin)
+        {
+            return (mixin.SetWrappingMethods as WrappingMethods<Value>)?.AfterError?.Invoke(exception) ?? true;
+        }
     }
 
     public struct EventWrappingPropertyImplementation<Value> : IWrappingPropertyImplementation<Value, WrappingPropertyNotificationMixin>
@@ -196,7 +274,7 @@ public class WrappingTests : BakingTetsBase
     }
 
     [TestMethod]
-    public void PropertyEventWrappingTest()
+    public void EventTest()
     {
         var instance = BakeryConfiguration.Create(propertyWrappingType: typeof(EventWrappingPropertyImplementation<>))
             .CreateBakery("Wrapping")
@@ -290,7 +368,7 @@ public class WrappingTests : BakingTetsBase
     }
 
     [TestMethod]
-    public void PropertyCacheWrappingTest()
+    public void CacheTest()
     {
         var instance = BakeryConfiguration.Create(propertyWrappingType: typeof(CachingWrappingPropertyImplementation<>))
             .CreateBakery("Wrapping")
@@ -329,5 +407,86 @@ public class WrappingTests : BakingTetsBase
         instance.Value = 0;
 
         Assert.AreEqual(instance.Value, 43);
+    }
+
+    [TestMethod]
+    public void ExceptionWithEventsTest()
+    {
+        var instance = BakeryConfiguration.Create(propertyWrappingType: typeof(EventWrappingPropertyImplementation<>))
+            .CreateBakery("Wrapping")
+            .Create<IWithThrowingProperty>();
+
+        var events = new List<(WrappingPropertyNotificationEventType type, Object? value)>();
+
+        var observable = instance as IWrappingPropertyNotificationMixin;
+
+        Assert.IsNotNull(observable);
+
+        if (observable is null) throw new Exception();
+
+        observable.OnEvent += (t, v) =>
+        {
+            events.Add((t, v));
+        };
+
+        Assert.AreEqual(0, events.Count);
+
+        instance.Value = 42;
+
+        Assert.AreEqual(2, events.Count);
+
+        instance.DoThrowOnSet = true;
+
+        Assert.ThrowsException<TestException>(() => instance.Value = 43);
+
+        Assert.AreEqual(4, events.Count);
+    }
+
+    [TestMethod]
+    public void ExceptionWithDelegatesTest()
+    {
+        var instance = BakeryConfiguration.Create(propertyWrappingType: typeof(DelegatingWrappingPropertyImplementation<>))
+            .CreateBakery("Wrapping")
+            .Create<IWithThrowingProperty>();
+
+        var wrapperImplementation = instance as IDelegatingWrappingPropertyMixin;
+
+        Assert.IsNotNull(wrapperImplementation);
+
+        if (wrapperImplementation is null) throw new Exception();
+
+        Exception? exception = null;
+
+        wrapperImplementation.GetWrappingMethods = new WrappingMethods<Int32>(
+            AfterError: (Exception ex) => { exception = ex; return true; }
+        );
+
+        wrapperImplementation.SetWrappingMethods = new WrappingMethods<Int32>(
+            AfterError: (Exception ex) => { exception = ex; return true; }
+        );
+
+        instance.Value = 42;
+
+        Assert.AreEqual(42, instance.Value);
+
+        instance.DoThrowOnGet = true;
+
+        Assert.ThrowsException<TestException>(() => instance.Value);
+
+        Assert.IsNotNull(exception);
+
+        instance.DoThrowOnGet = false;
+        instance.DoThrowOnSet = true;
+        exception = null;
+
+        wrapperImplementation.SetWrappingMethods = new WrappingMethods<Int32>(
+            AfterError: (Exception ex) => { exception = ex; return false; }
+        );
+
+        instance.Value = 43;
+
+        Assert.AreEqual(42, instance.Value);
+
+        Assert.IsNotNull(exception);
     }
 }
