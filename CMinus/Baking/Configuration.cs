@@ -1,4 +1,5 @@
-﻿using System;
+﻿using CMinus.Baking;
+using System;
 using System.Reflection;
 
 namespace CMinus;
@@ -7,30 +8,35 @@ public struct Dummy { }
 
 public interface IBakeryComponentGenerators
 {
-    MixInGenerator[] GetMixInGenerators(Type type);
+    MixinGenerator[] GetMixInGenerators(Type type);
+
+    AbstractMethodGenerator? GetMethodGenerator(MethodInfo method);
 
     AbstractPropertyGenerator? GetPropertyGenerator(PropertyInfo property);
-
+    
     AbstractEventGenerator GetEventGenerator(EventInfo evt);
 }
 
 public class ComponentGenerators : IBakeryComponentGenerators
 {
+    private readonly AbstractMethodGenerator? methodWrapperGenerator;
     private readonly AbstractPropertyGenerator propertyImplementationGenerator;
     private readonly AbstractPropertyGenerator? propertyWrapperGenerator;
     private readonly AbstractEventGenerator eventGenerator;
 
     public ComponentGenerators(
+        AbstractMethodGenerator? methodWrapperGenerator,
         AbstractPropertyGenerator propertyImplementationGenerator,
         AbstractPropertyGenerator? propertyWrapperGenerator,
         AbstractEventGenerator eventGenerator)
     {
+        this.methodWrapperGenerator = methodWrapperGenerator;
         this.propertyImplementationGenerator = propertyImplementationGenerator;
         this.propertyWrapperGenerator = propertyWrapperGenerator;
         this.eventGenerator = eventGenerator;
     }
 
-    public MixInGenerator[] GetMixInGenerators(Type type) => new MixInGenerator[] { };
+    public MixinGenerator[] GetMixInGenerators(Type type) => new MixinGenerator[] { };
 
     public AbstractPropertyGenerator? GetPropertyGenerator(PropertyInfo property)
     {
@@ -41,11 +47,11 @@ public class ComponentGenerators : IBakeryComponentGenerators
         {
             if (!setter.exists)
             {
-                throw new Exception($"The property {property.Name} has neither a setter nor a getter");
+                throw new Exception($"The property {property.Name} on {property.DeclaringType} has neither a setter nor a getter");
             }
             else
             {
-                throw new Exception($"The property {property.Name} has a setter but no getter");
+                throw new Exception($"The property {property.Name} on {property.DeclaringType} has a setter but no getter");
             }
         }
 
@@ -53,7 +59,7 @@ public class ComponentGenerators : IBakeryComponentGenerators
         {
             if (getter.implemented != setter.implemented)
             {
-                throw new Exception($"The property {property.Name} should implement either both getter and setter or neither");
+                throw new Exception($"The property {property.Name} on {property.DeclaringType} should implement either both getter and setter or neither");
             }
         }
 
@@ -74,6 +80,15 @@ public class ComponentGenerators : IBakeryComponentGenerators
         }
     }
 
+    public AbstractMethodGenerator? GetMethodGenerator(MethodInfo method)
+    {
+        var check = CheckMethod(method);
+
+        if (!check.implemented) throw new Exception($"Method {method} on {method.DeclaringType} must have a default implementation to wrap");
+
+        return methodWrapperGenerator;
+    }
+
     (Boolean exists, Boolean implemented) CheckMethod(MethodInfo? method)
     {
         return (exists: method is not null, implemented: !method?.IsAbstract ?? false);
@@ -82,11 +97,9 @@ public class ComponentGenerators : IBakeryComponentGenerators
 
     public AbstractEventGenerator GetEventGenerator(EventInfo evt) => eventGenerator;
 
-    public static ComponentGenerators Create(Type propertyImplementationType, Type eventImplementationType)
-        => Create(propertyImplementationType, typeof(TrivialPropertyWrapper), eventImplementationType);
-
-    public static ComponentGenerators Create(Type propertyImplementationType, Type? propertyWrapperType, Type eventImplementationType)
+    public static ComponentGenerators Create(Type? methodWrapperType, Type propertyImplementationType, Type? propertyWrapperType, Type eventImplementationType)
         => new ComponentGenerators(
+            methodWrapperType is not null ? MethodGenerator.Create(methodWrapperType) : null,
             PropertyGenerator.Create(propertyImplementationType),
             propertyWrapperType is not null ? PropertyGenerator.Create(propertyWrapperType) : null,
             EventGenerator.Create(eventImplementationType)
@@ -97,16 +110,21 @@ public record BakeryConfiguration(IBakeryComponentGenerators Generators, IDefaul
 {
     public static BakeryConfiguration Create(Type? propertyImplementationType = null, Type? propertyWrappingType = null, Type? eventImplementationType = null)
         => new BakeryConfiguration(ComponentGenerators.Create(
-            propertyImplementationType ?? typeof(SimplePropertyImplementation<>),
-            propertyWrappingType,
-            eventImplementationType ?? typeof(GenericEventImplementation<>)), Defaults.GetDefaultDefaultProvider());
+            methodWrapperType: null,
+            propertyImplementationType: propertyImplementationType ?? typeof(SimplePropertyImplementation<>),
+            propertyWrapperType: propertyWrappingType,
+            eventImplementationType: eventImplementationType ?? typeof(GenericEventImplementation<>)
+        ), Defaults.GetDefaultDefaultProvider());
 
     public static BakeryConfiguration PocGenerationConfiguration
-        = new BakeryConfiguration(ComponentGenerators.Create(typeof(SimplePropertyImplementation<>), typeof(GenericEventImplementation<>)), Defaults.GetDefaultDefaultProvider());
+        = new BakeryConfiguration(ComponentGenerators.Create(
+            methodWrapperType: null,
+            propertyImplementationType: typeof(SimplePropertyImplementation<>),
+            propertyWrapperType: null,
+            eventImplementationType: typeof(GenericEventImplementation<>)
+        ), Defaults.GetDefaultDefaultProvider());
 
     public AbstractlyBakery CreateBakery(String name) => new Bakery(name, this);
 }
 
-public class MixInGenerator
-{
-}
+public class MixinGenerator { }

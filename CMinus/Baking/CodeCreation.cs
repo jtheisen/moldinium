@@ -21,16 +21,16 @@ public record WrappingMethodImplementation(
     MethodInfo? AfterOnErrorMethod = null
 ) : MethodImplementation;
 
-public record PropertyImplementation(FieldBuilder FieldBuilder, MethodImplementation Get, MethodImplementation Set);
+public record PropertyImplementation(MethodImplementation Get, MethodImplementation Set);
 
-public class MethodCreation
+public class CodeCreation
 {
     private readonly TypeBuilder typeBuilder;
     private readonly IDictionary<Type, ImplementationTypeArgumentKind> argumentKinds;
     private readonly FieldBuilder? implementationFieldBuilder;
     private readonly FieldBuilder? mixInFieldBuilder;
 
-    public MethodCreation(
+    public CodeCreation(
         TypeBuilder typeBuilder,
         IDictionary<Type, ImplementationTypeArgumentKind> argumentKinds,
         FieldBuilder? implementationFieldBuilder,
@@ -77,26 +77,26 @@ public class MethodCreation
         return methodBuilder;
     }
 
-    public MethodBuilder CreatePropertyMethod(
+    public MethodBuilder CreateMethod(
         MethodInfo methodTemplate,
         MethodInfo wrappedMethod,
         MethodImplementation implementation,
-        Type valueType,
+        Type valueOrReturnType,
         MethodAttributes toAdd = default,
         MethodAttributes toRemove = default
     )
     {
         var methodBuilder = Declare(typeBuilder, methodTemplate, toAdd, toRemove);
         var generator = methodBuilder.GetILGenerator();
-        GeneratePropertyMethodImplementationCode(generator, methodBuilder, implementation, valueType, wrappedMethod);
+        GenerateMethodImplementationCode(generator, methodBuilder, implementation, valueOrReturnType, wrappedMethod);
         return methodBuilder;
     }
 
-    public void GeneratePropertyMethodImplementationCode(
+    public void GenerateMethodImplementationCode(
         ILGenerator generator,
         MethodBuilder methodBuilder,
         MethodImplementation methodImplementation,
-        Type valueType,
+        Type valueOrReturnType,
         MethodInfo? wrappedMethod = null
     )
     {
@@ -112,10 +112,10 @@ public class MethodCreation
         }
         else if (methodImplementation is WrappingMethodImplementation wrappingMethodImplementation)
         {
-            GenerateWrappingPropertyImplementationCode(
+            GenerateWrappingImplementationCode(
                 generator,
                 methodBuilder,
-                valueType,
+                valueOrReturnType,
                 wrappingMethodImplementation.BeforeMethod,
                 wrappingMethodImplementation.AfterMethod,
                 wrappingMethodImplementation.AfterOnErrorMethod,
@@ -128,27 +128,27 @@ public class MethodCreation
         }
     }
 
-    void GenerateWrappingPropertyImplementationCode(
+    void GenerateWrappingImplementationCode(
         ILGenerator il,
         MethodBuilder methodBuilder,
-        Type propertyType,
+        Type valueOrReturnType,
         MethodInfo? backingTryMethod,
         MethodInfo? backingAfterMethod,
         MethodInfo? backingAfterErrorMethod,
         MethodInfo? wrappedMethod
         )
     {
-        if (propertyType.IsValueType)
+        if (valueOrReturnType.IsValueType)
         {
-            il.DeclareLocal(propertyType);
+            il.DeclareLocal(valueOrReturnType);
         }
         else
         {
-            il.DeclareLocal(propertyType, pinned: true);
+            il.DeclareLocal(valueOrReturnType, pinned: true);
         }
 
         il.Emit(OpCodes.Ldloca_S, 0);
-        il.Emit(OpCodes.Initobj, propertyType);
+        il.Emit(OpCodes.Initobj, valueOrReturnType);
 
         il.DeclareLocal(typeof(Exception));
 

@@ -1,5 +1,6 @@
 ﻿using Castle.Core.Configuration;
 using Castle.DynamicProxy.Generators;
+using CMinus.Baking;
 using CMinus.Injection;
 using System;
 using System.Collections.Generic;
@@ -298,6 +299,7 @@ public class Bakery : AbstractlyBakery
         {
             var nestedGenerators = onlyDelegate
                 ? new ComponentGenerators(
+                    new DelegatingMethodGenerator(fieldBuilder),
                     new DelegatingPropertyGenerator(fieldBuilder),
                     new DelegatingPropertyGenerator(fieldBuilder),
                     new DelegatingEventGenerator(fieldBuilder)
