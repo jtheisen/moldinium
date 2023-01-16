@@ -28,16 +28,16 @@ public class CombinedTests
         => DependencyProvider.Create(configuration)
         .CreateInstance<InterfaceTypeWithParameterizedFactory>().Validate();
 
+    IDependencyProvider GetProvider() => DependencyProvider.Create(
+        new DefaultDependencyProviderConfiguration(
+            Baking: DefaultDependencyProviderBakingMode.Tracking
+        )
+    );
+
     [TestMethod]
     public void BakedTypeTest()
     {
-        var configuration = new DefaultDependencyProviderConfiguration(
-            Baking: DefaultDependencyProviderBakingMode.Basic,
-            BakeAbstract: false,
-            EnableOldModliniumModels: true
-        );
-
-        var provider = DependencyProvider.Create(configuration);
+        var provider = GetProvider();
 
         var bakedType = provider.ResolveType(typeof(ITodoListEntry));
 
@@ -53,13 +53,7 @@ public class CombinedTests
     [TestMethod]
     public void ReactionTest()
     {
-        var configuration = new DefaultDependencyProviderConfiguration(
-            Baking: DefaultDependencyProviderBakingMode.Basic,
-            BakeAbstract: true,
-            EnableOldModliniumModels: true
-        );
-
-        var provider = DependencyProvider.Create(configuration);
+        var provider = GetProvider();
 
         var instance = provider.CreateInstance<ITodoListEntry>();
 

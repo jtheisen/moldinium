@@ -8,10 +8,10 @@ public class BakingTestsBase
 {
     protected static readonly AbstractBakery BasicFactory = new Bakery("Basic");
 
-    protected T CreateTestModel<T, I>(ComponentGenerators generators, out I ifc)
+    protected T CreateTestModel<T, I>(out I ifc, params Type[] implementations)
         where I : class
     {
-        var instance = new BakeryConfiguration(generators, Defaults.GetDefaultDefaultProvider())
+        var instance = new BakeryConfiguration(ComponentGenerators.Create(implementations), Defaults.GetDefaultDefaultProvider())
             .CreateBakery("TestBakery")
             .Create<T>();
 

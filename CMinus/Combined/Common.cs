@@ -4,11 +4,6 @@ using System.Collections.Generic;
 
 namespace CMinus;
 
-public struct TrackingWrappedPropertyImplementation<T>
-{
-
-}
-
 [Flags]
 public enum DefaultDependencyProviderBakingMode
 {
@@ -123,6 +118,9 @@ public static class DependencyProvider
         DefaultDependencyProviderBakingMode.Basic => ComponentGenerators.Create(
             typeof(SimplePropertyImplementation<>),
             typeof(GenericEventImplementation<>)),
+        DefaultDependencyProviderBakingMode.Tracking => ComponentGenerators.Create(
+            typeof(TrackedPropertyImplementation<>),
+            typeof(TrackedComputedPropertyImplementation<,>)),
         _ => throw new NotImplementedException()
     };
 }

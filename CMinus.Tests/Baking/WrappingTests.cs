@@ -1,8 +1,6 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using static CMinus.Tests.Baking.WrappingTests;
 
 namespace CMinus.Tests.Baking;
 
@@ -141,9 +139,9 @@ public class WrappingTests : BakingTestsBase
     [TestMethod]
     public void TrivialDontDelegateTest()
     {
-        var instance = BakeryConfiguration.Create(typeof(TrivialDontDelegateWrappingPropertyImplementation<>))
-            .CreateBakery("Wrapping")
-            .Create<IWithImplementedProperty>();
+        var instance = CreateTestModel<IWithImplementedProperty, Object>(
+            out var _, typeof(TrivialDontDelegateWrappingPropertyImplementation<>)
+        );
 
         Assert.IsNull(instance.Value);
 
@@ -156,9 +154,9 @@ public class WrappingTests : BakingTestsBase
     [TestMethod]
     public void EventTest()
     {
-        var instance = BakeryConfiguration.Create(typeof(EventWrappingPropertyImplementation<,>))
-            .CreateBakery("Wrapping")
-            .Create<IWithImplementedProperty>();
+        var instance = CreateTestModel<IWithImplementedProperty, Object>(
+            out var _, typeof(EventWrappingPropertyImplementation<,>)
+        );
 
         instance.Validate();
 
@@ -252,15 +250,9 @@ public class WrappingTests : BakingTestsBase
     [TestMethod]
     public void CacheTest()
     {
-        var instance = BakeryConfiguration.Create(typeof(CachingWrappingPropertyImplementation<,>))
-            .CreateBakery("Wrapping")
-            .Create<IWithCountingProperty>();
-
-        var cacheControl = instance as ICachingPropertyMixin;
-
-        Assert.IsNotNull(cacheControl);
-
-        if (cacheControl is null) throw new Exception();
+        var instance = CreateTestModel<IWithCountingProperty, ICachingPropertyMixin>(
+            out var cacheControl, typeof(CachingWrappingPropertyImplementation<,>)
+        );
 
         Assert.AreEqual(cacheControl.IsValid, false);
 
@@ -294,17 +286,11 @@ public class WrappingTests : BakingTestsBase
     [TestMethod]
     public void ExceptionWithEventsTest()
     {
-        var instance = BakeryConfiguration.Create(typeof(EventWrappingPropertyImplementation<,>))
-            .CreateBakery("Wrapping")
-            .Create<IThrowingModel>();
+        var instance = CreateTestModel<IThrowingModel, IWrappingPropertyNotificationMixin>(
+            out var observable, typeof(EventWrappingPropertyImplementation<,>)
+        );
 
         var events = new List<(WrappingPropertyNotificationEventType type, Object? value)>();
-
-        var observable = instance as IWrappingPropertyNotificationMixin;
-
-        Assert.IsNotNull(observable);
-
-        if (observable is null) throw new Exception();
 
         observable.OnEvent += (t, v) =>
         {
@@ -327,15 +313,9 @@ public class WrappingTests : BakingTestsBase
     [TestMethod]
     public void ExceptionWithDelegatesTest()
     {
-        var instance = BakeryConfiguration.Create(typeof(DelegatingWrappingPropertyImplementation<,>))
-            .CreateBakery("Wrapping")
-            .Create<IThrowingModel>();
-
-        var wrapperImplementation = instance as IDelegatingWrappingPropertyMixin;
-
-        Assert.IsNotNull(wrapperImplementation);
-
-        if (wrapperImplementation is null) throw new Exception();
+        var instance = CreateTestModel<IThrowingModel, IDelegatingWrappingPropertyMixin>(
+            out var wrapperImplementation, typeof(DelegatingWrappingPropertyImplementation<,>)
+        );
 
         Exception? exception = null;
 
@@ -376,11 +356,8 @@ public class WrappingTests : BakingTestsBase
     public void ExceptionOnMethodWithDelegatesTest()
     {
         var instance = CreateTestModel<IThrowingModel, IDelegatingWrappingPropertyMixin>(
-            ComponentGenerators.Create(typeof(DelegatingWrappingMethodImplementation<,>)),
-            out var wrapperImplementation
+            out var wrapperImplementation, typeof(DelegatingWrappingMethodImplementation<,>)
         );
-
-        if (wrapperImplementation is null) throw new Exception();
 
         Exception? exception = null;
 

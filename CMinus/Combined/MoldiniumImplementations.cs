@@ -10,7 +10,7 @@ public struct TrackedPropertyMixin : ITracked { }
 public interface ITrackedPropertyImplementation<
     [TypeKind(ImplementationTypeArgumentKind.Value)] Value,
     [TypeKind(ImplementationTypeArgumentKind.Mixin)] Mixin
->
+> : IPropertyImplementation
 {
     void Init(Value def);
 
@@ -23,7 +23,7 @@ public struct TrackedPropertyImplementation<Value> : ITrackedPropertyImplementat
 {
     WatchableVariable<Value> variable;
 
-    public void Init(Value def) => new WatchableVariable<Value>(def);
+    public void Init(Value def) => variable = new WatchableVariable<Value>(def);
 
     public Value Get() => variable.Value;
 
@@ -34,7 +34,7 @@ public interface ITrackedComputedPropertyImplementation<
     [TypeKind(ImplementationTypeArgumentKind.Value)] Value,
     [TypeKind(ImplementationTypeArgumentKind.Exception)] Exception,
     [TypeKind(ImplementationTypeArgumentKind.Mixin)] Mixin
-> : IPropertyImplementation
+> : IPropertyWrapperImplementation
     where Exception : System.Exception
 {
     void Init();
@@ -54,10 +54,7 @@ public struct TrackedComputedPropertyImplementation<Value, Exception>
 {
     CachedBeforeAndAfterComputedWatchable<Value> watchable;
 
-    public void Init()
-    {
-        watchable = new CachedBeforeAndAfterComputedWatchable<Value>();
-    }
+    public void Init() => watchable = new CachedBeforeAndAfterComputedWatchable<Value>();
 
     public bool BeforeGet(ref Value value, ref TrackedPropertyMixin mixin) => watchable.BeforeGet(ref value);
 
