@@ -283,27 +283,25 @@ public class MethodCreation
             }
         }
 
-        var parameters = backingMethod.GetParameters();
+        var implementationType = backingMethod.DeclaringType!;
+
+        var typeDefinition = implementationType.IsGenericType ? implementationType.GetGenericTypeDefinition() : implementationType;
+
+        var genericTypeDefinitionBackingMethod = typeDefinition.GetMethod(backingMethod.Name);
+
+        if (genericTypeDefinitionBackingMethod is null)
+        {
+            throw new Exception($"Can't find generic type definition method corresponding to {backingMethod.Name} in {implementationType}");
+        }
+
+        var parameters = genericTypeDefinitionBackingMethod.GetParameters();
 
         foreach (var p in parameters)
         {
-            if (p.ParameterType == typeof(Object))
-            {
-                generator.Emit(OpCodes.Ldarg_0);
-            }
-            else if (p.ParameterType == typeof(Exception))
-            {
-                generator.Emit(OpCodes.Ldloc_1);
-            }
-            else
-            {
-                var (parameterType, byRef) = GetParameterType(p);
+            var (parameterType, byRef) = GetParameterType(p);
 
-                if (!argumentKinds.TryGetValue(parameterType, out var kind))
-                {
-                    throw new Exception($"Dont know how to handle argument {p.Name} of type {p.ParameterType} of property implementation method {backingMethod.Name} on property implementation type {backingMethod.DeclaringType}");
-                }
-
+            if (argumentKinds.TryGetValue(parameterType, out var kind))
+            {
                 switch (kind)
                 {
                     case ImplementationTypeArgumentKind.Value:
@@ -341,6 +339,18 @@ public class MethodCreation
                     default:
                         throw new Exception($"Unkown argument kind {kind}");
                 }
+            }
+            else if (p.ParameterType == typeof(Object))
+            {
+                generator.Emit(OpCodes.Ldarg_0);
+            }
+            else if (p.ParameterType == typeof(Exception))
+            {
+                generator.Emit(OpCodes.Ldloc_1);
+            }
+            else
+            {
+                throw new Exception($"Dont know how to handle argument {p.Name} of type {p.ParameterType} of property implementation method {backingMethod.Name} on property implementation type {backingMethod.DeclaringType}");
             }
         }
 

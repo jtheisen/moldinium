@@ -269,7 +269,7 @@ public class GenericPropertyGenerator : AbstractPropertyGenerator
         public ImplementationTypeArgumentKind parameterKind;
     }
 
-    readonly Dictionary<Type, ImplementationTypeArgumentKind> typeParameterToKindMapping;
+    readonly Dictionary<Type, ImplementationTypeArgumentKind> typeArgumentsToKindMapping;
 
     protected override IDictionary<Type, ImplementationTypeArgumentKind> GetArgumentKinds()
         => typeArgumentsInfos.ToDictionary(i => i.argumentType, i => i.parameterKind);
@@ -295,7 +295,7 @@ public class GenericPropertyGenerator : AbstractPropertyGenerator
 
         if (typeArguments.Length != typeParameters.Length) throw new Exception("Unexpected have different numbers of type parameters");
 
-        typeParameterToKindMapping = new Dictionary<Type, ImplementationTypeArgumentKind>();
+        typeArgumentsToKindMapping = new Dictionary<Type, ImplementationTypeArgumentKind>();
 
         typeArgumentsInfos = typeParameters.Select((p, i) =>
         {
@@ -314,7 +314,7 @@ public class GenericPropertyGenerator : AbstractPropertyGenerator
                     break;
             }
 
-            typeParameterToKindMapping[arg] = a.Kind;
+            typeArgumentsToKindMapping[arg] = a.Kind;
 
             return new TypeArgumentInfo
             {
@@ -344,7 +344,7 @@ public class GenericPropertyGenerator : AbstractPropertyGenerator
 
         foreach (var type in propertyImplementationType.GetGenericArguments())
         {
-            var kind = typeParameterToKindMapping[type];
+            var kind = typeArgumentsToKindMapping[type];
 
             switch (kind)
             {
