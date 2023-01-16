@@ -164,7 +164,7 @@ public class RethrowException : Exception
     }
 }
 
-class CachedBeforeAndAfterComputedWatchable<T> : IWatchable
+internal class CachedBeforeAndAfterComputedWatchable<T> : IWatchable
 {
     Boolean dirty = true;
 
@@ -267,7 +267,7 @@ class CachedBeforeAndAfterComputedWatchable<T> : IWatchable
         dirty = false;
     }
 
-    public Boolean AfterGetOnError(Exception exception)
+    public Boolean AfterErrorGet(Exception exception)
     {
         if (isInSubscribingEvaluation)
         {
@@ -291,7 +291,7 @@ class CachedBeforeAndAfterComputedWatchable<T> : IWatchable
 
     public void AfterSet() => InvalidateAndNotify();
 
-    public void AfterSetOnError() => InvalidateAndNotify();
+    public void AfterErrorSet() => InvalidateAndNotify();
 
     protected void Activate()
     {

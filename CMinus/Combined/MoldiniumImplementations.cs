@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics.CodeAnalysis;
 
 namespace CMinus;
 
@@ -20,9 +21,9 @@ public interface ITrackedPropertyImplementation<
 
 public struct TrackedPropertyImplementation<Value> : ITrackedPropertyImplementation<Value, TrackedPropertyMixin>
 {
-    Var<Value> variable;
+    WatchableVariable<Value> variable;
 
-    public void Init(Value def) => variable.Value = def;
+    public void Init(Value def) => new WatchableVariable<Value>(def);
 
     public Value Get() => variable.Value;
 
@@ -30,11 +31,66 @@ public struct TrackedPropertyImplementation<Value> : ITrackedPropertyImplementat
 }
 
 public interface ITrackedComputedPropertyImplementation<
-    [TypeKind(ImplementationTypeArgumentKind.Value)] Value
+    [TypeKind(ImplementationTypeArgumentKind.Value)] Value,
+    [TypeKind(ImplementationTypeArgumentKind.Exception)] Exception,
+    [TypeKind(ImplementationTypeArgumentKind.Mixin)] Mixin
 > : IPropertyImplementation
+    where Exception : System.Exception
 {
-    void Init(Value def, Func<Value> nestedGetter, Action<Value> nestedSetter);
-    Value Get();
-    void Set(Value value, Action<Value> nestedGetter);
+    void Init();
+
+    Boolean BeforeGet(ref Value value, ref Mixin mixin);
+
+    void AfterGet(ref Value value, ref Mixin mixin);
+    void AfterSet(ref Mixin mixin);
+
+    Boolean AfterErrorGet(Exception exception, ref Mixin mixin);
+    Boolean AfterErrorSet(ref Mixin mixin);
 }
 
+public struct TrackedComputedPropertyImplementation<Value, Exception>
+    : ITrackedComputedPropertyImplementation<Value, Exception, TrackedPropertyMixin>
+    where Exception : System.Exception
+{
+    CachedBeforeAndAfterComputedWatchable<Value> watchable;
+
+    public void Init()
+    {
+        watchable = new CachedBeforeAndAfterComputedWatchable<Value>();
+    }
+
+    public bool BeforeGet(ref Value value, ref TrackedPropertyMixin mixin) => watchable.BeforeGet(ref value);
+
+    public void AfterGet(ref Value value, ref TrackedPropertyMixin mixin) => watchable.AfterGet(ref value);
+
+    public void AfterSet(ref TrackedPropertyMixin mixin) => watchable.AfterSet();
+
+    public bool AfterErrorGet(Exception exception, ref TrackedPropertyMixin mixin) => watchable.AfterErrorGet(exception);
+
+    public bool AfterErrorSet(ref TrackedPropertyMixin mixin)
+    {
+        watchable.AfterErrorSet();
+
+        return true;
+    }
+}
+
+public interface IScopedMethodImplementation : IImplementation
+{
+    Boolean Before();
+
+    void After();
+
+    Boolean AfterError();
+}
+
+public struct ScopedMethodImplementation : IScopedMethodImplementation
+{
+    // Tracking needs to implement defering scopes
+
+    public Boolean Before() => true;
+
+    public void After() { }
+
+    public Boolean AfterError() => true;
+}
