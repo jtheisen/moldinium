@@ -108,9 +108,9 @@ public class ComponentGenerators : IBakeryComponentGenerators
 
 public record BakeryConfiguration(IBakeryComponentGenerators Generators, IDefaultProvider DefaultProvider, Boolean MakeAbstract = false)
 {
-    public static BakeryConfiguration Create(Type? propertyImplementationType = null, Type? propertyWrappingType = null, Type? eventImplementationType = null)
+    public static BakeryConfiguration Create(Type? methodWrapperType = null, Type? propertyImplementationType = null, Type? propertyWrappingType = null, Type? eventImplementationType = null)
         => new BakeryConfiguration(ComponentGenerators.Create(
-            methodWrapperType: null,
+            methodWrapperType: methodWrapperType,
             propertyImplementationType: propertyImplementationType ?? typeof(SimplePropertyImplementation<>),
             propertyWrapperType: propertyWrappingType,
             eventImplementationType: eventImplementationType ?? typeof(GenericEventImplementation<>)

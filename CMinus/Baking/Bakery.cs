@@ -253,9 +253,11 @@ public class Bakery : AbstractlyBakery
 
         foreach (var method in type.GetMethods())
         {
-            if (!method.IsAbstract || method.IsSpecialName) continue;
+            if (method.IsSpecialName) continue;
 
-            typeBuilder.DefineMethod(method.Name, method.Attributes | MethodAttributes.Public, method.ReturnType, method.GetParameters().Select(p => p.ParameterType).ToArray());
+            generators.GetMethodGenerator(method)?.GenerateMethod(state, method);
+
+            //typeBuilder.DefineMethod(method.Name, method.Attributes | MethodAttributes.Public, method.ReturnType, method.GetParameters().Select(p => p.ParameterType).ToArray());
         }
     }
 

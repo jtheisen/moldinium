@@ -106,7 +106,8 @@ public class CodeCreation
                 generator,
                 implementationFieldBuilder,
                 directMethodImplementation.Method,
-                ValueAt.FirstArgumentPassedByValue,
+                ValueOrReturnAt.FirstArgumentPassedByValue,
+                false,
                 addRet: true
             );
         }
@@ -163,7 +164,8 @@ public class CodeCreation
                 il,
                 implementationFieldBuilder,
                 backingTryMethod,
-                ValueAt.FirstLocalPassedByRef
+                ValueOrReturnAt.FirstLocalPassedByRef,
+                false
             );
 
             il.Emit(OpCodes.Brfalse_S, exitLabel);
@@ -190,7 +192,8 @@ public class CodeCreation
                     il,
                     implementationFieldBuilder,
                     backingAfterErrorMethod,
-                    ValueAt.FirstLocalPassedByRef
+                    ValueOrReturnAt.FirstLocalPassedByRef,
+                    true
                 );
 
                 var dontRethrowLabel = il.DefineLabel();
@@ -215,7 +218,8 @@ public class CodeCreation
                 il,
                 implementationFieldBuilder,
                 backingAfterMethod,
-                ValueAt.FirstLocalPassedByRef
+                ValueOrReturnAt.FirstLocalPassedByRef,
+                false
             );
         }
 
@@ -255,7 +259,7 @@ public class CodeCreation
         return nestedMethod.ReturnType != typeof(void);
     }
 
-    public enum ValueAt
+    public enum ValueOrReturnAt
     {
         NoValue,
         FirstArgumentPassedByValue,
@@ -267,7 +271,8 @@ public class CodeCreation
         ILGenerator generator,
         FieldBuilder? fieldBuilder,
         MethodInfo backingMethod,
-        ValueAt valueAt,
+        ValueOrReturnAt valueOrReturnAt,
+        Boolean haveExceptionAtLocal1,
         FieldBuilder? defaultImplementationFieldBuilder = null,
         MethodInfo? defaultImplementationGetMethod = null,
         Boolean addRet = false
@@ -294,29 +299,43 @@ public class CodeCreation
             throw new Exception($"Can't find generic type definition method corresponding to {backingMethod.Name} in {implementationType}");
         }
 
-        var parameters = genericTypeDefinitionBackingMethod.GetParameters();
+        var concreteParameters = backingMethod.GetParameters();
+        var genericParameters = genericTypeDefinitionBackingMethod.GetParameters();
 
-        foreach (var p in parameters)
+        for (var i = 0; i< genericParameters.Length; i++)
         {
-            var (parameterType, byRef) = GetParameterType(p);
+            var genericParameter = genericParameters[i];
+            var concreteParameter = concreteParameters[i];
+
+            var (parameterType, byRef) = GetParameterType(genericParameter);
 
             if (argumentKinds.TryGetValue(parameterType, out var kind))
             {
                 switch (kind)
                 {
+                    case ImplementationTypeArgumentKind.Container:
+                        generator.Emit(OpCodes.Ldarg_0);
+                        break;
+                    case ImplementationTypeArgumentKind.Exception:
+                        if (!haveExceptionAtLocal1) throw new Exception($"Can't pass an exception in this context");
+                        if (concreteParameter.ParameterType != typeof(Exception)) throw new Exception("The exception parameter must be a System.Exception");
+                        generator.Emit(OpCodes.Ldloc_1);
+                        break;
                     case ImplementationTypeArgumentKind.Value:
-                        switch (valueAt)
+                    case ImplementationTypeArgumentKind.Return:
+                        switch (valueOrReturnAt)
                         {
-                            case ValueAt.FirstArgumentPassedByValue:
-                                if (byRef) throw new Exception($"Value types need to be passed by value");
+                            case ValueOrReturnAt.FirstArgumentPassedByValue:
+                                if (byRef) throw new Exception($"{kind} types need to be passed by value");
                                 generator.Emit(OpCodes.Ldarg_1);
                                 break;
-                            case ValueAt.FirstLocalPassedByRef:
-                                if (!byRef) throw new Exception($"Value types to before and after methods need to be passed by ref");
+                            case ValueOrReturnAt.FirstLocalPassedByRef:
+                                if (!byRef) throw new Exception($"{kind} types to before and after methods need to be passed by ref");
                                 generator.Emit(OpCodes.Ldloca_S, 0);
                                 break;
-                            case ValueAt.GetFromDefaultImplementationPassedByValue:
-                                if (byRef) throw new Exception($"Value types need to be passed by value");
+                            case ValueOrReturnAt.GetFromDefaultImplementationPassedByValue:
+                                if (kind == ImplementationTypeArgumentKind.Return) throw new Exception("Method wrappers don't have defaults");
+                                if (byRef) throw new Exception($"{kind} types need to be passed by value");
                                 if (defaultImplementationFieldBuilder is null || defaultImplementationGetMethod is null)
                                 {
                                     throw new Exception("Expected to have a fieldBuilder for a default implementation with a get method");
@@ -340,17 +359,9 @@ public class CodeCreation
                         throw new Exception($"Unkown argument kind {kind}");
                 }
             }
-            else if (p.ParameterType == typeof(Object))
-            {
-                generator.Emit(OpCodes.Ldarg_0);
-            }
-            else if (p.ParameterType == typeof(Exception))
-            {
-                generator.Emit(OpCodes.Ldloc_1);
-            }
             else
             {
-                throw new Exception($"Dont know how to handle argument {p.Name} of type {p.ParameterType} of property implementation method {backingMethod.Name} on property implementation type {backingMethod.DeclaringType}");
+                throw new Exception($"Dont know how to handle argument {genericParameter.Name} of type {genericParameter.ParameterType} of property implementation method {backingMethod.Name} on property implementation type {backingMethod.DeclaringType}");
             }
         }
 

@@ -7,21 +7,22 @@ namespace CMinus.Tests.Baking;
 [TestClass]
 public class MixinBakingTests : BakingTetsBase
 {
-    public struct TrivialComplexPropertyImplementation<Value> : IStandardPropertyImplementation<Value, EmptyMixIn>
+    public struct TrivialStandardComplexPropertyImplementation<Value, Container>
+        : IStandardPropertyImplementation<Value, Container, EmptyMixIn>
     {
         public void Init(Value def) => value = def;
 
         Value value;
 
-        public Value Get(object self, ref EmptyMixIn mixIn) => value;
+        public Value Get(Container self, ref EmptyMixIn mixIn) => value;
 
-        public void Set(object self, ref EmptyMixIn mixIn, Value value) { this.value = value; }
+        public void Set(Container self, ref EmptyMixIn mixIn, Value value) { this.value = value; }
     }
 
     [TestMethod]
     public void TrivialComplexTest()
     {
-        var bakery = BakeryConfiguration.Create(typeof(TrivialComplexPropertyImplementation<>))
+        var bakery = BakeryConfiguration.Create(propertyImplementationType: typeof(TrivialStandardComplexPropertyImplementation<,>))
             .CreateBakery(nameof(TrivialComplexTest));
 
         {
@@ -63,7 +64,8 @@ public class MixinBakingTests : BakingTetsBase
         public void NotifyPropertyChanged(object o) => backingPropertyChanged?.Invoke(o, new PropertyChangedEventArgs(""));
     }
 
-    public struct NotifyPropertyChangedPropertyImplementation<Value> : IStandardPropertyImplementation<Value, NotifyPropertChangedMixin>
+    public struct NotifyPropertyChangedPropertyImplementation<Value, Container>
+        : IStandardPropertyImplementation<Value, Container, NotifyPropertChangedMixin>
     {
         bool initialized;
 
@@ -73,9 +75,9 @@ public class MixinBakingTests : BakingTetsBase
 
         Value value;
 
-        public Value Get(object self, ref NotifyPropertChangedMixin mixIn) => value;
+        public Value Get(Container self, ref NotifyPropertChangedMixin mixIn) => value;
 
-        public void Set(object self, ref NotifyPropertChangedMixin mixIn, Value value)
+        public void Set(Container self, ref NotifyPropertChangedMixin mixIn, Value value)
         {
             AssertInitialized();
 
@@ -88,7 +90,7 @@ public class MixinBakingTests : BakingTetsBase
     [TestMethod]
     public void NotifyPropertyChangedTest()
     {
-        var instance = BakeryConfiguration.Create(typeof(NotifyPropertyChangedPropertyImplementation<>))
+        var instance = BakeryConfiguration.Create(propertyImplementationType: typeof(NotifyPropertyChangedPropertyImplementation<,>))
             .CreateBakery(nameof(NotifyPropertyChangedTest))
             .Create<IHasNullableProperty>();
 

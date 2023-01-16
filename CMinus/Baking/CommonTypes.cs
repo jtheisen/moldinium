@@ -11,8 +11,8 @@ public enum ImplementationTypeArgumentKind
     Value,
     Return,
     Exception,
-    Mixin,
-    NestedPropertyImplementation
+    Container,
+    Mixin
 }
 
 [AttributeUsage(AttributeTargets.GenericParameter)]
@@ -29,3 +29,5 @@ public class TypeKindAttribute : Attribute
 public interface IWrappingImplementation { }
 
 public interface IImplementation { }
+
+public struct VoidDummy { }

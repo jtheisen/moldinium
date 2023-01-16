@@ -28,11 +28,14 @@ public abstract class AbstractMethodGenerator : AbstractGenerator
 
         var returnType = method.ReturnType;
 
+        if (returnType == typeof(void))
+        {
+            returnType = typeof(VoidDummy);
+        }
+
         var mixinFieldBuilder = EnsureMixin(state);
 
         var argumentKinds = GetArgumentKinds();
-
-        argumentKinds[returnType] = ImplementationTypeArgumentKind.Return;
 
         var (fieldBuilder, backingMethod) = GetMethodImplementation(state, method);
 

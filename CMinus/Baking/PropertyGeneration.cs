@@ -14,14 +14,15 @@ public interface IPropertyWrapper : IPropertyImplementation { }
 
 public interface IStandardPropertyImplementation<
     [TypeKind(ImplementationTypeArgumentKind.Value)] Value,
+    [TypeKind(ImplementationTypeArgumentKind.Container)] Container,
     [TypeKind(ImplementationTypeArgumentKind.Mixin)] Mixin
 > : IPropertyImplementation
 {
     void Init(Value def);
 
-    Value Get(Object self, ref Mixin mixin);
+    Value Get(Container self, ref Mixin mixin);
 
-    void Set(Object self, ref Mixin mixin, Value value);
+    void Set(Container self, ref Mixin mixin, Value value);
 }
 
 public struct EmptyMixIn { }
@@ -106,7 +107,8 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
                 codeCreator.GenerateImplementationCode(
                     state.ConstructorGenerator,
                     fieldBuilder, backingInitMethod,
-                    CodeCreation.ValueAt.GetFromDefaultImplementationPassedByValue,
+                    CodeCreation.ValueOrReturnAt.GetFromDefaultImplementationPassedByValue,
+                    haveExceptionAtLocal1: false,
                     defaultImplementationFieldBuilder,
                     defaultImplementationGetMethod
                 );

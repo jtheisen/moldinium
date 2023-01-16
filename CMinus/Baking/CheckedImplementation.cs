@@ -106,7 +106,18 @@ public class CheckedImplementation
                     arguments.Add(valueType ?? Throw());
                     break;
                 case ImplementationTypeArgumentKind.Return:
-                    arguments.Add(returnType ?? Throw());
+                    var usedReturnType = returnType;
+                    if (usedReturnType is not null && usedReturnType == typeof(void))
+                    {
+                        usedReturnType = typeof(VoidDummy);
+                    }
+                    arguments.Add(usedReturnType ?? Throw());
+                    break;
+                case ImplementationTypeArgumentKind.Exception:
+                    arguments.Add(typeof(Exception));
+                    break;
+                case ImplementationTypeArgumentKind.Container:
+                    arguments.Add(typeof(Object));
                     break;
                 default:
                     throw new Exception($"Dont know how to handle type parameter {type} of implementation type {implementationType}");
