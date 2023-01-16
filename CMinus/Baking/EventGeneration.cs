@@ -17,7 +17,7 @@ public class EventImplementationInterfaceAttribute : Attribute
     }
 }
 
-public interface IEventImplementation { }
+public interface IEventImplementation : IImplementation { }
 
 [EventImplementationInterface(typeof(BasicEventGenerator))]
 public interface IEventImplementation<D> : IEventImplementation

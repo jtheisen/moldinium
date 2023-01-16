@@ -4,33 +4,14 @@ using System.Linq;
 using System.Reflection.Emit;
 using System.Reflection;
 using CMinus.Injection;
-using Castle.DynamicProxy.Generators.Emitters.SimpleAST;
 
 namespace CMinus;
 
-public enum ImplementationTypeArgumentKind
-{
-    Value,
-    Mixin,
-    NestedPropertyImplementation
-}
-
-[AttributeUsage(AttributeTargets.GenericParameter)]
-public class TypeKindAttribute : Attribute
-{
-    public TypeKindAttribute(ImplementationTypeArgumentKind type)
-    {
-        Kind = type;
-    }
-
-    public ImplementationTypeArgumentKind Kind { get; }
-}
-
-public interface IPropertyImplementation { }
+public interface IPropertyImplementation : IImplementation { }
 
 public interface IPropertyWrapper : IPropertyImplementation { }
 
-public interface IPropertyImplementation<
+public interface IStandardPropertyImplementation<
     [TypeKind(ImplementationTypeArgumentKind.Value)] Value,
     [TypeKind(ImplementationTypeArgumentKind.Mixin)] Mixin
 > : IPropertyImplementation
@@ -108,6 +89,117 @@ public abstract class AbstractGenerator
         }
 
         return methodBuilder;
+    }
+}
+
+public abstract class AbstractGeneratorWithImplementation : AbstractGenerator
+{
+    protected readonly Type implementationType;
+
+    readonly TypeArgumentInfo[] typeArgumentsInfos;
+
+    struct TypeArgumentInfo
+    {
+        public Type argumentType;
+        public Type parameterType;
+        public ImplementationTypeArgumentKind parameterKind;
+    }
+
+    readonly Dictionary<Type, ImplementationTypeArgumentKind> typeArgumentsToKindMapping;
+
+    protected IDictionary<Type, ImplementationTypeArgumentKind> GetArgumentKinds()
+        => typeArgumentsInfos.ToDictionary(i => i.argumentType, i => i.parameterKind);
+
+    protected virtual IEnumerable<Type> GetInterfacesToIgnore() => new[] { typeof(IImplementation) };
+
+    protected AbstractGeneratorWithImplementation(Type implementationType)
+    {
+        this.implementationType = implementationType;
+
+        var interfacesToIgnore = GetInterfacesToIgnore().ToArray();
+
+        var implementationInterfaceType = implementationType
+            .GetInterfaces()
+            .Where(i => !interfacesToIgnore.Contains(i))
+            .Single($"Expected implementation type {implementationType} to implement only a single interface besides {String.Join(", ", GetInterfacesToIgnore())}")
+            ;
+
+        var implementationInterfaceTypeDefinition = implementationInterfaceType.IsGenericType
+            ? implementationInterfaceType.GetGenericTypeDefinition()
+            : implementationInterfaceType;
+
+        var typeArguments = implementationInterfaceType.GetGenericArguments();
+        var typeParameters = implementationInterfaceTypeDefinition.GetGenericArguments();
+
+        if (typeArguments.Length != typeParameters.Length) throw new Exception("Unexpected have different numbers of type parameters");
+
+        typeArgumentsToKindMapping = new Dictionary<Type, ImplementationTypeArgumentKind>();
+
+        typeArgumentsInfos = typeParameters.Select((p, i) =>
+        {
+            var a = p.GetCustomAttribute<TypeKindAttribute>();
+
+            if (a is null) throw new Exception($"Expected implementation interface {p} type paramter {p} to have a {nameof(TypeKindAttribute)}");
+
+            var arg = typeArguments[i];
+
+            switch (a.Kind)
+            {
+                case ImplementationTypeArgumentKind.Value:
+                    if (!arg.IsGenericParameter) throw new Exception($"Implementation type {implementationType} must be itself be generic in type parameter {p} of interface {implementationInterfaceTypeDefinition}");
+                    break;
+                default:
+                    break;
+            }
+
+            typeArgumentsToKindMapping[arg] = a.Kind;
+
+            return new TypeArgumentInfo
+            {
+                parameterType = p,
+                argumentType = arg,
+                parameterKind = a.Kind
+            };
+        }).ToArray();
+
+        var mixinArgumentInfo = typeArgumentsInfos
+            .Where(i => i.parameterKind == ImplementationTypeArgumentKind.Mixin)
+            .ToArray();
+
+        if (mixinArgumentInfo.Length > 1)
+        {
+            throw new Exception("Multiple mixins are not yet supported");
+        }
+        else if (mixinArgumentInfo.Length > 0)
+        {
+            mixinType = mixinArgumentInfo.Single().argumentType;
+        }
+    }
+
+
+
+}
+
+public abstract class AbstractMethodGenerator : AbstractGenerator
+{
+    public virtual void GenerateMethod(BakingState state, MethodInfo method)
+    {
+        var typeBuilder = state.TypeBuilder;
+
+        var returnType = method.ReturnType;
+
+        //var propertyBuilder = typeBuilder.defin(property.Name, property.Attributes, returnType, null);
+
+        var mixinFieldBuilder = EnsureMixin(state);
+
+        var argumentKinds = GetArgumentKinds();
+
+        argumentKinds[valueType] = ImplementationTypeArgumentKind.Value;
+
+        var (fieldBuilder, backingGetMethod, backingSetMethod) = GetPropertyImplementation(state, property);
+
+        var methodCreator = new MethodCreation(typeBuilder, argumentKinds, fieldBuilder, mixinFieldBuilder);
+
     }
 }
 
@@ -254,89 +346,9 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
         ?? throw new Exception($"Property {property.Name} on implementation type {property.DeclaringType} must have a {(setter ? "setter" : "getter")} method");
 }
 
-public class GenericPropertyGenerator : AbstractPropertyGenerator
+public class GenericPropertyGenerator : AbstractGeneratorWithImplementation
 {
-    readonly Type propertyImplementationType;
-
-    readonly Type? mixinType;
-
-    readonly TypeArgumentInfo[] typeArgumentsInfos;
-
-    struct TypeArgumentInfo
-    {
-        public Type argumentType;
-        public Type parameterType;
-        public ImplementationTypeArgumentKind parameterKind;
-    }
-
-    readonly Dictionary<Type, ImplementationTypeArgumentKind> typeArgumentsToKindMapping;
-
-    protected override IDictionary<Type, ImplementationTypeArgumentKind> GetArgumentKinds()
-        => typeArgumentsInfos.ToDictionary(i => i.argumentType, i => i.parameterKind);
-
     protected override FieldBuilder? EnsureMixin(BakingState state) => mixinType is not null ? state.EnsureMixin(state, mixinType, false) : null;
-
-    public GenericPropertyGenerator(Type propertyImplementationType)
-    {
-        this.propertyImplementationType = propertyImplementationType;
-
-        var propertyImplementationInterfaceType = propertyImplementationType
-            .GetInterfaces()
-            .Where(i => i != typeof(IPropertyImplementation) && i != typeof(IPropertyWrapper))
-            .Single($"Expected property implementation type {propertyImplementationType} to implement only a single interface besides {nameof(IPropertyImplementation)}")
-            ;
-
-        var propertyImplementationInterfaceTypeDefinition = propertyImplementationInterfaceType.IsGenericType
-            ? propertyImplementationInterfaceType.GetGenericTypeDefinition()
-            : propertyImplementationInterfaceType;
-
-        var typeArguments = propertyImplementationInterfaceType.GetGenericArguments();
-        var typeParameters = propertyImplementationInterfaceTypeDefinition.GetGenericArguments();
-
-        if (typeArguments.Length != typeParameters.Length) throw new Exception("Unexpected have different numbers of type parameters");
-
-        typeArgumentsToKindMapping = new Dictionary<Type, ImplementationTypeArgumentKind>();
-
-        typeArgumentsInfos = typeParameters.Select((p, i) =>
-        {
-            var a = p.GetCustomAttribute<TypeKindAttribute>();
-
-            if (a is null) throw new Exception($"Expected property implementation interface {p} type paramter {p} to have a {nameof(TypeKindAttribute)}");
-
-            var arg = typeArguments[i];
-
-            switch (a.Kind)
-            {
-                case ImplementationTypeArgumentKind.Value:
-                    if (!arg.IsGenericParameter) throw new Exception($"Property implementation type {propertyImplementationType} must be itself be generic in type parameter {p} of interface {propertyImplementationInterfaceTypeDefinition}");
-                    break;
-                default:
-                    break;
-            }
-
-            typeArgumentsToKindMapping[arg] = a.Kind;
-
-            return new TypeArgumentInfo
-            {
-                parameterType = p,
-                argumentType = arg,
-                parameterKind = a.Kind
-            };
-        }).ToArray();
-
-        var mixinArgumentInfo = typeArgumentsInfos
-            .Where(i => i.parameterKind == ImplementationTypeArgumentKind.Mixin)
-            .ToArray();
-
-        if (mixinArgumentInfo.Length > 1)
-        {
-            throw new Exception("Multiple mixins are not yet supported");
-        }
-        else if (mixinArgumentInfo.Length > 0)
-        {
-            mixinType = mixinArgumentInfo.Single().argumentType;
-        }
-    }
 
     Type[] GetTypeArguments(BakingState state, Type declaringType, Type valueType)
     {
@@ -365,9 +377,9 @@ public class GenericPropertyGenerator : AbstractPropertyGenerator
 
         var typeArguments = GetTypeArguments(state, typeof(Object), property.PropertyType);
 
-        var backingPropertyImplementationType = propertyImplementationType.IsGenericTypeDefinition
-            ? propertyImplementationType.MakeGenericType(typeArguments)
-            : propertyImplementationType;
+        var backingPropertyImplementationType = implementationType.IsGenericTypeDefinition
+            ? implementationType.MakeGenericType(typeArguments)
+            : implementationType;
 
         var fieldBuilder = typeBuilder.DefineField($"backing_{property.Name}", backingPropertyImplementationType, FieldAttributes.Private);
 

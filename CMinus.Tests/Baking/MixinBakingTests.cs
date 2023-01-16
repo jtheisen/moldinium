@@ -7,7 +7,7 @@ namespace CMinus.Tests.Baking;
 [TestClass]
 public class MixinBakingTests : BakingTetsBase
 {
-    public struct TrivialComplexPropertyImplementation<Value> : IPropertyImplementation<Value, EmptyMixIn>
+    public struct TrivialComplexPropertyImplementation<Value> : IStandardPropertyImplementation<Value, EmptyMixIn>
     {
         public void Init(Value def) => value = def;
 
@@ -63,7 +63,7 @@ public class MixinBakingTests : BakingTetsBase
         public void NotifyPropertyChanged(object o) => backingPropertyChanged?.Invoke(o, new PropertyChangedEventArgs(""));
     }
 
-    public struct NotifyPropertyChangedPropertyImplementation<Value> : IPropertyImplementation<Value, NotifyPropertChangedMixin>
+    public struct NotifyPropertyChangedPropertyImplementation<Value> : IStandardPropertyImplementation<Value, NotifyPropertChangedMixin>
     {
         bool initialized;
 
