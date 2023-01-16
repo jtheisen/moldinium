@@ -1,26 +1,10 @@
 ﻿using System;
-using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Reflection.PortableExecutable;
 
 namespace CMinus;
 
-[AttributeUsage(AttributeTargets.Interface)]
-public class EventImplementationInterfaceAttribute : Attribute
-{
-    public Type EventGeneratorType { get; }
-
-    public EventImplementationInterfaceAttribute(Type eventGeneratorType)
-    {
-        EventGeneratorType = eventGeneratorType;
-    }
-}
-
-public interface IEventImplementation : IImplementation { }
-
-[EventImplementationInterface(typeof(BasicEventGenerator))]
-public interface IEventImplementation<D> : IEventImplementation
+public interface IEventImplementation<[TypeKind(ImplementationTypeArgumentKind.Handler)] D> : IEventImplementation
     where D : Delegate
 {
     void Add(D d);
@@ -89,12 +73,6 @@ public abstract class AbstractEventGenerator : AbstractGenerator
 
 public abstract class AbstractImplementationTypeEventGenerator : AbstractEventGenerator
 {
-    protected readonly Type eventImplementationType;
-
-    public AbstractImplementationTypeEventGenerator(Type eventImplementationType)
-    {
-        this.eventImplementationType = eventImplementationType;
-    }
 }
 
 public class UnimplementedEventGenerator : AbstractEventGenerator
@@ -110,9 +88,11 @@ public class UnimplementedEventGenerator : AbstractEventGenerator
 
 public class BasicEventGenerator : AbstractImplementationTypeEventGenerator
 {
+    protected readonly Type eventImplementationType;
+
     public BasicEventGenerator(Type eventImplementationType)
-        : base(eventImplementationType)
     {
+        this.eventImplementationType = eventImplementationType;
     }
 
     protected override (FieldBuilder fieldBuilder, String backingAddMethodName, String backingRemoveMethodName)
@@ -141,16 +121,8 @@ public static class EventGenerator
 {
     public static AbstractEventGenerator Create(Type eventImplementationType)
     {
-        var candidates =
-            from i in eventImplementationType.GetInterfaces()
-            let a = i.GetCustomAttribute<EventImplementationInterfaceAttribute>()
-            where a is not null
-            select a;
+        var instance = new BasicEventGenerator(eventImplementationType);
 
-        var attribute = candidates.Single();
-
-        var instance = Activator.CreateInstance(attribute.EventGeneratorType, eventImplementationType);
-
-        return instance as AbstractEventGenerator ?? throw new Exception("Activator returned a null or incorrect type");
+        return instance;
     }
 }

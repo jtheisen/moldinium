@@ -1,5 +1,7 @@
 ﻿using CMinus.Baking;
+using CMinus.Injection;
 using System;
+using System.Linq;
 using System.Reflection;
 
 namespace CMinus;
@@ -97,32 +99,55 @@ public class ComponentGenerators : IBakeryComponentGenerators
 
     public AbstractEventGenerator GetEventGenerator(EventInfo evt) => eventGenerator;
 
-    public static ComponentGenerators Create(Type? methodWrapperType, Type propertyImplementationType, Type? propertyWrapperType, Type eventImplementationType)
+    static ComponentGenerators CreateInternal(Type? methodWrapperType = null, Type? propertyImplementationType = null, Type? propertyWrapperType = null, Type? eventImplementationType = null)
         => new ComponentGenerators(
             methodWrapperType is not null ? MethodGenerator.Create(methodWrapperType) : null,
-            PropertyGenerator.Create(propertyImplementationType),
+            PropertyGenerator.Create(propertyImplementationType ?? typeof(SimplePropertyImplementation<>)),
             propertyWrapperType is not null ? PropertyGenerator.Create(propertyWrapperType) : null,
-            EventGenerator.Create(eventImplementationType)
+            EventGenerator.Create(eventImplementationType ?? typeof(GenericEventImplementation<>))
         );
+
+    public static ComponentGenerators Create(params Type[] implementations)
+    {
+        foreach (var implementation in implementations)
+        {
+            CheckedImplementation.PreCheck(implementation);
+        }
+
+        var methodWrapperType
+            = FindType(implementations, typeof(IMethodWrapperImplementation));
+        var propertyImplementationType
+            = FindType(implementations, typeof(IPropertyImplementation));
+        var propertyWrapperType
+            = FindType(implementations, typeof(IPropertyWrapperImplementation));
+        var eventImplementationType
+            = FindType(implementations, typeof(IEventImplementation));
+
+        return CreateInternal(
+            methodWrapperType,
+            propertyImplementationType,
+            propertyWrapperType,
+            eventImplementationType
+        );
+    }
+
+    static Type? FindType(Type[] types, Type interfaceType)
+    {
+        var type = types
+            .Where(t => TypeInterfaces.Get(t).DoesTypeImplement(interfaceType))
+            .SingleOrDefault($"Multiple types of {interfaceType} found in {String.Join(", ", types.Cast<Type>())}");
+
+        return type;
+    }
 }
 
 public record BakeryConfiguration(IBakeryComponentGenerators Generators, IDefaultProvider DefaultProvider, Boolean MakeAbstract = false)
 {
-    public static BakeryConfiguration Create(Type? methodWrapperType = null, Type? propertyImplementationType = null, Type? propertyWrappingType = null, Type? eventImplementationType = null)
-        => new BakeryConfiguration(ComponentGenerators.Create(
-            methodWrapperType: methodWrapperType,
-            propertyImplementationType: propertyImplementationType ?? typeof(SimplePropertyImplementation<>),
-            propertyWrapperType: propertyWrappingType,
-            eventImplementationType: eventImplementationType ?? typeof(GenericEventImplementation<>)
-        ), Defaults.GetDefaultDefaultProvider());
+    public static BakeryConfiguration Create(params Type[] implementations)
+        => new BakeryConfiguration(ComponentGenerators.Create(implementations), Defaults.GetDefaultDefaultProvider());
 
     public static BakeryConfiguration PocGenerationConfiguration
-        = new BakeryConfiguration(ComponentGenerators.Create(
-            methodWrapperType: null,
-            propertyImplementationType: typeof(SimplePropertyImplementation<>),
-            propertyWrapperType: null,
-            eventImplementationType: typeof(GenericEventImplementation<>)
-        ), Defaults.GetDefaultDefaultProvider());
+        = new BakeryConfiguration(ComponentGenerators.Create(), Defaults.GetDefaultDefaultProvider());
 
     public AbstractlyBakery CreateBakery(String name) => new Bakery(name, this);
 }

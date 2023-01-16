@@ -95,12 +95,12 @@ public class CodeCreation
     public void GenerateMethodImplementationCode(
         ILGenerator generator,
         MethodBuilder methodBuilder,
-        MethodImplementation methodImplementation,
+        MethodImplementation implementation,
         Type valueOrReturnType,
         MethodInfo? wrappedMethod = null
     )
     {
-        if (methodImplementation is DirectMethodImplementation directMethodImplementation)
+        if (implementation is DirectMethodImplementation directMethodImplementation)
         {
             GenerateImplementationCode(
                 generator,
@@ -111,7 +111,7 @@ public class CodeCreation
                 addRet: true
             );
         }
-        else if (methodImplementation is WrappingMethodImplementation wrappingMethodImplementation)
+        else if (implementation is WrappingMethodImplementation wrappingMethodImplementation)
         {
             GenerateWrappingImplementationCode(
                 generator,
@@ -125,7 +125,7 @@ public class CodeCreation
         }
         else
         {
-            throw new Exception($"Unknown method implementation {methodImplementation.GetType()}");
+            throw new Exception($"Unknown method implementation {implementation.GetType()}");
         }
     }
 

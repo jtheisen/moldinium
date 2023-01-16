@@ -121,10 +121,8 @@ public static class DependencyProvider
     static ComponentGenerators CreateBakeryComponentGenerators(DefaultDependencyProviderBakingMode mode) => mode switch
     {
         DefaultDependencyProviderBakingMode.Basic => ComponentGenerators.Create(
-            methodWrapperType: null,
-            propertyImplementationType: typeof(SimplePropertyImplementation<>),
-            propertyWrapperType: null,
-            eventImplementationType: typeof(GenericEventImplementation<>)),
+            typeof(SimplePropertyImplementation<>),
+            typeof(GenericEventImplementation<>)),
         _ => throw new NotImplementedException()
     };
 }

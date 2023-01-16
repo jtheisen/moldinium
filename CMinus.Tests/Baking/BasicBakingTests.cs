@@ -5,7 +5,7 @@ using System.ComponentModel;
 namespace CMinus.Tests.Baking;
 
 [TestClass]
-public class BasicBakingTests : BakingTetsBase
+public class BasicBakingTests : BakingTestsBase
 {
     [TestMethod]
     public void SimpleTest()

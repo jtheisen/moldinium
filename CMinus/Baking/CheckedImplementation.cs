@@ -1,4 +1,5 @@
-﻿using System;
+﻿using CMinus.Injection;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -28,14 +29,49 @@ public class CheckedImplementation
 
     public Type? MixinType { get; }
 
-    public CheckedImplementation(Type implementationType, params Type[] interfaceTypesToIgnore)
+    static Type[] implementationBaseInterfaces = new[] {
+        typeof(IMethodWrapperImplementation),
+        typeof(IPropertyImplementation),
+        typeof(IPropertyWrapperImplementation),
+        typeof(IEventImplementation)
+    };
+
+    public static void PreCheck(Type implementationType)
+    {
+        var implementedBaseInterfaces = implementationBaseInterfaces
+            .Where(TypeInterfaces.Get(implementationType).DoesTypeImplement);
+
+        var count = implementedBaseInterfaces.Count();
+
+        if (count > 1)
+        {
+            throw new Exception(
+                $"Expected implementation type {implementationType} to implement exaclty one implementation base interface, "
+                + $"but it implements all of: {String.Join(", ", implementedBaseInterfaces)}");
+        }
+        else if (count == 0)
+        {
+            throw new Exception(
+                $"Expected implementation type {implementationType} to implement one of implementation base interface: "
+                + String.Join(", ", implementationBaseInterfaces.Cast<Type>()));
+        }
+
+    }
+
+    public CheckedImplementation(Type implementationType, params Type[] additionalInterfaceTypesToIgnore)
     {
         Type = implementationType;
 
+        PreCheck(implementationType);
+
+        var interfacesToIgnore = new [] { typeof(IImplementation), typeof(IEmptyImplementation) }
+            .Concat(additionalInterfaceTypesToIgnore)
+            .ToArray();
+
         var implementationInterfaceType = implementationType
             .GetInterfaces()
-            .Where(i => !interfaceTypesToIgnore.Contains(i))
-            .Single($"Expected implementation type {implementationType} to implement only a single interface besides {String.Join(", ", interfaceTypesToIgnore.Cast<Type>())}")
+            .Where(i => !interfacesToIgnore.Contains(i))
+            .Single($"Expected implementation type {implementationType} to implement only a single interface besides {String.Join(", ", additionalInterfaceTypesToIgnore.Cast<Type>())}")
             ;
 
         var implementationInterfaceTypeDefinition = implementationInterfaceType.IsGenericType

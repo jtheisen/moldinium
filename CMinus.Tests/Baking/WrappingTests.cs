@@ -7,7 +7,7 @@ using static CMinus.Tests.Baking.WrappingTests;
 namespace CMinus.Tests.Baking;
 
 [TestClass]
-public class WrappingTests : BakingTetsBase
+public class WrappingTests : BakingTestsBase
 {
     public interface IWithCountingProperty
     {
@@ -110,7 +110,7 @@ public class WrappingTests : BakingTetsBase
 
     public interface ITrivialWrappingPropertyImplementation<
         [TypeKind(ImplementationTypeArgumentKind.Value)] Value
-    > : IPropertyImplementation
+    > : IPropertyWrapperImplementation
     {
         Boolean BeforeGet();
         Boolean BeforeSet();
@@ -125,7 +125,7 @@ public class WrappingTests : BakingTetsBase
     [TestMethod]
     public void TrivialPropertyWrappingTest()
     {
-        var instance = BakeryConfiguration.Create(propertyWrappingType: typeof(TrivialWrappingPropertyImplementation<>))
+        var instance = BakeryConfiguration.Create(typeof(TrivialWrappingPropertyImplementation<>))
             .CreateBakery("Wrapping")
             .Create<IWithImplementedProperty>();
 
@@ -141,7 +141,7 @@ public class WrappingTests : BakingTetsBase
     [TestMethod]
     public void TrivialDontDelegateTest()
     {
-        var instance = BakeryConfiguration.Create(propertyWrappingType: typeof(TrivialDontDelegateWrappingPropertyImplementation<>))
+        var instance = BakeryConfiguration.Create(typeof(TrivialDontDelegateWrappingPropertyImplementation<>))
             .CreateBakery("Wrapping")
             .Create<IWithImplementedProperty>();
 
@@ -156,7 +156,7 @@ public class WrappingTests : BakingTetsBase
     [TestMethod]
     public void EventTest()
     {
-        var instance = BakeryConfiguration.Create(propertyWrappingType: typeof(EventWrappingPropertyImplementation<,>))
+        var instance = BakeryConfiguration.Create(typeof(EventWrappingPropertyImplementation<,>))
             .CreateBakery("Wrapping")
             .Create<IWithImplementedProperty>();
 
@@ -252,7 +252,7 @@ public class WrappingTests : BakingTetsBase
     [TestMethod]
     public void CacheTest()
     {
-        var instance = BakeryConfiguration.Create(propertyWrappingType: typeof(CachingWrappingPropertyImplementation<,>))
+        var instance = BakeryConfiguration.Create(typeof(CachingWrappingPropertyImplementation<,>))
             .CreateBakery("Wrapping")
             .Create<IWithCountingProperty>();
 
@@ -294,7 +294,7 @@ public class WrappingTests : BakingTetsBase
     [TestMethod]
     public void ExceptionWithEventsTest()
     {
-        var instance = BakeryConfiguration.Create(propertyWrappingType: typeof(EventWrappingPropertyImplementation<,>))
+        var instance = BakeryConfiguration.Create(typeof(EventWrappingPropertyImplementation<,>))
             .CreateBakery("Wrapping")
             .Create<IThrowingModel>();
 
@@ -327,7 +327,7 @@ public class WrappingTests : BakingTetsBase
     [TestMethod]
     public void ExceptionWithDelegatesTest()
     {
-        var instance = BakeryConfiguration.Create(propertyWrappingType: typeof(DelegatingWrappingPropertyImplementation<,>))
+        var instance = BakeryConfiguration.Create(typeof(DelegatingWrappingPropertyImplementation<,>))
             .CreateBakery("Wrapping")
             .Create<IThrowingModel>();
 
@@ -375,16 +375,10 @@ public class WrappingTests : BakingTetsBase
     [TestMethod]
     public void ExceptionOnMethodWithDelegatesTest()
     {
-        var instance = BakeryConfiguration.Create(
-            methodWrapperType: typeof(DelegatingWrappingMethodImplementation<,>),
-            propertyWrappingType: null
-        )
-            .CreateBakery("Wrapping")
-            .Create<IThrowingModel>();
-
-        var wrapperImplementation = instance as IDelegatingWrappingPropertyMixin;
-
-        Assert.IsNotNull(wrapperImplementation);
+        var instance = CreateTestModel<IThrowingModel, IDelegatingWrappingPropertyMixin>(
+            ComponentGenerators.Create(typeof(DelegatingWrappingMethodImplementation<,>)),
+            out var wrapperImplementation
+        );
 
         if (wrapperImplementation is null) throw new Exception();
 

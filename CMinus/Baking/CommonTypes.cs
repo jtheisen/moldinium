@@ -10,6 +10,7 @@ public enum ImplementationTypeArgumentKind
 {
     Value,
     Return,
+    Handler,
     Exception,
     Container,
     Mixin
@@ -26,8 +27,16 @@ public class TypeKindAttribute : Attribute
     public ImplementationTypeArgumentKind Kind { get; }
 }
 
-public interface IWrappingImplementation { }
-
 public interface IImplementation { }
+
+public interface IEmptyImplementation : IImplementation { }
+
+public interface IPropertyImplementation : IImplementation { }
+
+public interface IPropertyWrapperImplementation : IImplementation { }
+
+public interface IMethodWrapperImplementation : IImplementation { }
+
+public interface IEventImplementation : IImplementation { }
 
 public struct VoidDummy { }

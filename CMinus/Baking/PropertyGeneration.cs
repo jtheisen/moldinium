@@ -8,10 +8,6 @@ using Castle.DynamicProxy.Generators;
 
 namespace CMinus;
 
-public interface IPropertyImplementation : IImplementation { }
-
-public interface IPropertyWrapper : IPropertyImplementation { }
-
 public interface IStandardPropertyImplementation<
     [TypeKind(ImplementationTypeArgumentKind.Value)] Value,
     [TypeKind(ImplementationTypeArgumentKind.Container)] Container,
@@ -52,7 +48,7 @@ public struct SimplePropertyImplementation<T> : ISimplePropertyImplementation<T>
     public void Set(T value) => this.value = value;
 }
 
-public interface ITrivialPropertyWrapper : IPropertyWrapper { }
+public interface ITrivialPropertyWrapper : IPropertyWrapperImplementation { }
 
 public struct TrivialPropertyWrapper : ITrivialPropertyWrapper { }
 
@@ -75,7 +71,7 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
         argumentKinds[valueType] = ImplementationTypeArgumentKind.Value;
 
-        var (fieldBuilder, (backingGetMethod, backingSetMethod)) = GetPropertyImplementation(state, property);
+        var (fieldBuilder, (getImplementation, setImplementation)) = GetPropertyImplementation(state, property);
 
         var codeCreator = new CodeCreation(typeBuilder, argumentKinds, fieldBuilder, mixinFieldBuilder);
 
@@ -119,7 +115,7 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
         {
             var getMethodBuilder = codeCreator.CreateMethod(
                 getMethod, getMethod.GetBaseDefinition(),
-                backingGetMethod,
+                getImplementation,
                 valueType,
                 toRemove: MethodAttributes.Abstract
             );
@@ -131,7 +127,7 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
         {
             var setMethodBuilder = codeCreator.CreateMethod(
                 setMethod, setMethod.GetBaseDefinition(),
-                backingSetMethod,
+                setImplementation,
                 valueType,
                 toRemove: MethodAttributes.Abstract
             );
@@ -218,7 +214,12 @@ public static class PropertyGenerator
 {
     public static AbstractPropertyGenerator Create(Type propertyImplementationType)
     {
-        var instance = new GenericPropertyGenerator(new CheckedImplementation(propertyImplementationType, typeof(IImplementation), typeof(IPropertyImplementation), typeof(IPropertyWrapper)));
+        var ignoredInterfaces = new[] {
+            typeof(IPropertyImplementation),
+            typeof(IPropertyWrapperImplementation),
+        };
+
+        var instance = new GenericPropertyGenerator(new CheckedImplementation(propertyImplementationType, ignoredInterfaces));
 
         return instance;
     }

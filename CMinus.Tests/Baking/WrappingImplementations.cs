@@ -7,7 +7,7 @@ public interface IWrappingMethodImplementation<
     [TypeKind(ImplementationTypeArgumentKind.Return)] Return,
     [TypeKind(ImplementationTypeArgumentKind.Exception)] Exception,
     [TypeKind(ImplementationTypeArgumentKind.Mixin)] Mixin
-> : IImplementation
+> : IMethodWrapperImplementation
     where Exception : System.Exception
 {
     Boolean Before(ref Return value, ref Mixin mixin);
@@ -19,7 +19,7 @@ public interface IWrappingPropertyImplementation<
     [TypeKind(ImplementationTypeArgumentKind.Value)] Value,
     [TypeKind(ImplementationTypeArgumentKind.Exception)] Exception,
     [TypeKind(ImplementationTypeArgumentKind.Mixin)] Mixin
-> : IPropertyImplementation
+> : IPropertyWrapperImplementation
     where Exception : System.Exception
 {
     Boolean BeforeGet([MaybeNullWhen(true)] ref Value value, ref Mixin mixin);

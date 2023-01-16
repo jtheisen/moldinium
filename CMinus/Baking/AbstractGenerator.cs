@@ -65,7 +65,7 @@ public abstract class AbstractGenerator
 
             return method;
         }
-        else if (haveBeforeOrAfter || TypeInterfaces.Get(type).DoesTypeImplement(typeof(IPropertyWrapper)))
+        else if (haveBeforeOrAfter || TypeInterfaces.Get(type).DoesTypeImplement(typeof(IEmptyImplementation)))
         {
             if (haveAfterMethod != haveAfterOnErrorMethod) throw new Exception($"Implementation {type} must define either neither or both of the After methods");
 
@@ -77,7 +77,7 @@ public abstract class AbstractGenerator
         }
         else
         {
-            throw new Exception($"Implementation {type} must define either {name}, one of the respective Before and After methods or implement {nameof(IPropertyWrapper)}");
+            throw new Exception($"Implementation {type} must define either {name}, one of the respective Before and After methods or implement {nameof(IEmptyImplementation)}");
         }
     }
 

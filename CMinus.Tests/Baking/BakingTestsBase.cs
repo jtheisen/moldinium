@@ -1,11 +1,30 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using static CMinus.Tests.Baking.WrappingTests;
 
 namespace CMinus.Tests.Baking;
 
-public class BakingTetsBase
+public class BakingTestsBase
 {
     protected static readonly AbstractBakery BasicFactory = new Bakery("Basic");
+
+    protected T CreateTestModel<T, I>(ComponentGenerators generators, out I ifc)
+        where I : class
+    {
+        var instance = new BakeryConfiguration(generators, Defaults.GetDefaultDefaultProvider())
+            .CreateBakery("TestBakery")
+            .Create<T>();
+
+        var ifcMaybeNull = instance as I;
+
+        Assert.IsNotNull(ifcMaybeNull);
+
+        if (ifcMaybeNull is null) throw new Exception();
+
+        ifc = ifcMaybeNull;
+
+        return instance;
+    }
 
     public interface IHasStringPropertyWithInit
     {

@@ -5,13 +5,11 @@ using System.Reflection;
 
 namespace CMinus.Baking;
 
-public interface IMethodWrappingImplementation : IWrappingImplementation { }
-
 public interface IStandardMethodWrapper<
     [TypeKind(ImplementationTypeArgumentKind.Value)] TResult,
     [TypeKind(ImplementationTypeArgumentKind.Exception)] TException,
     [TypeKind(ImplementationTypeArgumentKind.Mixin)] TMixin
-> : IMethodWrappingImplementation
+> : IMethodWrapperImplementation
     where TException : Exception
 {
     Boolean Before(ref TResult result, ref TMixin mixin);
@@ -104,7 +102,7 @@ public static class MethodGenerator
 {
     public static AbstractMethodGenerator Create(Type methodImplementationType)
     {
-        var instance = new GenericMethodGenerator(new CheckedImplementation(methodImplementationType, typeof(IImplementation), typeof(IMethodWrappingImplementation)));
+        var instance = new GenericMethodGenerator(new CheckedImplementation(methodImplementationType, typeof(IMethodWrapperImplementation)));
 
         return instance;
     }

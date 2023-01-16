@@ -5,7 +5,7 @@ using System.ComponentModel;
 namespace CMinus.Tests.Baking;
 
 [TestClass]
-public class MixinBakingTests : BakingTetsBase
+public class MixinBakingTests : BakingTestsBase
 {
     public struct TrivialStandardComplexPropertyImplementation<Value, Container>
         : IStandardPropertyImplementation<Value, Container, EmptyMixIn>
@@ -22,7 +22,7 @@ public class MixinBakingTests : BakingTetsBase
     [TestMethod]
     public void TrivialComplexTest()
     {
-        var bakery = BakeryConfiguration.Create(propertyImplementationType: typeof(TrivialStandardComplexPropertyImplementation<,>))
+        var bakery = BakeryConfiguration.Create(typeof(TrivialStandardComplexPropertyImplementation<,>))
             .CreateBakery(nameof(TrivialComplexTest));
 
         {
@@ -90,7 +90,7 @@ public class MixinBakingTests : BakingTetsBase
     [TestMethod]
     public void NotifyPropertyChangedTest()
     {
-        var instance = BakeryConfiguration.Create(propertyImplementationType: typeof(NotifyPropertyChangedPropertyImplementation<,>))
+        var instance = BakeryConfiguration.Create(typeof(NotifyPropertyChangedPropertyImplementation<,>))
             .CreateBakery(nameof(NotifyPropertyChangedTest))
             .Create<IHasNullableProperty>();
 
