@@ -1,49 +1,65 @@
-# Playground for experimentation with C-, a subset of the C# language
+# CMinus/Moldinium
 
-* C- can indeed bring back type safety by making dependency injection
-  part of the build (in a "verify run" after the compile):
+This repo is called CMinus but it's going to merge with my
+old Moldinium project under the name Moldinium.
 
-    * All type dependencies need to be known early as is DI-dogma anyway.
-    * If this goes through, all further needed types can be constructed.
-    * The construction in this playground is dynamic, but assembly
-    weaving could also be used: Another reason why we want to know
-    all the required types at build time.
+It's a library to write code entirely in C# interfaces and
+consists of three independent parts:
 
-* The current implementation constructs a (potentially) abstract class
-  for each interface and then proxies that. The base is
+- dynamic type creation from interfaces
+- dependency injection
+- dependency tracking
 
-    * necessary for baking in and merging the interface default
-    implementations easily, the C# runtime does all that for us
-    and DynamicProxy can't handle interface default implementations
-    right now,
+## State
 
-    * convenient for value-typed property implementations as they can
-    then be fields in the constructed object,
+The repo shows the creation of type from interfaces,
+with dependencies resolved, and
 
-    * still needs to be derived from again as a caching mechanism for
-    methods cannot be implemented on the base directly without
-    touching the auto-baking of the first point (or at least I
-    don't know how).
+- implemented properties wrapped as computed,
+- methods wrapped as actions (but see below) and
+- unimplemented properties implemented as trackable and
+  - get resolved if not-nullable and with an init setter,
+  - get default-initialized from a default provider if
+    not-nullable and with a set setter
 
-* Parameterized construction sucks.
+The Moldinium types can implement INotifyPropertyChanged
+but this is only tried separately from the tracking
+in the test suite as of yet.
 
-    * the best we got is having a record
-      implement the interface and then construct that. The object can still
-      be made polymorphic, for instance in the getter wrapper of the
-      interface implementation.
+## Todo
 
-    * It would be awesome if the C# language would allow the record cloning
-    syntax for interfaces that have a suited cloning method. In the hope
-    for it's arrival I think it's better to write domain model properties
-    with init-setters even though at the moment those can't be called.
+The following notes are for myself to remember what issues
+still need tackling:
 
-        * Even cooler would be `new MyInterface(...) { ... }` that gets translated
-        to `Construct<MyInterface>(...)` but good luck getting that in.
+### Derived type's properties need to be derived themselves
 
-* The rest works quite well, the difficulty here is finding a sensible
-  subset to work with, there are a number of topics not yet explorered:
-    
-    * interface function implementation wrapping
-    * nested containers
-    * lifetime management
+This is necessary to allow tools that do reflection themselves,
+such as EF or JsonConvert to construct the correct types
+to put into properties.
 
+### Derived types need to form a hierarchy
+
+This is necessary for EF and serialization tools to understand
+the hierarchy.
+
+### Attributes need to be converted
+
+For the same reasons
+
+### Tracking needs an action context
+
+Apparantly this wasn't done yet, so there's nothing to call
+in the implementation of function wrappers.
+
+### The bakery should support nested wrappers
+
+Not strictly necessary, but this would be really useful.
+
+### Internal dependency resolving
+
+Not strictly necessary as long as the tracking repository
+is statically located, as it currently still is, but it has
+other advantages, such as that dependencies can be injected
+into types created by EF or deserializers.
+
+This requires the dependency resolver to be ambient.
