@@ -49,6 +49,31 @@ I Foo<I>()
 }
 ```
 
+Thinking about this some more, it may be not that big
+of a deal.
+
+EF Entities themselves rarely need initializing from within
+LINQ. They are usually loaded as they are. The `new` syntax
+is used mostly for projection entities that aren't part
+of the storage model and could still be classic types.
+
+Also, there is presence of init props here, these are classic
+set setters in this context. So an EF query could do this:
+
+```c#
+var results = (
+    from t in myThings
+    select t
+).ToArray().Select(t => Create<MyI>().Modify(dto =>
+{
+    dto.Name = e.Name;
+    // ...
+})
+)
+```
+
+Not super beautiful, but acceptable.
+
 ## Todo
 
 The following notes are for myself to remember what issues
