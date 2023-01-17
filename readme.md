@@ -26,6 +26,29 @@ The Moldinium types can implement INotifyPropertyChanged
 but this is only tried separately from the tracking
 in the test suite as of yet.
 
+## The major downer
+
+The major downside of using moldinium models is that lose
+the nice syntax of object creation: new T { ... }
+
+This will be especially annoying in LINQ queries and
+exceptionally so with EF, where EF won't understand a
+different means of creating the object.
+
+Also, all usage of fluent APIs will have to be wrapped
+in something generic to allow Moldinium to provide the
+correct types later.
+
+At least this is possible:
+
+```c#
+I Foo<I>()
+    where I : Is.I, new()
+{
+    return new I { Name = "foo" };
+}
+```
+
 ## Todo
 
 The following notes are for myself to remember what issues

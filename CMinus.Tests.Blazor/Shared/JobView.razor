@@ -1,0 +1,40 @@
+﻿
+<div>
+    @if (!Job.HasEnded)
+    {
+        <div>
+            running
+        </div>
+    }
+    else if (Job.Exception is Exception exception)
+    {
+        <div>
+            @exception
+        </div>
+    }
+    else
+    {
+        <div>
+            completed
+        </div>
+    }
+
+    @if (Job is SimpleJob simpleJob)
+    {
+        <SimpleJobView Job="@simpleJob" />
+    }
+    else if (Job is ComplexJob complexJob)
+    {
+        <ComplexJobView Job="@complexJob" />
+    }
+    else
+    {
+        <div>unknown job</div>
+    }
+
+</div>
+
+@code {
+    [Parameter]
+    public IJob Job { get; set; }
+}

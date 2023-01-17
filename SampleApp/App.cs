@@ -1,73 +1,52 @@
-﻿using System.Net;
+﻿namespace SampleApp;
 
-namespace SampleApp;
-
-public interface ITaskListVm
+public interface IJobListVm
 {
-    Func<ITaskConfig> CreateTaskConfig { get; init; }
-
-    ITaskList TaskList { get; init; }
+    IJobList JobList { get; init; }
 }
 
-public interface ITaskList
+public interface IJobList
 {
-    Func<ITaskList, ITaskConfig, ITaskListItem> CreateItem { get; init; }
+    Func<SimpleJob> NewSimpleJob { get; init; }
+    Func<ComplexJob> NewComplexJob { get; init; }
 
-    IList<ITaskListItem> Items { get; set; }
+    CancellationTokenSource Cts { get; set; }
 
-    void Remove(ITaskListItem item) => Items.Remove(item);
+    IList<IJob> Items { get; set; }
 
-    void Add(ITaskConfig config) => Items.Add(CreateItem(this, config));
-}
+    void AddSimpleJob() => AddAndRunJob(NewSimpleJob());
+    void AddComplexJob() => AddAndRunJob(NewComplexJob());
 
-public interface ITaskConfig
-{
-    String Url { get; set; }
-}
-
-public interface ITaskListItem
-{
-    Func<ITaskRequest> CreateRequest { get; init; }
-
-    ITaskList Owner { get; init; }
-
-    ITaskConfig Config { get; init; }
-
-    Boolean IsEditing { get; set; }
-
-    Boolean CanEdit { get; set; }
-
-    ITaskRequest? CurrentRequest { get; set; }
-
-    void Remove() => Owner.Remove(this);
-
-    void Start()
+    async void AddAndRunJob(IJob job)
     {
-        CurrentRequest = CreateRequest();
+        Items.Add(job);
 
-        CurrentRequest.Request();
+        await job.Run();
+
+        await Task.Delay(1000);
+
+        Items.Remove(job);
+    }
+
+    void Cancel()
+    {
+        Cts.Cancel();
+
+        Cts = new CancellationTokenSource();
     }
 }
 
-public interface ITaskRequest
+public interface IJob
 {
-    ITaskConfig Config { get; init; }
-
-    HttpClient HttpClient { get; init; }
-
-    Boolean IsCompleted { get; set; }
-
-    HttpStatusCode StatusCode { get; set; }
+    Boolean HasEnded { get; set; }
 
     Exception? Exception { get; set; }
 
-    async void Request()
+    async Task Run()
     {
         try
         {
-            using var response = await HttpClient.GetAsync(Config.Url);
-
-            StatusCode = response.StatusCode;
+            await RunImpl();
         }
         catch (Exception ex)
         {
@@ -75,7 +54,35 @@ public interface ITaskRequest
         }
         finally
         {
-            IsCompleted = true;
+            HasEnded = true;
+        }
+    }
+
+    Task RunImpl();
+}
+
+public interface SimpleJob : IJob
+{
+    CancellationToken Ct { get; init; }
+
+    async Task IJob.RunImpl() => await Task.Delay(4000, Ct);
+}
+
+public interface ComplexJob : IJob
+{
+    Func<SimpleJob> CreateSimpleJob { get; init; }
+
+    List<IJob> SubJobs { get; set; }
+
+    async Task IJob.RunImpl()
+    {
+        for (var i = 0; i < 3; ++i)
+        {
+            var subJob = CreateSimpleJob();
+
+            SubJobs.Add(subJob);
+
+            await subJob.Run();
         }
     }
 }

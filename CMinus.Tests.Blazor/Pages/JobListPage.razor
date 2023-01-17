@@ -1,0 +1,17 @@
+﻿@inherits LocalComponentBase
+
+@inject IJobListVm Vm
+
+@page "/joblist"
+
+<PageTitle>Task list sample</PageTitle>
+
+<button @onclick="Vm.JobList.AddSimpleJob">Add simple job</button>
+<button @onclick="Vm.JobList.AddComplexJob">Add complex job</button>
+
+<div>
+    @foreach (var job in Vm.JobList)
+    {
+        <JobView Job="@job" />
+    }
+</div>
