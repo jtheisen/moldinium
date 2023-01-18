@@ -28,10 +28,10 @@ public struct DefaultDefaultConstructible<T> : IDefault<T>
     public T Default => new T();
 }
 
-public struct DefaultDefaultConstructible<T, I> : IDefault<T>
-    where I : T, new()
+public struct DefaultDefaultConstructible<Type, Implementation> : IDefault<Type>
+    where Implementation : Type, new()
 {
-    public T Default => new I();
+    public Type Default => new Implementation();
 }
 
 public interface IDefaultProvider

@@ -101,11 +101,18 @@ public static class Extensions
     public static void Ignore(this ValueTask _) { }
 
     [DebuggerHidden]
-    public static T Assert<T>(this T value, Predicate<T> predicate, String message = null)
+    public static T Assert<T>(this T value, Predicate<T> predicate, String? message = null)
     {
         if (!predicate(value))
         {
-            throw new Exception(message);
+            if (message is not null)
+            {
+                throw new Exception(message);
+            }
+            else
+            {
+                throw new Exception();
+            }
         }
 
         return value;

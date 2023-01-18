@@ -20,7 +20,7 @@ public interface IStandardMethodWrapper<
 
 public abstract class AbstractMethodGenerator : AbstractGenerator
 {
-    public virtual void GenerateMethod(BakingState state, MethodInfo method)
+    public virtual void GenerateMethod(IBuildingContext state, MethodInfo method)
     {
         var typeBuilder = state.TypeBuilder;
 
@@ -47,9 +47,9 @@ public abstract class AbstractMethodGenerator : AbstractGenerator
         );
     }
 
-    protected virtual FieldBuilder? EnsureMixin(BakingState state) => null;
+    protected virtual FieldBuilder? EnsureMixin(IBuildingContext state) => null;
 
-    protected abstract (FieldBuilder, MethodImplementation) GetMethodImplementation(BakingState state, MethodInfo method);
+    protected abstract (FieldBuilder, MethodImplementation) GetMethodImplementation(IBuildingContext state, MethodInfo method);
 }
 
 public class GenericMethodGenerator : AbstractMethodGenerator
@@ -64,9 +64,9 @@ public class GenericMethodGenerator : AbstractMethodGenerator
     protected override IDictionary<Type, ImplementationTypeArgumentKind> GetArgumentKinds()
         => implementation.GetArgumentKinds();
 
-    protected override FieldBuilder? EnsureMixin(BakingState state) => implementation.MixinType is not null ? state.EnsureMixin(state, implementation.MixinType, false) : null;
+    protected override FieldBuilder? EnsureMixin(IBuildingContext state) => implementation.MixinType is not null ? state.EnsureMixin(implementation.MixinType, false) : null;
 
-    protected override (FieldBuilder, MethodImplementation) GetMethodImplementation(BakingState state, MethodInfo method)
+    protected override (FieldBuilder, MethodImplementation) GetMethodImplementation(IBuildingContext state, MethodInfo method)
     {
         var typeBuilder = state.TypeBuilder;
 
@@ -90,7 +90,7 @@ public class DelegatingMethodGenerator : AbstractMethodGenerator
     }
 
     protected override (FieldBuilder, MethodImplementation)
-        GetMethodImplementation(BakingState state, MethodInfo method)
+        GetMethodImplementation(IBuildingContext state, MethodInfo method)
     {
         var implementationMethod = GetMethod(fieldBuilder, method.Name);
 

@@ -10,7 +10,7 @@
 <button @onclick="Vm.JobList.AddComplexJob">Add complex job</button>
 
 <div>
-    @foreach (var job in Vm.JobList)
+    @foreach (var job in Vm.JobList.Items)
     {
         <JobView Job="@job" />
     }

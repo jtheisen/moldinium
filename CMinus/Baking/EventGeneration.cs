@@ -24,7 +24,7 @@ public struct GenericEventImplementation<D> : IEventImplementation<D>
 
 public abstract class AbstractEventGenerator : AbstractGenerator
 {
-    public virtual void GenerateEvent(BakingState state, EventInfo evt)
+    public virtual void GenerateEvent(IBuildingContext state, EventInfo evt)
     {
         var typeBuilder = state.TypeBuilder;
 
@@ -79,7 +79,7 @@ public class UnimplementedEventGenerator : AbstractEventGenerator
 {
     public static readonly UnimplementedEventGenerator Instance = new UnimplementedEventGenerator();
 
-    public override void GenerateEvent(BakingState state, EventInfo evt) => throw new NotImplementedException();
+    public override void GenerateEvent(IBuildingContext state, EventInfo evt) => throw new NotImplementedException();
 
     protected override (FieldBuilder fieldBuilder, String backingAddMethodName, String backingRemoveMethodName)
         GetBackings(TypeBuilder typeBuilder, EventInfo property)

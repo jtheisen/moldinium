@@ -1,23 +1,12 @@
-﻿using Castle.Core.Configuration;
-using Castle.DynamicProxy.Generators;
-using CMinus.Baking;
-using CMinus.Injection;
+﻿using CMinus.Injection;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Reflection.PortableExecutable;
 
 namespace CMinus;
-
-public delegate FieldBuilder MixinEnsurer(BakingState state, Type type, Boolean isPrivate);
-
-public record BakingState(TypeBuilder TypeBuilder, MixinEnsurer EnsureMixin, ILGenerator ConstructorGenerator, IDefaultProvider DefaultProvider)
-{
-    public readonly Dictionary<Type, FieldBuilder> Mixins = new Dictionary<Type, FieldBuilder>();
-}
 
 public abstract class AbstractBakery
 {
@@ -84,17 +73,17 @@ public class AbstractlyBakery : AbstractBakery
         }
     }
 
-    public override Type Create(Type interfaceOrBaseOrMixinType)
+    public override Type Create(Type interfaceOrBaseType)
     {
-        var name = GetTypeName(interfaceOrBaseOrMixinType);
-        return moduleBuilder.GetType(name) ?? Create(name, interfaceOrBaseOrMixinType);
+        var name = GetTypeName(interfaceOrBaseType);
+        return moduleBuilder.GetType(name) ?? Create(name, interfaceOrBaseType);
     }
 
-    protected virtual Type Create(String name, Type interfaceType)
+    protected virtual Type Create(String name, Type interfaceOrBaseType)
     {
         var typeBuilder = moduleBuilder.DefineType(name, typeAttributes);
 
-        RedeclareInterface(typeBuilder, interfaceType);
+        RedeclareInterface(typeBuilder, interfaceOrBaseType);
 
         return typeBuilder.CreateType() ?? throw new Exception("TypeBuilder gave no built type");
     }
@@ -180,8 +169,6 @@ public class Bakery : AbstractlyBakery
     readonly IBakeryComponentGenerators generators;
     readonly IDefaultProvider defaultProvider;
 
-    BakingState? state;
-
     public String Name => name;
 
     public Bakery(String name)
@@ -195,124 +182,21 @@ public class Bakery : AbstractlyBakery
         defaultProvider = this.configuration.DefaultProvider;
     }
 
-    protected override Type Create(String name, Type interfaceOrBaseOrMixinType)
+    protected Type Analyze(Type interfaceOrBaseType)
     {
-        if (state is not null) throw new Exception("Already building a type");
+        var processor = new AnalyzingBakingProcessor(generators);
 
-        var baseType = interfaceOrBaseOrMixinType.IsClass ? interfaceOrBaseOrMixinType : null;
+        processor.Visit(interfaceOrBaseType);
 
-        var typeBuilder = moduleBuilder.DefineType(name, typeAttributes, baseType);
-
-        var constructorBuilder = typeBuilder.DefineConstructor(MethodAttributes.Public, CallingConventions.Standard, new Type[] { });
-
-        var constructorGenerator = constructorBuilder.GetILGenerator();
-
-        state = new BakingState(typeBuilder, EnsureDelegatingMixin, constructorGenerator, defaultProvider);
-
-        try
-        {
-            if (interfaceOrBaseOrMixinType.IsValueType)
-            {
-                EnsureImplementedMixin(state, interfaceOrBaseOrMixinType, false);
-            }
-            else
-            {
-                ImplementBaseOrInterface(state, interfaceOrBaseOrMixinType, generators);
-            }
-
-            constructorGenerator.Emit(OpCodes.Ret);
-
-            return typeBuilder.CreateType() ?? throw new Exception("no type?");
-        }
-        finally
-        {
-            state = null;
-        }
+        throw new NotImplementedException();
     }
 
-    void ImplementBaseOrInterface(BakingState state, Type type, IBakeryComponentGenerators generators)
+    protected override Type Create(String name, Type interfaceOrBaseType)
     {
-        var typeBuilder = state.TypeBuilder;
+        var baseType = interfaceOrBaseType.IsClass ? interfaceOrBaseType : null;
 
-        if (type.IsInterface)
-        {
-            typeBuilder.AddInterfaceImplementation(type);
-        }
+        var processor = new BuildingBakingProcessor(name, baseType, typeAttributes, defaultProvider, generators, moduleBuilder);
 
-        var props = type.GetProperties().ToArray();
-
-        foreach (var property in type.GetProperties())
-        {
-            generators.GetPropertyGenerator(property)?.GenerateProperty(state, property);
-        }
-
-        foreach (var evt in type.GetEvents())
-        {
-            generators.GetEventGenerator(evt).GenerateEvent(state, evt);
-        }
-
-        foreach (var method in type.GetMethods())
-        {
-            if (method.IsSpecialName) continue;
-
-            generators.GetMethodGenerator(method)?.GenerateMethod(state, method);
-
-            //typeBuilder.DefineMethod(method.Name, method.Attributes | MethodAttributes.Public, method.ReturnType, method.GetParameters().Select(p => p.ParameterType).ToArray());
-        }
+        return processor.Create(interfaceOrBaseType);
     }
-
-    FieldBuilder EnsureImplementedMixin(BakingState state, Type type, Boolean isPrivate)
-        => EnsureMixin(state, type, false, isPrivate);
-
-    FieldBuilder EnsureDelegatingMixin(BakingState state, Type type, Boolean isPrivate)
-        => EnsureMixin(state, type, true, isPrivate);
-
-    FieldBuilder EnsureMixin(BakingState state, Type type, Boolean onlyDelegate, Boolean isPrivate)
-    {
-        var fieldBuilder = state.Mixins.GetValueOrDefault(type);
-
-        if (fieldBuilder is null)
-        {
-            CreateMixin(state, type, onlyDelegate, isPrivate, out fieldBuilder);
-        }
-
-        return fieldBuilder;
-    }
-
-    void CreateMixin(BakingState state, Type type, Boolean onlyDelegate, Boolean isPrivate, out FieldBuilder fieldBuilder)
-    {
-        var typeBuilder = state.TypeBuilder;
-
-        fieldBuilder = typeBuilder.DefineField($"mixin_{(type.FullName ?? "x").Replace('.', '_')}_{Guid.NewGuid()}", type, FieldAttributes.Private);
-
-        state.Mixins[type] = fieldBuilder;
-
-        var propertyImplementationType = typeof(IPropertyImplementation);
-
-        var interfaces = (
-            from i in type.GetInterfaces()
-            where !propertyImplementationType.IsAssignableFrom(i)
-            select i
-        ).ToArray();
-
-        if (interfaces.Length == 0) return;
-
-        if (!isPrivate)
-        {
-            var nestedGenerators = onlyDelegate
-                ? new ComponentGenerators(
-                    new DelegatingMethodGenerator(fieldBuilder),
-                    new DelegatingPropertyGenerator(fieldBuilder),
-                    new DelegatingPropertyGenerator(fieldBuilder),
-                    new DelegatingEventGenerator(fieldBuilder)
-                )
-                : generators;
-
-            foreach (var ifc in interfaces)
-            {
-                ImplementBaseOrInterface(state, ifc, nestedGenerators);
-            }
-        }
-    }
-
 }

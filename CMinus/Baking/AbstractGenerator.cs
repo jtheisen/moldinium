@@ -9,6 +9,8 @@ namespace CMinus;
 
 public abstract class AbstractGenerator
 {
+    public virtual Type? GetMixinType() => null;
+
     protected MethodBuilder Create(
         TypeBuilder typeBuilder,
         MethodInfo methodTemplate,

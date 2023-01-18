@@ -1,10 +1,10 @@
 ﻿
 @foreach (var subJob in Job.SubJobs)
 {
-    <JobView Job="@job" />
+    <JobView Job="@subJob" />
 }
 
 @code {
     [Parameter]
-    public ComplexJob Job { get; set; }
+    public ComplexJob Job { get; set; } = null!;
 }

@@ -4,7 +4,6 @@ using System.Linq;
 using System.Reflection.Emit;
 using System.Reflection;
 using CMinus.Injection;
-using Castle.DynamicProxy.Generators;
 
 namespace CMinus;
 
@@ -54,7 +53,7 @@ public struct TrivialPropertyWrapper : ITrivialPropertyWrapper { }
 
 public abstract class AbstractPropertyGenerator : AbstractGenerator
 {
-    public virtual void GenerateProperty(BakingState state, PropertyInfo property)
+    public virtual void GenerateProperty(IBuildingContext state, PropertyInfo property)
     {
         var typeBuilder = state.TypeBuilder;
 
@@ -98,7 +97,7 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
                 if (defaultImplementationGetMethod is null) throw new Exception("Can't find getter on default value implementation");
 
-                var defaultImplementationFieldBuilder = state.EnsureMixin(state, defaultType, true);
+                var defaultImplementationFieldBuilder = state.EnsureMixin(defaultType, true);
 
                 codeCreator.GenerateImplementationCode(
                     state.ConstructorGenerator,
@@ -136,9 +135,9 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
         }
     }
 
-    protected virtual FieldBuilder? EnsureMixin(BakingState state) => null;
+    protected virtual FieldBuilder? EnsureMixin(IBuildingContext state) => null;
 
-    protected abstract (FieldBuilder, PropertyImplementation) GetPropertyImplementation(BakingState state, PropertyInfo property);
+    protected abstract (FieldBuilder, PropertyImplementation) GetPropertyImplementation(IBuildingContext state, PropertyInfo property);
 
     protected MethodInfo GetPropertyMethod(PropertyInfo property, Boolean setter)
         => (setter ? property.GetSetMethod() : property.GetGetMethod())
@@ -148,21 +147,20 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 public class GenericPropertyGenerator : AbstractPropertyGenerator
 {
     private readonly CheckedImplementation implementation;
-    private readonly Type propertyImplementationType;
 
     public GenericPropertyGenerator(CheckedImplementation implementation)
     {
         this.implementation = implementation;
-
-        propertyImplementationType = implementation.Type;
     }
+
+    public override Type? GetMixinType() => implementation.MixinType;
 
     protected override IDictionary<Type, ImplementationTypeArgumentKind> GetArgumentKinds()
         => implementation.GetArgumentKinds();
 
-    protected override FieldBuilder? EnsureMixin(BakingState state) => implementation.MixinType is not null ? state.EnsureMixin(state, implementation.MixinType, false) : null;
+    protected override FieldBuilder? EnsureMixin(IBuildingContext state) => implementation.MixinType is not null ? state.EnsureMixin(implementation.MixinType, false) : null;
 
-    protected override (FieldBuilder, PropertyImplementation) GetPropertyImplementation(BakingState state, PropertyInfo property)
+    protected override (FieldBuilder, PropertyImplementation) GetPropertyImplementation(IBuildingContext state, PropertyInfo property)
     {
         var typeBuilder = state.TypeBuilder;
 
@@ -183,10 +181,10 @@ public class UnimplementedPropertyGenerator : AbstractPropertyGenerator
 {
     public static readonly UnimplementedPropertyGenerator Instance = new UnimplementedPropertyGenerator();
 
-    public override void GenerateProperty(BakingState state, PropertyInfo property) => throw new NotImplementedException();
+    public override void GenerateProperty(IBuildingContext state, PropertyInfo property) => throw new NotImplementedException();
 
     protected override (FieldBuilder, PropertyImplementation)
-        GetPropertyImplementation(BakingState state, PropertyInfo property)
+        GetPropertyImplementation(IBuildingContext state, PropertyInfo property)
         => throw new NotImplementedException();
 }
 
@@ -200,7 +198,7 @@ public class DelegatingPropertyGenerator : AbstractPropertyGenerator
     }
 
     protected override (FieldBuilder, PropertyImplementation)
-        GetPropertyImplementation(BakingState state, PropertyInfo property)
+        GetPropertyImplementation(IBuildingContext state, PropertyInfo property)
     {
         var propertyOnImplementation = fieldBuilder.FieldType.GetProperty(property.Name);
 

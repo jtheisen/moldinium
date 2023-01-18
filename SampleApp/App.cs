@@ -7,15 +7,17 @@ public interface IJobListVm
 
 public interface IJobList
 {
-    Func<SimpleJob> NewSimpleJob { get; init; }
-    Func<ComplexJob> NewComplexJob { get; init; }
+    Func<CancellationToken, SimpleJob> NewSimpleJob { get; init; }
+    Func<CancellationToken, ComplexJob> NewComplexJob { get; init; }
 
-    CancellationTokenSource Cts { get; set; }
+    CancellationTokenSource? Cts { get; set; }
 
     IList<IJob> Items { get; set; }
 
-    void AddSimpleJob() => AddAndRunJob(NewSimpleJob());
-    void AddComplexJob() => AddAndRunJob(NewComplexJob());
+    CancellationTokenSource GetCts() => Cts ?? (Cts = new CancellationTokenSource());
+
+    void AddSimpleJob() => AddAndRunJob(NewSimpleJob(GetCts().Token));
+    void AddComplexJob() => AddAndRunJob(NewComplexJob(GetCts().Token));
 
     async void AddAndRunJob(IJob job)
     {
@@ -30,9 +32,9 @@ public interface IJobList
 
     void Cancel()
     {
-        Cts.Cancel();
+        Cts?.Cancel();
 
-        Cts = new CancellationTokenSource();
+        Cts = null;
     }
 }
 
