@@ -1,23 +1,48 @@
-﻿namespace SampleApp;
+﻿using System.Diagnostics;
 
-public interface IJobListVm
+namespace SampleApp;
+
+public interface IJobListApp
 {
-    IJobList JobList { get; init; }
+    Func<SimpleJobConfig, IJobList> CreateJobList { get; init; }
+
+    IJobList CreateDefaultJobList()
+    {
+        return CreateJobList(new SimpleJobConfig(TimeSpan.FromSeconds(3), 100));
+    }
+}
+
+public record CommandConfig(Action Execute, Boolean CanExecute = true);
+
+public interface ICommand : System.Windows.Input.ICommand
+{
+    CommandConfig Config { get; init; }
+
+    event EventHandler? System.Windows.Input.ICommand.CanExecuteChanged { add { } remove { } }
+
+    bool System.Windows.Input.ICommand.CanExecute(object? parameter) => Config.CanExecute;
+
+    void System.Windows.Input.ICommand.Execute(object? parameter) => Config.Execute();
 }
 
 public interface IJobList
 {
+    Func<CommandConfig, ICommand> NewCommand { get; init; }
+
     Func<CancellationToken, SimpleJob> NewSimpleJob { get; init; }
     Func<CancellationToken, ComplexJob> NewComplexJob { get; init; }
 
     CancellationTokenSource? Cts { get; set; }
 
+    CancellationToken Ct => GetCts().Token;
+
     IList<IJob> Items { get; set; }
 
     CancellationTokenSource GetCts() => Cts ?? (Cts = new CancellationTokenSource());
 
-    void AddSimpleJob() => AddAndRunJob(NewSimpleJob(GetCts().Token));
-    void AddComplexJob() => AddAndRunJob(NewComplexJob(GetCts().Token));
+    ICommand AddSimpleJobCommand => NewCommand(new CommandConfig(() => AddAndRunJob(NewSimpleJob(Ct))));
+    ICommand AddComplexJobCommand => NewCommand(new CommandConfig(() => AddAndRunJob(NewComplexJob(Ct))));
+    ICommand CancelCommand => NewCommand(new CommandConfig(() => Cancel()));
 
     async void AddAndRunJob(IJob job)
     {
@@ -25,7 +50,7 @@ public interface IJobList
 
         await job.Run();
 
-        await Task.Delay(1000);
+        await Task.Delay(3000);
 
         Items.Remove(job);
     }
@@ -34,12 +59,16 @@ public interface IJobList
     {
         Cts?.Cancel();
 
+        Debug.WriteLine($"Cancelled at {DateTime.Now}");
+
         Cts = null;
     }
 }
 
 public interface IJob
 {
+    CancellationToken Ct { get; init; }
+
     Boolean HasEnded { get; set; }
 
     Exception? Exception { get; set; }
@@ -52,6 +81,8 @@ public interface IJob
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"Job cancelled at {DateTime.Now}");
+
             Exception = ex;
         }
         finally
@@ -63,18 +94,34 @@ public interface IJob
     Task RunImpl();
 }
 
+public record SimpleJobConfig(TimeSpan Duration, Int32 Steps);
+
 public interface SimpleJob : IJob
 {
-    CancellationToken Ct { get; init; }
+    SimpleJobConfig Config { get; init; }
 
-    async Task IJob.RunImpl() => await Task.Delay(4000, Ct);
+    Int32 Progress { get; set; }
+
+    async Task IJob.RunImpl()
+    {
+        var n = Config.Steps;
+
+        var ms = Config.Duration.TotalMilliseconds;
+
+        for (var i = 0; i < n; ++i)
+        {
+            await Task.Delay((Int32)(ms / n), Ct);
+
+            Progress = 100 * i / n;
+        }
+    }
 }
 
 public interface ComplexJob : IJob
 {
     Func<SimpleJob> CreateSimpleJob { get; init; }
 
-    List<IJob> SubJobs { get; set; }
+    IList<IJob> SubJobs { get; set; }
 
     async Task IJob.RunImpl()
     {
@@ -86,5 +133,7 @@ public interface ComplexJob : IJob
 
             await subJob.Run();
         }
+
+        await Task.Delay(1000, Ct);
     }
 }

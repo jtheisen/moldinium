@@ -37,6 +37,8 @@ public class MixinBakingTests : BakingTestsBase
     public interface INotifyPropertChangedMixin : INotifyPropertyChanged
     {
         int ListenerCount { get; set; }
+
+        void NotifyPropertyChanged(object o);
     }
 
     public struct NotifyPropertChangedMixin : INotifyPropertChangedMixin

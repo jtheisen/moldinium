@@ -35,16 +35,26 @@ public class TypeInterfaces
     {
         interfaces = new HashSet<Type>();
 
+        if (type.IsInterface)
+        {
+            AddInterface(type);
+        }
+
         foreach (var i in type.GetInterfaces())
         {
-            if (i.IsGenericType)
-            {
-                interfaces.Add(i.GetGenericTypeDefinition());
-            }
-            else
-            {
-                interfaces.Add(i);
-            }
+            AddInterface(i);
+        }
+    }
+
+    void AddInterface(Type i)
+    {
+        if (i.IsGenericType)
+        {
+            interfaces.Add(i.GetGenericTypeDefinition());
+        }
+        else
+        {
+            interfaces.Add(i);
         }
     }
 

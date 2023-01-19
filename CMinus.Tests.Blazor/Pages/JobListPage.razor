@@ -1,17 +1,29 @@
 ﻿@inherits LocalComponentBase
 
-@inject IJobListVm Vm
+@inject IJobListApp App
 
 @page "/joblist"
 
 <PageTitle>Task list sample</PageTitle>
 
-<button @onclick="Vm.JobList.AddSimpleJob">Add simple job</button>
-<button @onclick="Vm.JobList.AddComplexJob">Add complex job</button>
+<MiniInfo Name="@nameof(JobListPage)" DateTime="@DateTime.Now" />
 
-<div>
-    @foreach (var job in Vm.JobList.Items)
+<button class="btn btn-primary" @onclick="jobList.AddSimpleJob">Add simple job</button>
+<button class="btn btn-primary" @onclick="jobList.AddComplexJob">Add complex job</button>
+<button class="btn btn-warning" @onclick="jobList.Cancel">Cancel job</button>
+
+<div class="mt-4">
+    @foreach (var job in jobList.Items)
     {
         <JobView Job="@job" />
     }
 </div>
+
+@code {
+    IJobList jobList = default!;
+
+    protected override void OnInitialized()
+    {
+        jobList = App.CreateDefaultJobList();
+    }
+}

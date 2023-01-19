@@ -87,7 +87,7 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
             {
                 var info = TypeProperties.Get(property.DeclaringType ?? throw new Exception("Unexpectedly not having a declaring type"));
 
-                var requiresDefault = info.Properties.Single(p => p.info == property).requiresDefault;
+                var requiresDefault = !isImplemented && info.Properties.Single(p => p.info == property).requiresDefault;
 
                 var takesDefaultValue = backingInitMethod.GetParameters().Select(p => p.ParameterType).Any(t => t == valueType);
 
@@ -95,7 +95,7 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
                 // need a default. In that case, we use a dummy default provider that at least doesn't do any allocation.
                 Type? genericDefaultImplementationType = requiresDefault ? state.DefaultProvider.GetDefaultType(valueType) : typeof(DummyDefault<>);
 
-                if (genericDefaultImplementationType is null) throw new Exception($"Default provider can't handle type {valueType}");
+                if (genericDefaultImplementationType is null) throw new Exception($"Default provider can't handle type {valueType}, required for property {property}");
 
                 var defaultType = Defaults.CreateConcreteDefaultImplementationType(genericDefaultImplementationType, valueType);
 

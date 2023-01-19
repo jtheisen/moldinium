@@ -1,5 +1,6 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using System.Collections.Generic;
 using static CMinus.Tests.Baking.WrappingTests;
 
 namespace CMinus.Tests.Baking;
@@ -43,6 +44,13 @@ public class BakingTestsBase
     public interface IHasPropertyWithDefault
     {
         String Value { get; set; }
+    }
+
+    public interface IHasPropertiesWithCollection
+    {
+        IList<String> StringList { get; set; }
+
+        ICollection<String> StringCollection { get; set; }
     }
 
     public interface IHasNullableProperty

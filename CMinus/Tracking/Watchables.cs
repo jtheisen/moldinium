@@ -247,11 +247,34 @@ internal class CachedBeforeAndAfterComputedWatchable<T> : IWatchable
         return needEvaluation;
     }
 
-    public void AfterGet(ref T value)
+    Action MakeNotify(Action? notify)
+    {
+        if (notify is null) return InvalidateAndNotify;
+
+        void Notify()
+        {
+            try
+            {
+                notify();
+            }
+            catch
+            {
+                // FIXME
+            }
+
+            InvalidateAndNotify();
+        }
+
+        return Notify;
+    }
+
+    public void AfterGet(ref T value, Action? notify = null)
     {
         if (isInSubscribingEvaluation)
         {
-            Repository.Instance.EndEvaluationAndSubscribe(Name, --evaluationNestingLevel, value, ref subscriptions, InvalidateAndNotify);
+            var combinedNotify = MakeNotify(notify);
+
+            Repository.Instance.EndEvaluationAndSubscribe(Name, --evaluationNestingLevel, value, ref subscriptions, combinedNotify);
 
             isInSubscribingEvaluation = false;
         }
@@ -267,11 +290,13 @@ internal class CachedBeforeAndAfterComputedWatchable<T> : IWatchable
         dirty = false;
     }
 
-    public Boolean AfterErrorGet(Exception exception)
+    public Boolean AfterErrorGet(Exception exception, Action? notify = null)
     {
         if (isInSubscribingEvaluation)
         {
-            Repository.Instance.EndEvaluationWithExceptionAndSubscribe<T>(Name, --evaluationNestingLevel, exception, ref subscriptions, InvalidateAndNotify);
+            var combinedNotify = MakeNotify(notify);
+
+            Repository.Instance.EndEvaluationWithExceptionAndSubscribe<T>(Name, --evaluationNestingLevel, exception, ref subscriptions, combinedNotify);
 
             isInSubscribingEvaluation = false;
         }
@@ -579,7 +604,7 @@ class Repository
 
     static Lazy<Repository> instance = new Lazy<Repository>(() => new Repository());
 
-    public static IWatchablesLogger logger = new WatchablesLogger();
+    public static IWatchablesLogger? logger; // = new WatchablesLogger();
 
     Repository()
     {

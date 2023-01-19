@@ -1,0 +1,12 @@
+﻿<div class="text-muted" style="font-size: .5em">
+    @Name
+    @DateTime.TimeOfDay
+</div>
+
+@code {
+    [Parameter]
+    public String Name { get; set; }
+
+    [Parameter]
+    public DateTime DateTime { get; set; }
+}

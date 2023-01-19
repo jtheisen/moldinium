@@ -34,6 +34,11 @@ public struct DefaultDefaultConstructible<Type, Implementation> : IDefault<Type>
     public Type Default => new Implementation();
 }
 
+public struct DefaultTrackableList<T> : IDefault<ICollection<T>>
+{
+    public ICollection<T> Default => new WatchableList<T>();
+}
+
 public interface IDefaultProvider
 {
     Type? GetDefaultType(Type type);
@@ -41,6 +46,13 @@ public interface IDefaultProvider
 
 public class DefaultDefaultProvider : IDefaultProvider
 {
+    private readonly bool useTrackableList;
+
+    public DefaultDefaultProvider(Boolean useTrackableList = true)
+    {
+        this.useTrackableList = useTrackableList;
+    }
+
     public Type? GetDefaultType(Type type)
     {
         if (type.IsValueType)
@@ -59,15 +71,28 @@ public class DefaultDefaultProvider : IDefaultProvider
 
         var traits = TypeTraits.Get(type);
 
-        if (interfaces.DoesTypeImplement(typeof(ICollection<>)) && traits.IsDefaultConstructible)
+        if (interfaces.DoesTypeImplement(typeof(ICollection<>)))
         {
-            return typeof(DefaultDefaultConstructible<>);
+            if (useTrackableList)
+            {
+                var trackableListDefaultType = GetDefaultImplementationTypeForTrackableList(type);
+
+                return trackableListDefaultType;
+            }
+            else if (traits.IsDefaultConstructible)
+            {
+                return typeof(DefaultDefaultConstructible<>);
+            }
         }
 
-        var genericTypeDefinition = type.GetGenericTypeDefinition();
+        return null;
+    }
+
+    Type GetDefaultImplementationTypeForTrackableList(Type type)
+    {
         var arguments = type.GetGenericArguments();
 
-        if (interfacesForTrackableList.Contains(genericTypeDefinition) && arguments.Length <= 1)
+        if (arguments.Length <= 1)
         {
             var typeArgument = arguments.Length == 1 ? arguments[0] : typeof(Object);
 
@@ -77,15 +102,11 @@ public class DefaultDefaultProvider : IDefaultProvider
 
             return defaultImplementationType;
         }
-
-        return null;
+        else
+        {
+            throw new Exception($"Expected generic collection type {type} to have at most one type paramter");
+        }
     }
-
-    static readonly Type[] interfacesForTrackableList = new[]
-    {
-        typeof(IList<>),
-        typeof(ICollection<>)
-    };
 }
 
 public static class Defaults

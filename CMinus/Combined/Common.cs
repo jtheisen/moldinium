@@ -121,6 +121,9 @@ public static class DependencyProvider
         DefaultDependencyProviderBakingMode.Tracking => ComponentGenerators.Create(
             typeof(TrackedPropertyImplementation<>),
             typeof(TrackedComputedPropertyImplementation<,>)),
+        DefaultDependencyProviderBakingMode.TrackingAndNotifyPropertyChanged => ComponentGenerators.Create(
+            typeof(TrackedNotifyingPropertyImplementation<,>),
+            typeof(TrackedNotifyingComputedPropertyImplementation<,,>)),
         _ => throw new NotImplementedException()
     };
 }

@@ -32,11 +32,22 @@ public class BasicBakingTests : BakingTestsBase
     }
 
     [TestMethod]
+    public void DefaultCollectionsTest()
+    {
+        var test = BasicFactory.Create<IHasPropertiesWithCollection>();
+
+        Assert.IsTrue(test.StringList.GetType() == typeof(WatchableList<String>));
+        Assert.IsTrue(test.StringCollection.GetType() == typeof(WatchableList<String>));
+    }
+
+    [TestMethod]
     public void EventTypeCreationTest() => BasicFactory.Create<IHasEvent>();
 
 
     [TestMethod]
     public void WithInitTest() => BasicFactory.Create<IHasStringPropertyWithInit>();
+
+
 
     public abstract class AHasStringPropertyWithInit
     {

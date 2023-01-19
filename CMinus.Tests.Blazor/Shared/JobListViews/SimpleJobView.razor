@@ -1,5 +1,7 @@
 ﻿@inherits LocalComponentBase
 
+<MiniInfo Name="@(nameof(SimpleJobView) + " ")" DateTime="@DateTime.Now" />
+
 @code {
     [Parameter]
     public SimpleJob Job { get; set; }

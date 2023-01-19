@@ -1,16 +1,24 @@
 ﻿@inherits LocalComponentBase
 
-<div>
+<div class="border-top border-bottom">
+    <MiniInfo Name="@nameof(JobView)" DateTime="@DateTime.Now" />
+
     @if (!Job.HasEnded)
     {
         <div>
             running
         </div>
     }
-    else if (Job.Exception is Exception exception)
+    else if (Job.Exception is OperationCanceledException)
     {
         <div>
-            @exception
+            Cancelled
+        </div>
+    }
+    else if (Job.Exception is Exception)
+    {
+        <div>
+            Error
         </div>
     }
     else
