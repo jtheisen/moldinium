@@ -209,25 +209,6 @@ public class Bakery : AbstractlyBakery
 
 public class InterfaceMapping
 {
-    FieldInfo? methodBaseField;
-
-    MethodInfo? GetBaseMethod(MethodBody methodBody)
-    {
-        if (methodBaseField is null)
-        {
-            var runtimeMethodBodyType = methodBody.GetType();
-
-            methodBaseField = runtimeMethodBodyType.GetField("_methodBase", BindingFlags.NonPublic | BindingFlags.Instance);
-
-            if (methodBaseField is null)
-            {
-                throw new Exception($"{runtimeMethodBodyType} does not contain the private field _methodBase which is required at this point");
-            }
-        }
-
-        return (MethodInfo?)methodBaseField.GetValue(methodBody);
-    }
-
     HashSet<MethodInfo> implementations;
     Dictionary<MethodInfo, MethodInfo> declarationsToImplementations;
 
@@ -241,6 +222,13 @@ public class InterfaceMapping
         implementations = new HashSet<MethodInfo>();
         declarationsToImplementations = new Dictionary<MethodInfo, MethodInfo>();
 
+        var implementableMethods = (
+            from ifc in interfaces
+            from method in ifc.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
+            where !method.Name.Contains('.')
+            select (ifc, method)
+        ).ToLookup(e => (e.ifc.FullName?.Replace('+', '.'), e.method.Name), e => e.method);
+
         foreach (var ifc in interfaces)
         {
             foreach (var method in ifc.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public))
@@ -249,19 +237,67 @@ public class InterfaceMapping
 
                 if (body is null) continue;
 
-                var baseMethod = GetBaseMethod(body);
+                MethodInfo methodBase;
 
-                if (baseMethod is null) continue;
+                if (TryParsePrivateName(method.Name, out var containerName, out var methodName))
+                {
+                    var candidates = implementableMethods[(containerName, methodName)].ToArray();
+
+                    // TODO: check signatures
+
+                    if (candidates.Length == 0)
+                    {
+                        throw new Exception($"Internal error: There's a private implementation {method.Name} but the declaration for the method could not be found");
+                    }
+                    else if (candidates.Length > 1)
+                    {
+                        throw new Exception($"Internal error: There are multiple candidates for {method.Name}");
+                    }
+
+                    methodBase = candidates.Single();
+                }
+                else
+                {
+                    methodBase = method;
+                }
+
+
+                //var implementableMethodCandidates = implementableMethods[()]
 
                 implementations.Add(method);
 
-                if (declarationsToImplementations.ContainsKey(baseMethod))
+                if (declarationsToImplementations.ContainsKey(methodBase))
                 {
                     throw new Exception($"We have multiple implementations for {method}, this is not supported yet");
                 }
 
-                declarationsToImplementations[baseMethod] = method;
+                declarationsToImplementations[methodBase] = method;
             }
         }
+    }
+
+    Boolean TryParsePrivateName(String methodName, out String containerName, out String baseMethodName)
+    {
+        var lastDotAt = methodName.LastIndexOf('.');
+
+        if (lastDotAt >= 0)
+        {
+            containerName = methodName[..lastDotAt];
+            baseMethodName = methodName[(lastDotAt + 1)..];
+
+            return true;
+        }
+        else
+        {
+            containerName = String.Empty;
+            baseMethodName = String.Empty;
+
+            return false;
+        }
+    }
+
+    void CollectPrivateImplementations()
+    {
+
     }
 }

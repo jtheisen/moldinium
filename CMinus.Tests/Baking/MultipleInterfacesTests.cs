@@ -17,11 +17,8 @@ public class MultipleInterfacesTests : BakingTestsBase
 
         public String LastName { get; set; }
 
-        public Int32 Age { get; set; }
-
         String IPerson.Name => $"{FirstName} {LastName}";
     }
-
 
     [TestMethod]
     public void AdditionalBaseInterfaceTest()

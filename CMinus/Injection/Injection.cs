@@ -315,7 +315,9 @@ public class FactoryDependencyProvider : IDependencyProvider
                 return runtimeScope.Root;
             }
 
-            return DelegateCreation.CreateDelegate(dep.Type, Create);
+            var dlg = DelegateCreation.CreateDelegate(dep.Type, Create);
+
+            return dlg;
         }
 
         return new DependencyResolution(this, dep, MakeSubscope: MakeSubscope, Get: Get);

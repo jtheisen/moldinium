@@ -47,8 +47,6 @@ public abstract class AbstractMethodGenerator : AbstractGenerator
         );
     }
 
-    protected virtual FieldBuilder? EnsureMixin(IBuildingContext state) => null;
-
     protected abstract (FieldBuilder, MethodImplementation) GetMethodImplementation(IBuildingContext state, MethodInfo method);
 }
 
@@ -71,8 +69,6 @@ public class GenericMethodGenerator : AbstractMethodGenerator
         yield return implementation.MixinType;
     }
 
-    protected override FieldBuilder? EnsureMixin(IBuildingContext state) => implementation.MixinType is not null ? state.EnsureMixin(implementation.MixinType, false) : null;
-
     protected override (FieldBuilder, MethodImplementation) GetMethodImplementation(IBuildingContext state, MethodInfo method)
     {
         var typeBuilder = state.TypeBuilder;
@@ -81,7 +77,7 @@ public class GenericMethodGenerator : AbstractMethodGenerator
 
         var fieldBuilder = typeBuilder.DefineField($"backing_{method.Name}", methodImplementationType, FieldAttributes.Private);
 
-        var methodImplementation = GetMethodImplementation(fieldBuilder, "", state.GetImplementationMethod(method));
+        var methodImplementation = GetMethodImplementation(fieldBuilder, "", state.GetOuterImplementationInfo(method).ImplementationMethod);
 
         return (fieldBuilder, methodImplementation);
     }

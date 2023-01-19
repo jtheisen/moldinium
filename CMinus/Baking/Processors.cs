@@ -7,14 +7,37 @@ using System.Reflection;
 
 namespace CMinus;
 
+public struct MethodImplementationInfo
+{
+    public Boolean Exists { get; }
+    public MethodInfo? ImplementationMethod { get; }
+
+    public Boolean IsImplememted => ImplementationMethod is not null;
+    public Boolean IsMissingOrImplemented => !Exists || ImplementationMethod is not null;
+
+    public MethodImplementationInfo(InterfaceMapping mapping, MethodInfo? method)
+    {
+        if (method is not null)
+        {
+            Exists = true;
+            ImplementationMethod = mapping.GetImplementationMethod(method);
+        }
+        else
+        {
+            Exists = false;
+            ImplementationMethod = null;
+        }
+    }
+}
+
 public interface IBuildingContext
 {
     TypeBuilder TypeBuilder { get; }
     ILGenerator ConstructorGenerator { get; }
     IDefaultProvider DefaultProvider { get; }
 
-    Boolean IsImplemented(MethodInfo method);
-    MethodInfo? GetImplementationMethod(MethodInfo? method);
+    MethodImplementationInfo GetOuterImplementationInfo(MethodInfo? method);
+
 
     FieldBuilder EnsureMixin(Type type, Boolean isPrivate);
 }
@@ -219,8 +242,8 @@ public class BuildingBakingProcessor : BakingProcessorWithComponentGenerators, I
 
     FieldBuilder IBuildingContext.EnsureMixin(Type type, bool isPrivate) => EnsureDelegatingMixin(type, isPrivate);
 
-    Boolean IBuildingContext.IsImplemented(MethodInfo method) => interfaceMapping.IsImplemented(method);
-    MethodInfo? IBuildingContext.GetImplementationMethod(MethodInfo? method) => interfaceMapping.GetImplementationMethod(method);
+    MethodImplementationInfo IBuildingContext.GetOuterImplementationInfo(MethodInfo? method)
+        => new MethodImplementationInfo(interfaceMapping, method);
 }
 
 public class AnalyzingBakingProcessor : BakingProcessorWithComponentGenerators

@@ -70,7 +70,7 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
         argumentKinds[valueType] = ImplementationTypeArgumentKind.Value;
 
-        var isImplemented = getMethod is not null ? state.IsImplemented(getMethod) : false;
+        var isImplemented = getMethod is not null ? state.GetOuterImplementationInfo(getMethod).IsImplememted : false;
 
         var propertyImplementation = GetPropertyImplementation(state, property, isImplemented);
 
@@ -170,14 +170,19 @@ public class GenericPropertyGenerator : AbstractPropertyGenerator
         wrapper?.AddArgumentKinds(argumentKinds);
     }
 
+
+
     protected override (FieldBuilder, PropertyImplementation)? GetPropertyImplementation(IBuildingContext state, PropertyInfo property, Boolean wrap)
     {
-        var getExistingGetImplementation = state.GetImplementationMethod(property.GetGetMethod());
-        var getExistingSetImplementation = state.GetImplementationMethod(property.GetSetMethod());
+        var outerGetImplementation = state.GetOuterImplementationInfo(property.GetGetMethod());
+        var outerSetImplementation = state.GetOuterImplementationInfo(property.GetSetMethod());
 
-        if (getExistingGetImplementation is not null != getExistingSetImplementation is not null)
+        if (outerGetImplementation.Exists && outerSetImplementation.Exists)
         {
-            throw new Exception($"The property {property.Name} on {property.DeclaringType} should implement either both getter and setter or neither");
+            if (outerGetImplementation.IsImplememted != outerSetImplementation.IsImplememted)
+            {
+                throw new Exception($"The property {property.Name} on {property.DeclaringType} should implement either both getter and setter or neither");
+            }
         }
 
         var typeBuilder = state.TypeBuilder;
@@ -186,7 +191,8 @@ public class GenericPropertyGenerator : AbstractPropertyGenerator
 
         if (implementation is null)
         {
-            if (wrap && getExistingGetImplementation is not null && getExistingSetImplementation is not null) return null;
+            // In this case, we can create the type without defining an implementation
+            if (wrap && outerGetImplementation.IsMissingOrImplemented && outerSetImplementation.IsMissingOrImplemented) return null;
 
             throw new Exception($"Property {property} needs to be {(wrap ? "wrapped" : "implemented")}, but there is no corresponding property implementation type");
         }
@@ -196,8 +202,8 @@ public class GenericPropertyGenerator : AbstractPropertyGenerator
         var fieldBuilder = typeBuilder.DefineField($"backing_{property.Name}", propertyImplementationType, FieldAttributes.Private);
 
         var propertyImplementation = new PropertyImplementation(
-            GetMethodImplementation(fieldBuilder, "Get", state.GetImplementationMethod(property.GetGetMethod())),
-            GetMethodImplementation(fieldBuilder, "Set", state.GetImplementationMethod(property.GetSetMethod()))
+            GetMethodImplementation(fieldBuilder, "Get", outerGetImplementation.ImplementationMethod),
+            GetMethodImplementation(fieldBuilder, "Set", outerSetImplementation.ImplementationMethod)
         );
 
         return (fieldBuilder, propertyImplementation);

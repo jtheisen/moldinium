@@ -45,21 +45,24 @@ namespace CMinus.Tests
 
     public interface NestedInterfaceType
     {
+        Int32 MagicNumber { get; init; }
+
         Config Config { get; init; }
 
         void Validate()
         {
             Assert.AreEqual("Moldinium", Config.Name);
+            Assert.AreEqual(42, MagicNumber);
         }
     }
 
     public interface InterfaceTypeWithParameterizedFactory
     {
-        Func<Config, NestedInterfaceType> Create { get; init; }
+        Func<Config, Int32, NestedInterfaceType> Create { get; init; }
 
         void Validate()
         {
-            var instance = Create(new Config("Moldinium"));
+            var instance = Create(new Config("Moldinium"), 42);
 
             instance.Validate();
         }

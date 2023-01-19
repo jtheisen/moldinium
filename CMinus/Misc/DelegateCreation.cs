@@ -27,7 +27,9 @@ public static class DelegateCreation
 
         foreach (var p in parameters)
         {
-            if (p.ParameterType.IsValueType) throw new ArgumentException($"The delegate parameter {p.Name} is a value type which is unsupported");
+            var type = p.ParameterType;
+
+            if (type.IsByRef || type.IsByRefLike) throw new ArgumentException($"The delegate parameter {p.Name} is passed by ref which is unsupported");
         }
 
         (bool hasTarget, DynamicMethod proxy) CreateMethod()
@@ -66,9 +68,15 @@ public static class DelegateCreation
         il.Emit(OpCodes.Newarr, typeof(object));
         for (int i = 0; i < parameterTypes.Length; i++)
         {
+            var type = parameterTypes[i];
+
             il.Emit(OpCodes.Dup);
             il.Emit(OpCodes.Ldc_I4, i);
             il.Emit(OpCodes.Ldarg, i + argOffset);
+            if (type.IsValueType)
+            {
+                il.Emit(OpCodes.Box, type);
+            }
             il.Emit(OpCodes.Stelem, typeof(object));
         }
         il.Emit(OpCodes.Call, implementation.Method);
