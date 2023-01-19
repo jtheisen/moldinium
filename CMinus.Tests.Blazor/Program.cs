@@ -11,7 +11,7 @@ services.AddRazorPages();
 services.AddServerSideBlazor();
 
 var configuration = new DefaultDependencyProviderConfiguration(
-    Baking: DefaultDependencyProviderBakingMode.Basic,
+    Baking: DefaultDependencyProviderBakingMode.Tracking,
     BakeAbstract: false,
     EnableOldModliniumModels: true
 );

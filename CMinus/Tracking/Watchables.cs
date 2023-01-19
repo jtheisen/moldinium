@@ -451,7 +451,8 @@ public interface IReaction<T> : IDisposable
 
 class Reaction<T> : IReaction<T>
 {
-    readonly Func<T> action;
+    readonly Action action;
+    private readonly Func<T> evaluation;
     readonly String name;
 
     Action invalidateAndNotify;
@@ -465,8 +466,15 @@ class Reaction<T> : IReaction<T>
     public T Value { get; private set; } = default!;
 
     public Reaction(Func<T> action, String? name = null)
+        : this(null, action, name)
     {
-        this.action = action;
+
+    }
+
+    public Reaction(Action? action, Func<T> evaluation, String? name = null)
+    {
+        this.action = action ?? EnsureRun;
+        this.evaluation = evaluation;
         this.name = name ?? "<unnamed>";
         this.invalidateAndNotify = InvalidateAndNotify;
 
@@ -480,7 +488,7 @@ class Reaction<T> : IReaction<T>
             if (!dirty) return;
 
             Value = Repository.Instance.EvaluateAndSubscribe(
-                this, ref subscriptions, action, invalidateAndNotify);
+                this, ref subscriptions, evaluation, invalidateAndNotify);
 
             exception = null;
         }
@@ -492,8 +500,8 @@ class Reaction<T> : IReaction<T>
 
     void InvalidateAndNotify()
     {
+        action();
         dirty = true;
-        EnsureRun();
     }
 
     public void Dispose()
@@ -505,11 +513,13 @@ class Reaction<T> : IReaction<T>
 
 class Reaction : Reaction<Object?>
 {
+    public Reaction(Action action, Action evaluation, String? name = null)
+        : base(action, () => { evaluation(); return null; }, name)
+    { }
+
     public Reaction(Action action, String? name = null)
         : base(() => { action(); return null; }, name)
-    {
-
-    }
+    { }
 }
 
 interface IWatchablesLogger
@@ -880,5 +890,21 @@ public static class Watchable
     /// <returns>A handle to the new reaction.</returns>
     public static IReaction<T> React<T>(Func<T> action)
         => new Reaction<T>(action);
+
+    /// <summary>
+    /// Creates a reaction.
+    /// </summary>
+    /// <param name="action">The action that will run on changes to dependencies.</param>
+    /// <returns>A handle to the new reaction.</returns>
+    public static IDisposable React(Action evaluation, Action reaction)
+        => new Reaction(reaction, evaluation);
+
+    /// <summary>
+    /// Creates a reaction.
+    /// </summary>
+    /// <param name="action">The action that will run on changes to dependencies.</param>
+    /// <returns>A handle to the new reaction.</returns>
+    public static IReaction<T> React<T>(Func<T> evaluation, Action reaction)
+        => new Reaction<T>(reaction, evaluation);
 
 }
