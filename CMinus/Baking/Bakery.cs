@@ -182,21 +182,86 @@ public class Bakery : AbstractlyBakery
         defaultProvider = this.configuration.DefaultProvider;
     }
 
-    protected Type Analyze(Type interfaceOrBaseType)
+    InterfaceMapping Analyze(Type interfaceOrBaseType)
     {
         var processor = new AnalyzingBakingProcessor(generators);
 
         processor.Visit(interfaceOrBaseType);
 
-        throw new NotImplementedException();
+        var interfaces = processor.Interfaces;
+
+        var mapping = new InterfaceMapping(interfaces);
+
+        return mapping;
     }
 
     protected override Type Create(String name, Type interfaceOrBaseType)
     {
         var baseType = interfaceOrBaseType.IsClass ? interfaceOrBaseType : null;
 
-        var processor = new BuildingBakingProcessor(name, baseType, typeAttributes, defaultProvider, generators, moduleBuilder);
+        var interfaceMapping = Analyze(interfaceOrBaseType);
+
+        var processor = new BuildingBakingProcessor(name, baseType, typeAttributes, interfaceMapping, defaultProvider, generators, moduleBuilder);
 
         return processor.Create(interfaceOrBaseType);
+    }
+}
+
+public class InterfaceMapping
+{
+    FieldInfo? methodBaseField;
+
+    MethodInfo? GetBaseMethod(MethodBody methodBody)
+    {
+        if (methodBaseField is null)
+        {
+            var runtimeMethodBodyType = methodBody.GetType();
+
+            methodBaseField = runtimeMethodBodyType.GetField("_methodBase", BindingFlags.NonPublic | BindingFlags.Instance);
+
+            if (methodBaseField is null)
+            {
+                throw new Exception($"{runtimeMethodBodyType} does not contain the private field _methodBase which is required at this point");
+            }
+        }
+
+        return (MethodInfo?)methodBaseField.GetValue(methodBody);
+    }
+
+    HashSet<MethodInfo> implementations;
+    Dictionary<MethodInfo, MethodInfo> declarationsToImplementations;
+
+    public Boolean IsImplemented(MethodInfo method) => declarationsToImplementations.ContainsKey(method);
+
+    public MethodInfo? GetImplementationMethod(MethodInfo? method)
+        => method is not null ? declarationsToImplementations.GetValueOrDefault(method) : null;
+
+    public InterfaceMapping(HashSet<Type> interfaces)
+    {
+        implementations = new HashSet<MethodInfo>();
+        declarationsToImplementations = new Dictionary<MethodInfo, MethodInfo>();
+
+        foreach (var ifc in interfaces)
+        {
+            foreach (var method in ifc.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public))
+            {
+                var body = method.GetMethodBody();
+
+                if (body is null) continue;
+
+                var baseMethod = GetBaseMethod(body);
+
+                if (baseMethod is null) continue;
+
+                implementations.Add(method);
+
+                if (declarationsToImplementations.ContainsKey(baseMethod))
+                {
+                    throw new Exception($"We have multiple implementations for {method}, this is not supported yet");
+                }
+
+                declarationsToImplementations[baseMethod] = method;
+            }
+        }
     }
 }

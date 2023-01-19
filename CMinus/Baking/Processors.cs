@@ -13,6 +13,9 @@ public interface IBuildingContext
     ILGenerator ConstructorGenerator { get; }
     IDefaultProvider DefaultProvider { get; }
 
+    Boolean IsImplemented(MethodInfo method);
+    MethodInfo? GetImplementationMethod(MethodInfo? method);
+
     FieldBuilder EnsureMixin(Type type, Boolean isPrivate);
 }
 
@@ -69,6 +72,7 @@ public abstract class BakingProcessorWithComponentGenerators
 
 public class BuildingBakingProcessor : BakingProcessorWithComponentGenerators, IBuildingContext
 {
+    private readonly InterfaceMapping interfaceMapping;
     private readonly IDefaultProvider defaultProvider;
     private readonly IBakeryComponentGenerators generators;
     private readonly TypeBuilder typeBuilder;
@@ -82,11 +86,12 @@ public class BuildingBakingProcessor : BakingProcessorWithComponentGenerators, I
     public ILGenerator ConstructorGenerator => constructorGenerator;
 
     public BuildingBakingProcessor(
-        String name, Type? baseType, TypeAttributes typeAttributes,
+        String name, Type? baseType, TypeAttributes typeAttributes, InterfaceMapping interfaceMapping,
         IDefaultProvider defaultProvider, IBakeryComponentGenerators generators, ModuleBuilder moduleBuilder
     )
         : base(generators)
     {
+        this.interfaceMapping = interfaceMapping;
         this.defaultProvider = defaultProvider;
         this.generators = generators;
 
@@ -123,6 +128,7 @@ public class BuildingBakingProcessor : BakingProcessorWithComponentGenerators, I
         }
     }
 
+    // TODO: should be done by the base method
     void ImplementBaseOrInterfaceCore(Type type, IBakeryComponentGenerators generators)
     {
         if (interfacesAndBases.Contains(type)) return;
@@ -189,7 +195,6 @@ public class BuildingBakingProcessor : BakingProcessorWithComponentGenerators, I
                 ? new ComponentGenerators(
                     new DelegatingMethodGenerator(fieldBuilder),
                     new DelegatingPropertyGenerator(fieldBuilder),
-                    new DelegatingPropertyGenerator(fieldBuilder),
                     new DelegatingEventGenerator(fieldBuilder)
                 )
                 : generators;
@@ -213,6 +218,9 @@ public class BuildingBakingProcessor : BakingProcessorWithComponentGenerators, I
         => generator?.GenerateProperty(this, property);
 
     FieldBuilder IBuildingContext.EnsureMixin(Type type, bool isPrivate) => EnsureDelegatingMixin(type, isPrivate);
+
+    Boolean IBuildingContext.IsImplemented(MethodInfo method) => interfaceMapping.IsImplemented(method);
+    MethodInfo? IBuildingContext.GetImplementationMethod(MethodInfo? method) => interfaceMapping.GetImplementationMethod(method);
 }
 
 public class AnalyzingBakingProcessor : BakingProcessorWithComponentGenerators
@@ -226,26 +234,24 @@ public class AnalyzingBakingProcessor : BakingProcessorWithComponentGenerators
     public readonly HashSet<Type> Mixins = new HashSet<Type>();
 
     protected override void VisitEvent(EventInfo evt, AbstractEventGenerator? generator)
-        => generator?.GetMixinType();
+        => AddMixin(generator?.GetMixinType());
 
     protected override void VisitMethod(MethodInfo method, AbstractMethodGenerator? generator)
-        => generator?.GetMixinType();
+        => AddMixin(generator?.GetMixinType());
 
     protected override void VisitProperty(PropertyInfo property, AbstractPropertyGenerator? generator)
-        => generator?.GetMixinType();
+        => AddMixin(generator?.GetMixinType());
 
-    protected override void VisitInterface(Type type)
-    {
-        Interfaces.Add(type);
-    }
+    protected override void VisitInterface(Type type) => Interfaces.Add(type);
 
     void AddMixin(Type? mixin)
     {
         if (mixin is not null)
         {
-            Mixins.Add(mixin);
-
-            Visit(mixin);
+            if (Mixins.Add(mixin))
+            {
+                Visit(mixin);
+            }
         }
     }
 }

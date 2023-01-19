@@ -4,12 +4,20 @@ using System.Reflection.Emit;
 using System.Reflection;
 using CMinus.Injection;
 using System.Collections.Generic;
+using System.Resources;
 
 namespace CMinus;
 
 public abstract class AbstractGenerator
 {
-    public virtual Type? GetMixinType() => null;
+    public virtual IEnumerable<Type?> GetMixinTypes() => Enumerable.Empty<Type?>();
+
+    public Type? GetMixinType()
+    {
+        return GetMixinTypes().OfType<Type>().Distinct().SingleOrDefault("Multiple mixins are not supported");
+    }
+
+    protected FieldBuilder? EnsureMixin(IBuildingContext state) => GetMixinType()?.Apply(t => state.EnsureMixin(t, false));
 
     protected MethodBuilder Create(
         TypeBuilder typeBuilder,
@@ -46,7 +54,7 @@ public abstract class AbstractGenerator
         return methodBuilder;
     }
 
-    protected MethodImplementation GetMethodImplementation(FieldBuilder fieldBuilder, String name)
+    protected MethodImplementation GetMethodImplementation(FieldBuilder fieldBuilder, String name, MethodInfo? wrappedMethod)
     {
         var type = fieldBuilder.FieldType;
 
@@ -75,7 +83,7 @@ public abstract class AbstractGenerator
             AssertReturnType(afterMethod, typeof(void));
             AssertReturnType(afterOnErrorMethod, typeof(Boolean));
 
-            return new WrappingMethodImplementation(beforeMethod, afterMethod, afterOnErrorMethod);
+            return new WrappingMethodImplementation(wrappedMethod, beforeMethod, afterMethod, afterOnErrorMethod);
         }
         else
         {
@@ -90,8 +98,16 @@ public abstract class AbstractGenerator
         if (method.ReturnType != type) throw new Exception($"Implementation {method.DeclaringType} must define the method {method} with a return type of {type}");
     }
 
-    protected virtual IDictionary<Type, ImplementationTypeArgumentKind> GetArgumentKinds()
-        => new Dictionary<Type, ImplementationTypeArgumentKind>();
+    protected virtual void AddArgumentKinds(Dictionary<Type, ImplementationTypeArgumentKind> argumentKinds) { }
+
+    protected Dictionary<Type, ImplementationTypeArgumentKind> GetArgumentKinds()
+    {
+        var argumentKinds = new Dictionary<Type, ImplementationTypeArgumentKind>();
+
+        AddArgumentKinds(argumentKinds);
+
+        return argumentKinds;
+    }
 
     protected MethodInfo GetMethod(FieldBuilder fieldBuilder, String name)
         => fieldBuilder.FieldType.GetMethod(name)

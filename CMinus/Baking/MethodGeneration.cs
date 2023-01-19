@@ -40,7 +40,7 @@ public abstract class AbstractMethodGenerator : AbstractGenerator
         var codeCreator = new CodeCreation(typeBuilder, argumentKinds, fieldBuilder, mixinFieldBuilder);
 
         codeCreator.CreateMethod(
-            method, method.GetBaseDefinition(),
+            method,
             backingMethod,
             returnType,
             toRemove: MethodAttributes.Abstract
@@ -61,8 +61,15 @@ public class GenericMethodGenerator : AbstractMethodGenerator
         this.implementation = implementation;
     }
 
-    protected override IDictionary<Type, ImplementationTypeArgumentKind> GetArgumentKinds()
-        => implementation.GetArgumentKinds();
+    protected override void AddArgumentKinds(Dictionary<Type, ImplementationTypeArgumentKind> argumentKinds)
+    {
+        implementation.AddArgumentKinds(argumentKinds);
+    }
+
+    public override IEnumerable<Type?> GetMixinTypes()
+    {
+        yield return implementation.MixinType;
+    }
 
     protected override FieldBuilder? EnsureMixin(IBuildingContext state) => implementation.MixinType is not null ? state.EnsureMixin(implementation.MixinType, false) : null;
 
@@ -74,7 +81,7 @@ public class GenericMethodGenerator : AbstractMethodGenerator
 
         var fieldBuilder = typeBuilder.DefineField($"backing_{method.Name}", methodImplementationType, FieldAttributes.Private);
 
-        var methodImplementation = GetMethodImplementation(fieldBuilder, "");
+        var methodImplementation = GetMethodImplementation(fieldBuilder, "", state.GetImplementationMethod(method));
 
         return (fieldBuilder, methodImplementation);
     }

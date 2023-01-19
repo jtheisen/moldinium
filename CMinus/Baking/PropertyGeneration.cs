@@ -70,7 +70,13 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
         argumentKinds[valueType] = ImplementationTypeArgumentKind.Value;
 
-        var (fieldBuilder, (getImplementation, setImplementation)) = GetPropertyImplementation(state, property);
+        var isImplemented = getMethod is not null ? state.IsImplemented(getMethod) : false;
+
+        var propertyImplementation = GetPropertyImplementation(state, property, isImplemented);
+
+        if (propertyImplementation is null) return;
+
+        var (fieldBuilder, (getImplementation, setImplementation)) = propertyImplementation.Value;
 
         var codeCreator = new CodeCreation(typeBuilder, argumentKinds, fieldBuilder, mixinFieldBuilder);
 
@@ -113,7 +119,7 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
         if (getMethod is not null)
         {
             var getMethodBuilder = codeCreator.CreateMethod(
-                getMethod, getMethod.GetBaseDefinition(),
+                getMethod,
                 getImplementation,
                 valueType,
                 toRemove: MethodAttributes.Abstract
@@ -125,7 +131,7 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
         if (setMethod is not null)
         {
             var setMethodBuilder = codeCreator.CreateMethod(
-                setMethod, setMethod.GetBaseDefinition(),
+                setMethod,
                 setImplementation,
                 valueType,
                 toRemove: MethodAttributes.Abstract
@@ -135,9 +141,7 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
         }
     }
 
-    protected virtual FieldBuilder? EnsureMixin(IBuildingContext state) => null;
-
-    protected abstract (FieldBuilder, PropertyImplementation) GetPropertyImplementation(IBuildingContext state, PropertyInfo property);
+    protected abstract (FieldBuilder, PropertyImplementation)? GetPropertyImplementation(IBuildingContext state, PropertyInfo property, Boolean wrap);
 
     protected MethodInfo GetPropertyMethod(PropertyInfo property, Boolean setter)
         => (setter ? property.GetSetMethod() : property.GetGetMethod())
@@ -146,31 +150,54 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
 public class GenericPropertyGenerator : AbstractPropertyGenerator
 {
-    private readonly CheckedImplementation implementation;
+    private readonly CheckedImplementation? implementation, wrapper;
 
-    public GenericPropertyGenerator(CheckedImplementation implementation)
+    public GenericPropertyGenerator(CheckedImplementation? implementation, CheckedImplementation? wrapper)
     {
         this.implementation = implementation;
+        this.wrapper = wrapper;
     }
 
-    public override Type? GetMixinType() => implementation.MixinType;
-
-    protected override IDictionary<Type, ImplementationTypeArgumentKind> GetArgumentKinds()
-        => implementation.GetArgumentKinds();
-
-    protected override FieldBuilder? EnsureMixin(IBuildingContext state) => implementation.MixinType is not null ? state.EnsureMixin(implementation.MixinType, false) : null;
-
-    protected override (FieldBuilder, PropertyImplementation) GetPropertyImplementation(IBuildingContext state, PropertyInfo property)
+    public override IEnumerable<Type?> GetMixinTypes()
     {
+        yield return implementation?.MixinType;
+        yield return wrapper?.MixinType;
+    }
+
+    protected override void AddArgumentKinds(Dictionary<Type, ImplementationTypeArgumentKind> argumentKinds)
+    {
+        implementation?.AddArgumentKinds(argumentKinds);
+        wrapper?.AddArgumentKinds(argumentKinds);
+    }
+
+    protected override (FieldBuilder, PropertyImplementation)? GetPropertyImplementation(IBuildingContext state, PropertyInfo property, Boolean wrap)
+    {
+        var getExistingGetImplementation = state.GetImplementationMethod(property.GetGetMethod());
+        var getExistingSetImplementation = state.GetImplementationMethod(property.GetSetMethod());
+
+        if (getExistingGetImplementation is not null != getExistingSetImplementation is not null)
+        {
+            throw new Exception($"The property {property.Name} on {property.DeclaringType} should implement either both getter and setter or neither");
+        }
+
         var typeBuilder = state.TypeBuilder;
+
+        var implementation = wrap ? wrapper : this.implementation;
+
+        if (implementation is null)
+        {
+            if (wrap && getExistingGetImplementation is not null && getExistingSetImplementation is not null) return null;
+
+            throw new Exception($"Property {property} needs to be {(wrap ? "wrapped" : "implemented")}, but there is no corresponding property implementation type");
+        }
 
         var propertyImplementationType = implementation.MakeImplementationType(valueType: property.PropertyType);
 
         var fieldBuilder = typeBuilder.DefineField($"backing_{property.Name}", propertyImplementationType, FieldAttributes.Private);
 
         var propertyImplementation = new PropertyImplementation(
-            GetMethodImplementation(fieldBuilder, "Get"),
-            GetMethodImplementation(fieldBuilder, "Set")
+            GetMethodImplementation(fieldBuilder, "Get", state.GetImplementationMethod(property.GetGetMethod())),
+            GetMethodImplementation(fieldBuilder, "Set", state.GetImplementationMethod(property.GetSetMethod()))
         );
 
         return (fieldBuilder, propertyImplementation);
@@ -183,8 +210,8 @@ public class UnimplementedPropertyGenerator : AbstractPropertyGenerator
 
     public override void GenerateProperty(IBuildingContext state, PropertyInfo property) => throw new NotImplementedException();
 
-    protected override (FieldBuilder, PropertyImplementation)
-        GetPropertyImplementation(IBuildingContext state, PropertyInfo property)
+    protected override (FieldBuilder, PropertyImplementation)?
+        GetPropertyImplementation(IBuildingContext state, PropertyInfo property, Boolean wrap)
         => throw new NotImplementedException();
 }
 
@@ -197,8 +224,8 @@ public class DelegatingPropertyGenerator : AbstractPropertyGenerator
         this.fieldBuilder = targetFieldBuilder;
     }
 
-    protected override (FieldBuilder, PropertyImplementation)
-        GetPropertyImplementation(IBuildingContext state, PropertyInfo property)
+    protected override (FieldBuilder, PropertyImplementation)?
+        GetPropertyImplementation(IBuildingContext state, PropertyInfo property, Boolean wrap)
     {
         var propertyOnImplementation = fieldBuilder.FieldType.GetProperty(property.Name);
 
@@ -210,14 +237,19 @@ public class DelegatingPropertyGenerator : AbstractPropertyGenerator
 
 public static class PropertyGenerator
 {
-    public static AbstractPropertyGenerator Create(Type propertyImplementationType)
+    public static AbstractPropertyGenerator Create(Type? propertyImplementationType, Type? propertyWrapperType)
     {
         var ignoredInterfaces = new[] {
             typeof(IPropertyImplementation),
             typeof(IPropertyWrapperImplementation),
         };
 
-        var instance = new GenericPropertyGenerator(new CheckedImplementation(propertyImplementationType, ignoredInterfaces));
+        var checkedImplementation
+            = propertyImplementationType?.Apply(t => new CheckedImplementation(t, ignoredInterfaces));
+        var checkedWrapper
+            = propertyWrapperType?.Apply(t => new CheckedImplementation(t, ignoredInterfaces));
+
+        var instance = new GenericPropertyGenerator(checkedImplementation, checkedWrapper);
 
         return instance;
     }

@@ -16,6 +16,7 @@ public record MethodImplementation
 public record DirectMethodImplementation(MethodInfo Method) : MethodImplementation { }
 
 public record WrappingMethodImplementation(
+    MethodInfo? WrappedMethod,
     MethodInfo? BeforeMethod = null,
     MethodInfo? AfterMethod = null,
     MethodInfo? AfterOnErrorMethod = null
@@ -79,7 +80,6 @@ public class CodeCreation
 
     public MethodBuilder CreateMethod(
         MethodInfo methodTemplate,
-        MethodInfo wrappedMethod,
         MethodImplementation implementation,
         Type valueOrReturnType,
         MethodAttributes toAdd = default,
@@ -88,7 +88,7 @@ public class CodeCreation
     {
         var methodBuilder = Declare(typeBuilder, methodTemplate, toAdd, toRemove);
         var generator = methodBuilder.GetILGenerator();
-        GenerateMethodImplementationCode(generator, methodBuilder, implementation, valueOrReturnType, wrappedMethod);
+        GenerateMethodImplementationCode(generator, methodBuilder, implementation, valueOrReturnType);
         return methodBuilder;
     }
 
@@ -96,8 +96,7 @@ public class CodeCreation
         ILGenerator generator,
         MethodBuilder methodBuilder,
         MethodImplementation implementation,
-        Type valueOrReturnType,
-        MethodInfo? wrappedMethod = null
+        Type valueOrReturnType
     )
     {
         if (implementation is DirectMethodImplementation directMethodImplementation)
@@ -120,7 +119,7 @@ public class CodeCreation
                 wrappingMethodImplementation.BeforeMethod,
                 wrappingMethodImplementation.AfterMethod,
                 wrappingMethodImplementation.AfterOnErrorMethod,
-                wrappedMethod
+                wrappingMethodImplementation.WrappedMethod ?? throw new Exception($"Internal error: asked to wrap method {methodBuilder.Name} but have no method to wrap")
             );
         }
         else

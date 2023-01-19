@@ -19,21 +19,35 @@ public class CheckedImplementation
 
     Dictionary<Type, ImplementationTypeArgumentKind> typeArgumentsToKindMapping;
 
+    public Boolean IsWrapper { get; }
+
     public IReadOnlyDictionary<Type, ImplementationTypeArgumentKind> TypeArgumentsToKindMapping
         => typeArgumentsToKindMapping;
 
-    public IDictionary<Type, ImplementationTypeArgumentKind> GetArgumentKinds()
-        => typeArgumentsInfos.ToDictionary(i => i.argumentType, i => i.parameterKind);
+    public void AddArgumentKinds(Dictionary<Type, ImplementationTypeArgumentKind> d)
+    {
+        foreach (var i in typeArgumentsInfos)
+        {
+            d[i.argumentType] = i.parameterKind;
+        }
+    }
 
     public Type Type { get; }
 
     public Type? MixinType { get; }
 
-    static Type[] implementationBaseInterfaces = new[] {
+    static Type[] implementationBaseInterfaces = new[]
+    {
         typeof(IMethodWrapperImplementation),
         typeof(IPropertyImplementation),
         typeof(IPropertyWrapperImplementation),
         typeof(IEventImplementation)
+    };
+
+    static Type[] wrapperImplementationBaseInterfaces = new[]
+    {
+        typeof(IMethodWrapperImplementation),
+        typeof(IPropertyWrapperImplementation)
     };
 
     public static void PreCheck(Type implementationType)
@@ -73,6 +87,8 @@ public class CheckedImplementation
             .Where(i => !interfacesToIgnore.Contains(i))
             .Single($"Expected implementation type {implementationType} to implement only a single interface besides {String.Join(", ", additionalInterfaceTypesToIgnore.Cast<Type>())}")
             ;
+
+        IsWrapper = wrapperImplementationBaseInterfaces.Contains(implementationType);
 
         var implementationInterfaceTypeDefinition = implementationInterfaceType.IsGenericType
             ? implementationInterfaceType.GetGenericTypeDefinition()

@@ -22,19 +22,16 @@ public interface IBakeryComponentGenerators
 public class ComponentGenerators : IBakeryComponentGenerators
 {
     private readonly AbstractMethodGenerator? methodWrapperGenerator;
-    private readonly AbstractPropertyGenerator propertyImplementationGenerator;
-    private readonly AbstractPropertyGenerator? propertyWrapperGenerator;
+    private readonly AbstractPropertyGenerator propertyGenerator;
     private readonly AbstractEventGenerator eventGenerator;
 
     public ComponentGenerators(
         AbstractMethodGenerator? methodWrapperGenerator,
         AbstractPropertyGenerator propertyImplementationGenerator,
-        AbstractPropertyGenerator? propertyWrapperGenerator,
         AbstractEventGenerator eventGenerator)
     {
         this.methodWrapperGenerator = methodWrapperGenerator;
-        this.propertyImplementationGenerator = propertyImplementationGenerator;
-        this.propertyWrapperGenerator = propertyWrapperGenerator;
+        this.propertyGenerator = propertyImplementationGenerator;
         this.eventGenerator = eventGenerator;
     }
 
@@ -42,68 +39,22 @@ public class ComponentGenerators : IBakeryComponentGenerators
 
     public AbstractPropertyGenerator? GetPropertyGenerator(PropertyInfo property)
     {
-        var getter = CheckMethod(property.GetGetMethod());
-        var setter = CheckMethod(property.GetSetMethod());
-
-        if (!getter.exists)
-        {
-            if (!setter.exists)
-            {
-                throw new Exception($"The property {property.Name} on {property.DeclaringType} has neither a setter nor a getter");
-            }
-            else
-            {
-                throw new Exception($"The property {property.Name} on {property.DeclaringType} has a setter but no getter");
-            }
-        }
-
-        if (setter.exists)
-        {
-            if (getter.implemented != setter.implemented)
-            {
-                throw new Exception($"The property {property.Name} on {property.DeclaringType} should implement either both getter and setter or neither");
-            }
-        }
-
-        if (getter.implemented)
-        {
-            if (propertyWrapperGenerator is not null)
-            {
-                return propertyWrapperGenerator;
-            }
-            else
-            {
-                return null;
-            }
-        }
-        else
-        {
-            return propertyImplementationGenerator;
-        }
+        return propertyGenerator;
     }
 
     public AbstractMethodGenerator? GetMethodGenerator(MethodInfo method)
     {
-        var check = CheckMethod(method);
-
-        if (!check.implemented) throw new Exception($"Method {method} on {method.DeclaringType} must have a default implementation to wrap");
+        //if (!implemented) throw new Exception($"Method {method} on {method.DeclaringType} must have a default implementation to wrap");
 
         return methodWrapperGenerator;
     }
-
-    (Boolean exists, Boolean implemented) CheckMethod(MethodInfo? method)
-    {
-        return (exists: method is not null, implemented: !method?.IsAbstract ?? false);
-    }
-
 
     public AbstractEventGenerator GetEventGenerator(EventInfo evt) => eventGenerator;
 
     static ComponentGenerators CreateInternal(Type? methodWrapperType = null, Type? propertyImplementationType = null, Type? propertyWrapperType = null, Type? eventImplementationType = null)
         => new ComponentGenerators(
             methodWrapperType is not null ? MethodGenerator.Create(methodWrapperType) : null,
-            PropertyGenerator.Create(propertyImplementationType ?? typeof(SimplePropertyImplementation<>)),
-            propertyWrapperType is not null ? PropertyGenerator.Create(propertyWrapperType) : null,
+            PropertyGenerator.Create(propertyImplementationType ?? typeof(SimplePropertyImplementation<>), propertyWrapperType),
             EventGenerator.Create(eventImplementationType ?? typeof(GenericEventImplementation<>))
         );
 

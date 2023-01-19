@@ -254,33 +254,33 @@ public class WrappingTests : BakingTestsBase
             out var cacheControl, typeof(CachingWrappingPropertyImplementation<,>)
         );
 
-        Assert.AreEqual(cacheControl.IsValid, false);
+        Assert.AreEqual(false, cacheControl.IsValid);
 
-        Assert.AreEqual(instance.Value, 0);
+        Assert.AreEqual(0, instance.Value);
 
-        Assert.AreEqual(cacheControl.IsValid, true);
+        Assert.AreEqual(true, cacheControl.IsValid);
 
-        Assert.AreEqual(instance.Value, 0);
+        Assert.AreEqual(0, instance.Value);
 
         cacheControl.IsValid = false;
 
-        Assert.AreEqual(instance.Value, 1);
+        Assert.AreEqual(1, instance.Value);
 
         instance.Value = 42;
 
-        Assert.AreEqual(instance.Value, 42);
+        Assert.AreEqual(42, instance.Value);
 
-        Assert.AreEqual(instance.Value, 42);
+        Assert.AreEqual(42, instance.Value);
 
         cacheControl.IsValid = false;
 
-        Assert.AreEqual(instance.Value, 43);
+        Assert.AreEqual(43, instance.Value);
 
         cacheControl.LockSetter = true;
 
         instance.Value = 0;
 
-        Assert.AreEqual(instance.Value, 43);
+        Assert.AreEqual(43, instance.Value);
     }
 
     [TestMethod]
