@@ -8,19 +8,29 @@ public class MultipleInterfacesTests : BakingTestsBase
 {
     public interface IPerson
     {
-        public String Name { get; set; }
+        public String Name { get; }
     }
 
     public interface INaturalPerson : IPerson
     {
+        public String FirstName { get; set; }
+
+        public String LastName { get; set; }
+
         public Int32 Age { get; set; }
+
+        String IPerson.Name => $"{FirstName} {LastName}";
     }
+
 
     [TestMethod]
     public void AdditionalBaseInterfaceTest()
     {
         var person = CreateTestModel<INaturalPerson>();
 
-        person.Name = "Gilgamesh";
+        person.FirstName = "Peer";
+        person.LastName = "Nullman";
+
+        Assert.AreEqual("Peer Nullman", person.Name);
     }
 }
