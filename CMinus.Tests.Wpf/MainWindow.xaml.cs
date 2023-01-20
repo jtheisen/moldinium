@@ -15,7 +15,11 @@ namespace CMinus.Tests.Wpf
 
             var app = (App)Application.Current;
 
-            JobList.DataContext = app.JobListApp.CreateDefaultJobList();
+            var jobList = app.JobListApp.CreateDefaultJobList();
+
+            jobList.AddSimpleJobCommand.Execute(null);
+
+            JobList.DataContext = jobList;
         }
     }
 }

@@ -7,12 +7,16 @@
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
     <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition/>
+        </Grid.RowDefinitions>
         <StackPanel Orientation="Horizontal" VerticalAlignment="Top">
             <Button Margin="4" Padding="4" Command="{Binding AddSimpleJobCommand}" Content="Add simple job" />
             <Button Margin="4" Padding="4" Command="{Binding AddComplexJobCommand}" Content="Add complex job" />
             <Button Margin="4" Padding="4" Command="{Binding CancelCommand}" Content="Add complex job" />
         </StackPanel>
-        <ItemsControl ItemsSource="{Binding Items}">
+        <ItemsControl ItemsSource="{Binding Items}" Grid.Row="1">
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
                     <local:Job DataContext="{Binding}" />

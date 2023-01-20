@@ -167,7 +167,7 @@ public interface ITrackedNotifyingComputedPropertyImplementation<
     [TypeKind(ImplementationTypeArgumentKind.Exception)] Exception,
     [TypeKind(ImplementationTypeArgumentKind.Mixin)] Mixin
 > : IPropertyWrapperImplementation
-    where Container : class, INotifyingPropertyMixin
+    where Container : class
     where Exception : System.Exception
 {
     void Init();
@@ -183,7 +183,7 @@ public interface ITrackedNotifyingComputedPropertyImplementation<
 
 public struct TrackedNotifyingComputedPropertyImplementation<Value, Container, Exception>
     : ITrackedNotifyingComputedPropertyImplementation<Value, Container, Exception, TrackedNotifyingPropertyMixin>
-    where Container : class, INotifyingPropertyMixin
+    where Container : class
     where Exception : System.Exception
 {
     CachedBeforeAndAfterComputedWatchable<Value> watchable;
@@ -193,12 +193,12 @@ public struct TrackedNotifyingComputedPropertyImplementation<Value, Container, E
     public bool BeforeGet(ref Value value, ref TrackedNotifyingPropertyMixin mixin) => watchable.BeforeGet(ref value);
 
     public void AfterGet(ref Value value, Container container, ref TrackedNotifyingPropertyMixin mixin)
-        => watchable.AfterGet(ref value, () => container.NotifyPropertyChanged(container));
+        => watchable.AfterGet(ref value, () => (container as INotifyingPropertyMixin)!.NotifyPropertyChanged(container));
 
     public void AfterSet(ref TrackedNotifyingPropertyMixin mixin) => watchable.AfterSet();
 
     public bool AfterErrorGet(Exception exception, Container container, ref TrackedNotifyingPropertyMixin mixin)
-        => watchable.AfterErrorGet(exception, () => container.NotifyPropertyChanged(container));
+        => watchable.AfterErrorGet(exception, () => (container as INotifyingPropertyMixin)!.NotifyPropertyChanged(container));
 
     public bool AfterErrorSet(ref TrackedNotifyingPropertyMixin mixin)
     {
