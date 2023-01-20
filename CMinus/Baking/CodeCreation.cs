@@ -16,7 +16,7 @@ public record MethodImplementation
 public record DirectMethodImplementation(MethodInfo Method) : MethodImplementation { }
 
 public record WrappingMethodImplementation(
-    MethodInfo? WrappedMethod,
+    MethodImplementationInfo? WrappedMethod,
     MethodInfo? BeforeMethod = null,
     MethodInfo? AfterMethod = null,
     MethodInfo? AfterOnErrorMethod = null
@@ -112,6 +112,10 @@ public class CodeCreation
         }
         else if (implementation is WrappingMethodImplementation wrappingMethodImplementation)
         {
+            var outerMethod = wrappingMethodImplementation.WrappedMethod;
+
+            if (outerMethod is null || !outerMethod.Value.IsImplememted) throw new Exception($"Internal error: asked to wrap method {methodBuilder.Name} but have no method to wrap");
+
             GenerateWrappingImplementationCode(
                 generator,
                 methodBuilder,
@@ -119,7 +123,7 @@ public class CodeCreation
                 wrappingMethodImplementation.BeforeMethod,
                 wrappingMethodImplementation.AfterMethod,
                 wrappingMethodImplementation.AfterOnErrorMethod,
-                wrappingMethodImplementation.WrappedMethod ?? throw new Exception($"Internal error: asked to wrap method {methodBuilder.Name} but have no method to wrap")
+                outerMethod.Value
             );
         }
         else
@@ -135,7 +139,7 @@ public class CodeCreation
         MethodInfo? backingTryMethod,
         MethodInfo? backingAfterMethod,
         MethodInfo? backingAfterErrorMethod,
-        MethodInfo? wrappedMethod
+        MethodImplementationInfo wrappedMethod
         )
     {
         if (valueOrReturnType.IsValueType)
@@ -170,7 +174,6 @@ public class CodeCreation
             il.Emit(OpCodes.Brfalse_S, exitLabel);
         }
 
-        if (wrappedMethod is not null)
         {
             var tryBlockLabel = il.BeginExceptionBlock();
 
@@ -234,14 +237,21 @@ public class CodeCreation
 
     Boolean GenerateNestedCallCode(
         ILGenerator generator,
-        MethodInfo nestedMethod
+        MethodImplementationInfo nestedMethodInfo
         )
     {
+        var nestedMethod = nestedMethodInfo.ImplementationMethod!;
+
         var isStatic = nestedMethod.IsStatic;
 
         if (!isStatic)
         {
             generator.Emit(OpCodes.Ldarg_0);
+
+            if (nestedMethodInfo.MixinFieldBuilder is FieldBuilder mixinFieldBuilder)
+            {
+                generator.Emit(OpCodes.Ldflda, mixinFieldBuilder);
+            }
         }
 
         var parameters = nestedMethod.GetParameters();

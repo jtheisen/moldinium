@@ -54,7 +54,7 @@ public abstract class AbstractGenerator
         return methodBuilder;
     }
 
-    protected MethodImplementation GetMethodImplementation(FieldBuilder fieldBuilder, String name, MethodInfo? wrappedMethod)
+    protected MethodImplementation GetMethodImplementation(FieldBuilder fieldBuilder, String name, MethodImplementationInfo? wrappedMethod)
     {
         var type = fieldBuilder.FieldType;
 

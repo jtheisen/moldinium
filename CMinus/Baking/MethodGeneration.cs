@@ -77,27 +77,9 @@ public class GenericMethodGenerator : AbstractMethodGenerator
 
         var fieldBuilder = typeBuilder.DefineField($"backing_{method.Name}", methodImplementationType, FieldAttributes.Private);
 
-        var methodImplementation = GetMethodImplementation(fieldBuilder, "", state.GetOuterImplementationInfo(method).ImplementationMethod);
+        var methodImplementation = GetMethodImplementation(fieldBuilder, "", state.GetOuterImplementationInfo(method));
 
         return (fieldBuilder, methodImplementation);
-    }
-}
-
-public class DelegatingMethodGenerator : AbstractMethodGenerator
-{
-    private readonly FieldBuilder fieldBuilder;
-
-    public DelegatingMethodGenerator(FieldBuilder targetFieldBuilder)
-    {
-        this.fieldBuilder = targetFieldBuilder;
-    }
-
-    protected override (FieldBuilder, MethodImplementation)
-        GetMethodImplementation(IBuildingContext state, MethodInfo method)
-    {
-        var implementationMethod = GetMethod(fieldBuilder, method.Name);
-
-        return (fieldBuilder, implementationMethod);
     }
 }
 

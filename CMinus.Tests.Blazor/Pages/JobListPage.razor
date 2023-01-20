@@ -8,9 +8,9 @@
 
 <MiniInfo Name="@nameof(JobListPage)" DateTime="@DateTime.Now" />
 
-<button class="btn btn-primary" @onclick="jobList.AddSimpleJob">Add simple job</button>
-<button class="btn btn-primary" @onclick="jobList.AddComplexJob">Add complex job</button>
-<button class="btn btn-warning" @onclick="jobList.Cancel">Cancel job</button>
+<button class="btn btn-primary" @onclick="jobList.AddSimpleJobCommand.Execute">Add simple job</button>
+<button class="btn btn-primary" @onclick="jobList.AddComplexJobCommand.Execute">Add complex job</button>
+<button class="btn btn-warning" @onclick="jobList.CancelCommand.Execute">Cancel job</button>
 
 <div class="mt-4">
     @foreach (var job in jobList.Items)

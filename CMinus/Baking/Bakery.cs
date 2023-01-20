@@ -182,7 +182,7 @@ public class Bakery : AbstractlyBakery
         defaultProvider = this.configuration.DefaultProvider;
     }
 
-    InterfaceMapping Analyze(Type interfaceOrBaseType)
+    (ImplementationMapping mapping, Type[] publicMixins) Analyze(Type interfaceOrBaseType)
     {
         var processor = new AnalyzingBakingProcessor(generators);
 
@@ -190,37 +190,42 @@ public class Bakery : AbstractlyBakery
 
         var interfaces = processor.Interfaces;
 
-        var mapping = new InterfaceMapping(interfaces);
+        var mapping = new ImplementationMapping(interfaces);
 
-        return mapping;
+        return (mapping, processor.PublicMixins.ToArray());
     }
 
     protected override Type Create(String name, Type interfaceOrBaseType)
     {
         var baseType = interfaceOrBaseType.IsClass ? interfaceOrBaseType : null;
 
-        var interfaceMapping = Analyze(interfaceOrBaseType);
+        var (interfaceMapping, publicMixins) = Analyze(interfaceOrBaseType);
 
         var processor = new BuildingBakingProcessor(name, baseType, typeAttributes, interfaceMapping, defaultProvider, generators, moduleBuilder);
 
-        return processor.Create(interfaceOrBaseType);
+        return processor.Create(interfaceMapping.Interfaces, publicMixins);
     }
 }
 
-public class InterfaceMapping
+public class ImplementationMapping
 {
+    Type[] interfaces;
     HashSet<MethodInfo> implementations;
     Dictionary<MethodInfo, MethodInfo> declarationsToImplementations;
+
+    public Type[] Interfaces => interfaces;
 
     public Boolean IsImplemented(MethodInfo method) => declarationsToImplementations.ContainsKey(method);
 
     public MethodInfo? GetImplementationMethod(MethodInfo? method)
         => method is not null ? declarationsToImplementations.GetValueOrDefault(method) : null;
 
-    public InterfaceMapping(HashSet<Type> interfaces)
+    public ImplementationMapping(HashSet<Type> types)
     {
         implementations = new HashSet<MethodInfo>();
         declarationsToImplementations = new Dictionary<MethodInfo, MethodInfo>();
+
+        interfaces = types.Where(t => t.IsInterface).ToArray();
 
         var implementableMethods = (
             from ifc in interfaces
@@ -229,7 +234,7 @@ public class InterfaceMapping
             select (ifc, method)
         ).ToLookup(e => (e.ifc.FullName?.Replace('+', '.'), e.method.Name), e => e.method);
 
-        foreach (var ifc in interfaces)
+        foreach (var ifc in types)
         {
             foreach (var method in ifc.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public))
             {
@@ -260,7 +265,6 @@ public class InterfaceMapping
                 {
                     methodBase = method;
                 }
-
 
                 //var implementableMethodCandidates = implementableMethods[()]
 

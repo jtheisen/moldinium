@@ -202,8 +202,8 @@ public class GenericPropertyGenerator : AbstractPropertyGenerator
         var fieldBuilder = typeBuilder.DefineField($"backing_{property.Name}", propertyImplementationType, FieldAttributes.Private);
 
         var propertyImplementation = new PropertyImplementation(
-            GetMethodImplementation(fieldBuilder, "Get", outerGetImplementation.ImplementationMethod),
-            GetMethodImplementation(fieldBuilder, "Set", outerSetImplementation.ImplementationMethod)
+            GetMethodImplementation(fieldBuilder, "Get", outerGetImplementation),
+            GetMethodImplementation(fieldBuilder, "Set", outerSetImplementation)
         );
 
         return (fieldBuilder, propertyImplementation);
@@ -219,26 +219,6 @@ public class UnimplementedPropertyGenerator : AbstractPropertyGenerator
     protected override (FieldBuilder, PropertyImplementation)?
         GetPropertyImplementation(IBuildingContext state, PropertyInfo property, Boolean wrap)
         => throw new NotImplementedException();
-}
-
-public class DelegatingPropertyGenerator : AbstractPropertyGenerator
-{
-    private readonly FieldBuilder fieldBuilder;
-
-    public DelegatingPropertyGenerator(FieldBuilder targetFieldBuilder)
-    {
-        this.fieldBuilder = targetFieldBuilder;
-    }
-
-    protected override (FieldBuilder, PropertyImplementation)?
-        GetPropertyImplementation(IBuildingContext state, PropertyInfo property, Boolean wrap)
-    {
-        var propertyOnImplementation = fieldBuilder.FieldType.GetProperty(property.Name);
-
-        if (propertyOnImplementation is null) throw new Exception($"Implementing type {fieldBuilder.FieldType} unexpectedly has no property named {property.Name}");
-
-        return (fieldBuilder, new PropertyImplementation(GetPropertyMethod(propertyOnImplementation, false), GetPropertyMethod(propertyOnImplementation, true)));
-    }
 }
 
 public static class PropertyGenerator
