@@ -22,6 +22,10 @@ public interface IStandardPropertyImplementation<
 
 public struct EmptyMixIn { }
 
+public interface ITrivialPropertyWrapper : IPropertyWrapperImplementation { }
+
+public class TrivialPropertyWrapper : ITrivialPropertyWrapper, IEmptyImplementation { }
+
 public interface ISimplePropertyImplementation<
     [TypeKind(ImplementationTypeArgumentKind.Value)] ValueT
 > : IPropertyImplementation
@@ -47,10 +51,6 @@ public struct SimplePropertyImplementation<T> : ISimplePropertyImplementation<T>
     public void Set(T value) => this.value = value;
 }
 
-public interface ITrivialPropertyWrapper : IPropertyWrapperImplementation { }
-
-public struct TrivialPropertyWrapper : ITrivialPropertyWrapper { }
-
 public abstract class AbstractPropertyGenerator : AbstractGenerator
 {
     public virtual void GenerateProperty(IBuildingContext state, PropertyInfo property)
@@ -70,9 +70,9 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
         argumentKinds[valueType] = ImplementationTypeArgumentKind.Value;
 
-        var isImplemented = getMethod is not null ? state.GetOuterImplementationInfo(getMethod).IsImplememted : false;
+        var isImplementedByInterface = getMethod is not null ? state.GetOuterImplementationInfo(getMethod).IsImplememtedByInterface : false;
 
-        var propertyImplementation = GetPropertyImplementation(state, property, isImplemented);
+        var propertyImplementation = GetPropertyImplementation(state, property, isImplementedByInterface);
 
         if (propertyImplementation is null) return;
 
@@ -87,7 +87,7 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
             {
                 var info = TypeProperties.Get(property.DeclaringType ?? throw new Exception("Unexpectedly not having a declaring type"));
 
-                var requiresDefault = !isImplemented && info.Properties.Single(p => p.info == property).requiresDefault;
+                var requiresDefault = !isImplementedByInterface && info.Properties.Single(p => p.info == property).requiresDefault;
 
                 var takesDefaultValue = backingInitMethod.GetParameters().Select(p => p.ParameterType).Any(t => t == valueType);
 
@@ -192,7 +192,7 @@ public class GenericPropertyGenerator : AbstractPropertyGenerator
         if (implementation is null)
         {
             // In this case, we can create the type without defining an implementation
-            if (wrap && outerGetImplementation.IsMissingOrImplemented && outerSetImplementation.IsMissingOrImplemented) return null;
+            if (wrap && outerGetImplementation.IsMissingOrImplementedByInterface && outerSetImplementation.IsMissingOrImplementedByInterface) return null;
 
             throw new Exception($"Property {property} needs to be {(wrap ? "wrapped" : "implemented")}, but there is no corresponding property implementation type");
         }

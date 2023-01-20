@@ -53,8 +53,8 @@ public class ComponentGenerators : IBakeryComponentGenerators
 
     static ComponentGenerators CreateInternal(Type? methodWrapperType = null, Type? propertyImplementationType = null, Type? propertyWrapperType = null, Type? eventImplementationType = null)
         => new ComponentGenerators(
-            methodWrapperType is not null ? MethodGenerator.Create(methodWrapperType) : null,
-            PropertyGenerator.Create(propertyImplementationType ?? typeof(SimplePropertyImplementation<>), propertyWrapperType),
+            MethodGenerator.Create(methodWrapperType ?? typeof(TrivialMethodWrapper)),
+            PropertyGenerator.Create(propertyImplementationType ?? typeof(SimplePropertyImplementation<>), propertyWrapperType ?? typeof(TrivialPropertyWrapper)),
             EventGenerator.Create(eventImplementationType ?? typeof(GenericEventImplementation<>))
         );
 

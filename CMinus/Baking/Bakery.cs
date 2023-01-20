@@ -1,7 +1,9 @@
 ﻿using CMinus.Injection;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -16,7 +18,9 @@ public abstract class AbstractBakery
     {
         var type = Resolve(typeof(T));
 
-        if (Activator.CreateInstance(type) is T t)
+        var instance = Activator.CreateInstance(type);
+
+        if (instance is T t)
         {
             return t;
         }
@@ -188,11 +192,12 @@ public class Bakery : AbstractlyBakery
 
         processor.Visit(interfaceOrBaseType);
 
-        var interfaces = processor.Interfaces;
+        var interfaceTypes = processor.Interfaces;
+        var mixinTypes = processor.PublicMixins;
 
-        var mapping = new ImplementationMapping(interfaces);
+        var mapping = new ImplementationMapping(interfaceTypes.Concat(mixinTypes).ToHashSet());
 
-        return (mapping, processor.PublicMixins.ToArray());
+        return (mapping, mixinTypes.ToArray());
     }
 
     protected override Type Create(String name, Type interfaceOrBaseType)
@@ -220,6 +225,28 @@ public class ImplementationMapping
     public MethodInfo? GetImplementationMethod(MethodInfo? method)
         => method is not null ? declarationsToImplementations.GetValueOrDefault(method) : null;
 
+    public String ImplementationReport
+    {
+        get
+        {
+            var writer = new StringWriter();
+
+            foreach (var p in declarationsToImplementations)
+            {
+                var implementationName = p.Value.Name;
+
+                if (!implementationName.Contains('.'))
+                {
+                    implementationName = $"{p.Value.DeclaringType?.Name}.{implementationName}";
+                }
+
+                writer.WriteLine($"{p.Key.DeclaringType?.Name}.{p.Key.Name} -> {implementationName}");
+            }
+
+            return writer.ToString();
+        }
+    }
+
     public ImplementationMapping(HashSet<Type> types)
     {
         implementations = new HashSet<MethodInfo>();
@@ -227,16 +254,18 @@ public class ImplementationMapping
 
         interfaces = types.Where(t => t.IsInterface).ToArray();
 
-        var implementableMethods = (
+        var bindingFlags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly;
+
+        var implementableMethodsByName = (
             from ifc in interfaces
-            from method in ifc.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
+            from method in ifc.GetMethods(bindingFlags)
             where !method.Name.Contains('.')
             select (ifc, method)
         ).ToLookup(e => (e.ifc.FullName?.Replace('+', '.'), e.method.Name), e => e.method);
 
         foreach (var ifc in types)
         {
-            foreach (var method in ifc.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public))
+            foreach (var method in ifc.GetMethods(bindingFlags))
             {
                 var body = method.GetMethodBody();
 
@@ -246,7 +275,7 @@ public class ImplementationMapping
 
                 if (TryParsePrivateName(method.Name, out var containerName, out var methodName))
                 {
-                    var candidates = implementableMethods[(containerName, methodName)].ToArray();
+                    var candidates = implementableMethodsByName[(containerName, methodName)].ToArray();
 
                     // TODO: check signatures
 
@@ -275,7 +304,10 @@ public class ImplementationMapping
                     throw new Exception($"We have multiple implementations for {method}, this is not supported yet");
                 }
 
-                declarationsToImplementations[methodBase] = method;
+                if (methodBase.DeclaringType!.IsInterface)
+                {
+                    declarationsToImplementations[methodBase] = method;
+                }
             }
         }
     }
@@ -298,10 +330,5 @@ public class ImplementationMapping
 
             return false;
         }
-    }
-
-    void CollectPrivateImplementations()
-    {
-
     }
 }

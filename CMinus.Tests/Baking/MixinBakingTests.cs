@@ -45,6 +45,8 @@ public class MixinBakingTests : BakingTestsBase
     {
         public int ListenerCount { get; set; }
 
+        Int32 INotifyPropertChangedMixin.ListenerCount { get => ListenerCount; set => ListenerCount = value; }
+
         event PropertyChangedEventHandler? backingPropertyChanged;
 
         public event PropertyChangedEventHandler? PropertyChanged
@@ -64,6 +66,8 @@ public class MixinBakingTests : BakingTestsBase
         }
 
         public void NotifyPropertyChanged(object o) => backingPropertyChanged?.Invoke(o, new PropertyChangedEventArgs(""));
+
+        void INotifyPropertChangedMixin.NotifyPropertyChanged(object o) => NotifyPropertyChanged(o);
     }
 
     public struct NotifyPropertyChangedPropertyImplementation<Value, Container>

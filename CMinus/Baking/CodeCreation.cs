@@ -136,7 +136,7 @@ public class CodeCreation
         ILGenerator il,
         MethodBuilder methodBuilder,
         Type valueOrReturnType,
-        MethodInfo? backingTryMethod,
+        MethodInfo? backingBeforeMethod,
         MethodInfo? backingAfterMethod,
         MethodInfo? backingAfterErrorMethod,
         MethodImplementationInfo wrappedMethod
@@ -161,12 +161,12 @@ public class CodeCreation
 
         var exitLabel = il.DefineLabel();
 
-        if (backingTryMethod is not null)
+        if (backingBeforeMethod is not null)
         {
             GenerateImplementationCode(
                 il,
                 implementationFieldBuilder,
-                backingTryMethod,
+                backingBeforeMethod,
                 ValueOrReturnAt.FirstLocalPassedByRef,
                 false
             );

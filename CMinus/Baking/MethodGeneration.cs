@@ -5,6 +5,10 @@ using System.Reflection;
 
 namespace CMinus.Baking;
 
+public interface ITrivialMethodWrapper : IMethodWrapperImplementation { }
+
+public struct TrivialMethodWrapper : ITrivialMethodWrapper, IEmptyImplementation { }
+
 public interface IStandardMethodWrapper<
     [TypeKind(ImplementationTypeArgumentKind.Value)] TResult,
     [TypeKind(ImplementationTypeArgumentKind.Exception)] TException,

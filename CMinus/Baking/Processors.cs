@@ -14,7 +14,8 @@ public struct MethodImplementationInfo
     public FieldBuilder? MixinFieldBuilder { get; }
 
     public Boolean IsImplememted => ImplementationMethod is not null;
-    public Boolean IsMissingOrImplemented => !Exists || ImplementationMethod is not null;
+    public Boolean IsImplememtedByInterface => MixinFieldBuilder is null && ImplementationMethod is not null;
+    public Boolean IsMissingOrImplementedByInterface => !Exists || IsImplememtedByInterface;
 
     public MethodImplementationInfo(ImplementationMapping mapping, Dictionary<Type, FieldBuilder> mixins, MethodInfo? method)
     {
@@ -63,24 +64,7 @@ public abstract class BakingProcessorWithComponentGenerators
         this.generators = generators;
     }
 
-    public void Visit(Type type)
-    {
-        if (type.IsInterface)
-        {
-            VisitInterface(type);
-
-            VisitMembers(type);
-        }
-        else
-        {
-            VisitMembers(type);
-
-            foreach (var ifc in type.GetInterfaces())
-            {
-                Visit(ifc);
-            }
-        }
-    }
+    public abstract void Visit(Type type);
 
     protected void VisitMembers(Type type)
     {
@@ -101,8 +85,6 @@ public abstract class BakingProcessorWithComponentGenerators
             VisitMethod(method, generators.GetMethodGenerator(method));
         }
     }
-
-    protected virtual void VisitInterface(Type type) { }
 
     protected abstract void VisitProperty(PropertyInfo property, AbstractPropertyGenerator? generator);
     protected abstract void VisitEvent(EventInfo evt, AbstractEventGenerator? generator);
@@ -158,6 +140,16 @@ public class BuildingBakingProcessor : BakingProcessorWithComponentGenerators, I
         return typeBuilder.CreateType() ?? throw new Exception("Internal error: got no type from type builder");
     }
 
+    public override void Visit(Type type)
+    {
+        if (type.IsInterface)
+        {
+            VisitInterface(type);
+
+            VisitMembers(type);
+        }
+    }
+
     FieldBuilder EnsureMixin(Type type)
     {
         var fieldBuilder = mixins.GetValueOrDefault(type);
@@ -177,9 +169,11 @@ public class BuildingBakingProcessor : BakingProcessorWithComponentGenerators, I
         mixins[type] = fieldBuilder;
     }
 
-    protected override void VisitInterface(Type type)
+    void VisitInterface(Type type)
     {
         if (interfacesAndBases.Contains(type)) throw new Exception($"Already processed interface {type}");
+
+        typeBuilder.AddInterfaceImplementation(type);
 
         interfacesAndBases.Add(type);
     }
@@ -219,6 +213,25 @@ public class AnalyzingBakingProcessor : BakingProcessorWithComponentGenerators
     public readonly HashSet<Type> Interfaces = new HashSet<Type>();
     public readonly HashSet<Type> PublicMixins = new HashSet<Type>();
 
+    public override void Visit(Type type)
+    {
+        if (type.IsInterface)
+        {
+            VisitInterface(type);
+
+            VisitMembers(type);
+        }
+        else
+        {
+            VisitMembers(type);
+
+            foreach (var ifc in type.GetInterfaces())
+            {
+                Visit(ifc);
+            }
+        }
+    }
+
     protected override void VisitEvent(EventInfo evt, AbstractEventGenerator? generator)
         => AddMixin(generator?.GetMixinType());
 
@@ -228,7 +241,7 @@ public class AnalyzingBakingProcessor : BakingProcessorWithComponentGenerators
     protected override void VisitProperty(PropertyInfo property, AbstractPropertyGenerator? generator)
         => AddMixin(generator?.GetMixinType());
 
-    protected override void VisitInterface(Type type) => Interfaces.Add(type);
+    void VisitInterface(Type type) => Interfaces.Add(type);
 
     void AddMixin(Type? mixin)
     {
