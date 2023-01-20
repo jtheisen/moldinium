@@ -94,6 +94,7 @@ public struct MethodImplementationInfo
 {
     MethodImplementationKind kind;
 
+    public Boolean IsImplementedPrivately { get; }
     public MethodImplementationKind Kind => kind;
 
     public Boolean Exists => kind != MethodImplementationKind.NonExistent;
@@ -106,6 +107,7 @@ public struct MethodImplementationInfo
 
     public MethodImplementationInfo(FieldBuilder mixinFieldBuilder, MethodInfo method)
     {
+        IsImplementedPrivately = method.IsPrivate;
         kind = MethodImplementationKind.ImplementedByMixin;
         MixinFieldBuilder = mixinFieldBuilder;
         ImplementationMethod = method;
@@ -117,6 +119,8 @@ public struct MethodImplementationInfo
         {
             var implementationMethod = mapping.GetImplementationMethod(method);
             ImplementationMethod = implementationMethod;
+
+            IsImplementedPrivately = implementationMethod?.IsPrivate ?? false;
 
             if (implementationMethod?.DeclaringType is Type type && mixins.TryGetValue(type, out var mixinFieldBuilder))
             {
@@ -137,6 +141,7 @@ public struct MethodImplementationInfo
         else
         {
             kind = MethodImplementationKind.NonExistent;
+            IsImplementedPrivately = false;
             ImplementationMethod = null;
             MixinFieldBuilder = null;
         }

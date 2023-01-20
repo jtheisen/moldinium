@@ -39,7 +39,11 @@ public abstract class AbstractMethodGenerator : AbstractGenerator
 
         var argumentKinds = GetArgumentKinds();
 
-        var (fieldBuilder, backingMethod) = GetMethodImplementation(state, method);
+        var methodImplementation = GetMethodImplementation(state, method);
+
+        if (methodImplementation is null) return;
+
+        var (fieldBuilder, backingMethod) = methodImplementation.Value;
 
         var codeCreator = new CodeCreation(typeBuilder, argumentKinds, fieldBuilder, mixinFieldBuilder);
 
@@ -51,7 +55,7 @@ public abstract class AbstractMethodGenerator : AbstractGenerator
         );
     }
 
-    protected abstract (FieldBuilder, MethodImplementation) GetMethodImplementation(IBuildingContext state, MethodInfo method);
+    protected abstract (FieldBuilder, MethodImplementation)? GetMethodImplementation(IBuildingContext state, MethodInfo method);
 }
 
 public class GenericMethodGenerator : AbstractMethodGenerator
@@ -73,15 +77,20 @@ public class GenericMethodGenerator : AbstractMethodGenerator
         yield return implementation.MixinType;
     }
 
-    protected override (FieldBuilder, MethodImplementation) GetMethodImplementation(IBuildingContext state, MethodInfo method)
+    protected override (FieldBuilder, MethodImplementation)? GetMethodImplementation(IBuildingContext state, MethodInfo method)
     {
         var typeBuilder = state.TypeBuilder;
+
+        var outerMethodImplementation = state.GetOuterImplementationInfo(method);
+
+
+        if (outerMethodImplementation.IsImplementedPrivately) return null;
 
         var methodImplementationType = implementation.MakeImplementationType(returnType: method.ReturnType);
 
         var fieldBuilder = typeBuilder.DefineField($"backing_{method.Name}", methodImplementationType, FieldAttributes.Private);
 
-        var methodImplementation = GetMethodImplementation(fieldBuilder, "", state.GetOuterImplementationInfo(method));
+        var methodImplementation = GetMethodImplementation(fieldBuilder, "", outerMethodImplementation);
 
         return (fieldBuilder, methodImplementation);
     }

@@ -59,8 +59,6 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
         var valueType = property.PropertyType;
 
-        var propertyBuilder = typeBuilder.DefineProperty(property.Name, property.Attributes, valueType, null);
-
         var mixinFieldBuilder = EnsureMixin(state);
 
         var getMethod = property.GetGetMethod();
@@ -77,6 +75,8 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
         if (propertyImplementation is null) return;
 
         var (fieldBuilder, (getImplementation, setImplementation)) = propertyImplementation.Value;
+
+        var propertyBuilder = typeBuilder.DefineProperty(property.Name, property.Attributes, valueType, null);
 
         var codeCreator = new CodeCreation(typeBuilder, argumentKinds, fieldBuilder, mixinFieldBuilder);
 
@@ -187,6 +187,8 @@ public class GenericPropertyGenerator : AbstractPropertyGenerator
                 throw new Exception($"The property {property.Name} has an should have their get and set methods implemented by the same mixin");
             }
         }
+
+        if (outerGetImplementation.IsImplementedPrivately || outerSetImplementation.IsImplementedPrivately) return null;
 
         if (outerGetImplementation.Kind == MethodImplementationKind.ImplementedByMixin)
         {
