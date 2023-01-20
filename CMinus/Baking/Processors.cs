@@ -1,48 +1,10 @@
 ﻿using CMinus.Baking;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection.Emit;
 using System.Reflection;
 
 namespace CMinus;
-
-public struct MethodImplementationInfo
-{
-    public Boolean Exists { get; }
-    public MethodInfo? ImplementationMethod { get; }
-    public FieldBuilder? MixinFieldBuilder { get; }
-
-    public Boolean IsImplememted => ImplementationMethod is not null;
-    public Boolean IsImplememtedByInterface => MixinFieldBuilder is null && ImplementationMethod is not null;
-    public Boolean IsMissingOrImplementedByInterface => !Exists || IsImplememtedByInterface;
-
-    public MethodImplementationInfo(ImplementationMapping mapping, Dictionary<Type, FieldBuilder> mixins, MethodInfo? method)
-    {
-        if (method is not null)
-        {
-            var implementationMethod = mapping.GetImplementationMethod(method);
-
-            Exists = true;
-            ImplementationMethod = implementationMethod;
-
-            if (implementationMethod?.DeclaringType is Type type && mixins.TryGetValue(type, out var mixinFieldBuilder))
-            {
-                MixinFieldBuilder = mixinFieldBuilder;
-            }
-            else
-            {
-                MixinFieldBuilder = null;
-            }
-        }
-        else
-        {
-            Exists = false;
-            ImplementationMethod = null;
-            MixinFieldBuilder = null;
-        }
-    }
-}
 
 public interface IBuildingContext
 {
@@ -225,6 +187,19 @@ public class AnalyzingBakingProcessor : BakingProcessorWithComponentGenerators
         {
             VisitMembers(type);
 
+            foreach (var ifc in type.GetInterfaces())
+            {
+                Visit(ifc);
+            }
+        }
+    }
+
+    public void VisitFirst(Type type)
+    {
+        Visit(type);
+
+        if (type.IsInterface)
+        {
             foreach (var ifc in type.GetInterfaces())
             {
                 Visit(ifc);

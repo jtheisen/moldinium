@@ -23,7 +23,7 @@ public class MultipleElementsException : InvalidOperationException
     }
 }
 
-public static class Extensions
+public static partial class Extensions
 {
     public static T Return<T>(this Object _, T value) => value;
 

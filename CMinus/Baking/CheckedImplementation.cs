@@ -19,6 +19,16 @@ public class CheckedImplementation
 
     Dictionary<Type, ImplementationTypeArgumentKind> typeArgumentsToKindMapping;
 
+    public override string ToString()
+    {
+        return $"CheckedImplementation for {(IsWrapper ? "wrapper" : "direct")} {Type}";
+    }
+
+    public void AssertWrapperOrNot(Boolean wrapperRatherThanNot)
+    {
+        if (wrapperRatherThanNot != IsWrapper) throw new Exception($"Expected {Type} to be a {(wrapperRatherThanNot ? "wrapper" : "direct")}");
+    }
+
     public Boolean IsWrapper { get; }
 
     public IReadOnlyDictionary<Type, ImplementationTypeArgumentKind> TypeArgumentsToKindMapping
@@ -41,16 +51,18 @@ public class CheckedImplementation
         typeof(IMethodWrapperImplementation),
         typeof(IPropertyImplementation),
         typeof(IPropertyWrapperImplementation),
-        typeof(IEventImplementation)
+        typeof(IEventImplementation),
+        typeof(IEventWrapperImplementation)
     };
 
     static Type[] wrapperImplementationBaseInterfaces = new[]
     {
         typeof(IMethodWrapperImplementation),
-        typeof(IPropertyWrapperImplementation)
+        typeof(IPropertyWrapperImplementation),
+        typeof(IEventWrapperImplementation)
     };
 
-    public static void PreCheck(Type implementationType)
+    public static Type PreCheck(Type implementationType)
     {
         var implementedBaseInterfaces = implementationBaseInterfaces
             .Where(TypeInterfaces.Get(implementationType).DoesTypeImplement);
@@ -69,14 +81,17 @@ public class CheckedImplementation
                 $"Expected implementation type {implementationType} to implement one of implementation base interface: "
                 + String.Join(", ", implementationBaseInterfaces.Cast<Type>()));
         }
-
+        else
+        {
+            return implementedBaseInterfaces.Single();
+        }
     }
 
     public CheckedImplementation(Type implementationType, params Type[] additionalInterfaceTypesToIgnore)
     {
         Type = implementationType;
 
-        PreCheck(implementationType);
+        var implementationBaseInterface = PreCheck(implementationType);
 
         var interfacesToIgnore = new [] { typeof(IImplementation), typeof(IEmptyImplementation) }
             .Concat(additionalInterfaceTypesToIgnore)
@@ -88,7 +103,7 @@ public class CheckedImplementation
             .Single($"Expected implementation type {implementationType} to implement only a single interface besides {String.Join(", ", additionalInterfaceTypesToIgnore.Cast<Type>())}")
             ;
 
-        IsWrapper = wrapperImplementationBaseInterfaces.Contains(implementationType);
+        IsWrapper = wrapperImplementationBaseInterfaces.Contains(implementationBaseInterface);
 
         var implementationInterfaceTypeDefinition = implementationInterfaceType.IsGenericType
             ? implementationInterfaceType.GetGenericTypeDefinition()
@@ -112,6 +127,7 @@ public class CheckedImplementation
             switch (a.Kind)
             {
                 case ImplementationTypeArgumentKind.Value:
+                case ImplementationTypeArgumentKind.Handler:
                     if (!arg.IsGenericParameter) throw new Exception($"Implementation type {implementationType} must be itself be generic in type parameter {p} of interface {implementationInterfaceTypeDefinition}");
                     break;
                 default:
@@ -142,7 +158,7 @@ public class CheckedImplementation
         }
     }
 
-    Type[] GetTypeArguments(Type implementationType, Type? valueType, Type? returnType)
+    Type[] GetTypeArguments(Type implementationType, Type? proeprtyOrHandlerType, Type? returnType)
     {
         var arguments = new List<Type>();
 
@@ -155,7 +171,8 @@ public class CheckedImplementation
             switch (kind)
             {
                 case ImplementationTypeArgumentKind.Value:
-                    arguments.Add(valueType ?? Throw());
+                case ImplementationTypeArgumentKind.Handler:
+                    arguments.Add(proeprtyOrHandlerType ?? Throw());
                     break;
                 case ImplementationTypeArgumentKind.Return:
                     var usedReturnType = returnType;
@@ -179,9 +196,9 @@ public class CheckedImplementation
         return arguments.ToArray();
     }
 
-    public Type MakeImplementationType(Type? valueType = null, Type? returnType = null)
+    public Type MakeImplementationType(Type? propertyOrHandlerType = null, Type? returnType = null)
     {
-        var typeArguments = GetTypeArguments(Type, valueType, returnType);
+        var typeArguments = GetTypeArguments(Type, propertyOrHandlerType, returnType);
 
         var implementationType = Type.IsGenericTypeDefinition ? Type.MakeGenericType(typeArguments) : Type;
 

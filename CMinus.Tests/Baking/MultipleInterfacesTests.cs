@@ -8,14 +8,14 @@ public class MultipleInterfacesTests : BakingTestsBase
 {
     public interface IPerson
     {
-        public String Name { get; }
+        String Name { get; }
     }
 
     public interface INaturalPerson : IPerson
     {
-        public String FirstName { get; set; }
+        String FirstName { get; set; }
 
-        public String LastName { get; set; }
+        String LastName { get; set; }
 
         String IPerson.Name => $"{FirstName} {LastName}";
     }

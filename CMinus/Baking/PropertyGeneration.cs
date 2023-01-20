@@ -80,6 +80,7 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
         var codeCreator = new CodeCreation(typeBuilder, argumentKinds, fieldBuilder, mixinFieldBuilder);
 
+        if (fieldBuilder is not null)
         {
             var backingInitMethod = fieldBuilder.FieldType.GetMethod("Init");
 
@@ -141,11 +142,7 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
         }
     }
 
-    protected abstract (FieldBuilder, PropertyImplementation)? GetPropertyImplementation(IBuildingContext state, PropertyInfo property, Boolean wrap);
-
-    protected MethodInfo GetPropertyMethod(PropertyInfo property, Boolean setter)
-        => (setter ? property.GetSetMethod() : property.GetGetMethod())
-        ?? throw new Exception($"Property {property.Name} on implementation type {property.DeclaringType} must have a {(setter ? "setter" : "getter")} method");
+    protected abstract (FieldBuilder?, PropertyImplementation)? GetPropertyImplementation(IBuildingContext state, PropertyInfo property, Boolean wrap);
 }
 
 public class GenericPropertyGenerator : AbstractPropertyGenerator
@@ -156,6 +153,9 @@ public class GenericPropertyGenerator : AbstractPropertyGenerator
     {
         this.implementation = implementation;
         this.wrapper = wrapper;
+
+        implementation?.AssertWrapperOrNot(false);
+        wrapper?.AssertWrapperOrNot(true);
     }
 
     public override IEnumerable<Type?> GetMixinTypes()
@@ -170,19 +170,30 @@ public class GenericPropertyGenerator : AbstractPropertyGenerator
         wrapper?.AddArgumentKinds(argumentKinds);
     }
 
-
-
-    protected override (FieldBuilder, PropertyImplementation)? GetPropertyImplementation(IBuildingContext state, PropertyInfo property, Boolean wrap)
+    protected override (FieldBuilder?, PropertyImplementation)? GetPropertyImplementation(IBuildingContext state, PropertyInfo property, Boolean wrap)
     {
         var outerGetImplementation = state.GetOuterImplementationInfo(property.GetGetMethod());
         var outerSetImplementation = state.GetOuterImplementationInfo(property.GetSetMethod());
 
         if (outerGetImplementation.Exists && outerSetImplementation.Exists)
         {
-            if (outerGetImplementation.IsImplememted != outerSetImplementation.IsImplememted)
+            if (outerGetImplementation.Kind != outerSetImplementation.Kind)
             {
-                throw new Exception($"The property {property.Name} on {property.DeclaringType} should implement either both getter and setter or neither");
+                throw new Exception($"The property {property.Name} has an get method of {outerGetImplementation.Kind} and a set method of {outerSetImplementation.Kind}, but they should be the same");
             }
+
+            if (outerGetImplementation.MixinFieldBuilder != outerSetImplementation.MixinFieldBuilder)
+            {
+                throw new Exception($"The property {property.Name} has an should have their get and set methods implemented by the same mixin");
+            }
+        }
+
+        if (outerGetImplementation.Kind == MethodImplementationKind.ImplementedByMixin)
+        {
+            return (null, new PropertyImplementation(
+                new OuterMethodImplemention(outerGetImplementation),
+                new OuterMethodImplemention(outerSetImplementation)
+            ));
         }
 
         var typeBuilder = state.TypeBuilder;
@@ -197,7 +208,7 @@ public class GenericPropertyGenerator : AbstractPropertyGenerator
             throw new Exception($"Property {property} needs to be {(wrap ? "wrapped" : "implemented")}, but there is no corresponding property implementation type");
         }
 
-        var propertyImplementationType = implementation.MakeImplementationType(valueType: property.PropertyType);
+        var propertyImplementationType = implementation.MakeImplementationType(propertyOrHandlerType: property.PropertyType);
 
         var fieldBuilder = typeBuilder.DefineField($"backing_{property.Name}", propertyImplementationType, FieldAttributes.Private);
 

@@ -3,26 +3,8 @@ using System.Reflection;
 using System.Collections.Generic;
 using System;
 using System.Linq;
-using Castle.DynamicProxy.Generators;
-using System.Reflection.PortableExecutable;
 
 namespace CMinus;
-
-public record MethodImplementation
-{
-    public static implicit operator MethodImplementation(MethodInfo method) => new DirectMethodImplementation(method);
-}
-
-public record DirectMethodImplementation(MethodInfo Method) : MethodImplementation { }
-
-public record WrappingMethodImplementation(
-    MethodImplementationInfo? WrappedMethod,
-    MethodInfo? BeforeMethod = null,
-    MethodInfo? AfterMethod = null,
-    MethodInfo? AfterOnErrorMethod = null
-) : MethodImplementation;
-
-public record PropertyImplementation(MethodImplementation Get, MethodImplementation Set);
 
 public class CodeCreation
 {
@@ -71,10 +53,8 @@ public class CodeCreation
             parameters.Select(p => p.GetOptionalCustomModifiers()).ToArray()
         );
 
-        if (methodTemplate.DeclaringType!.IsClass)
-        {
-            typeBuilder.DefineMethodOverride(methodBuilder, methodTemplate);
-        }
+        typeBuilder.DefineMethodOverride(methodBuilder, methodTemplate);
+
         return methodBuilder;
     }
 
@@ -109,6 +89,12 @@ public class CodeCreation
                 false,
                 addRet: true
             );
+        }
+        else if (implementation is OuterMethodImplemention outerMethodImplementation)
+        {
+            GenerateNestedCallCode(generator, outerMethodImplementation.WrappedMethod);
+
+            generator.Emit(OpCodes.Ret);
         }
         else if (implementation is WrappingMethodImplementation wrappingMethodImplementation)
         {
@@ -188,6 +174,8 @@ public class CodeCreation
 
             il.Emit(OpCodes.Stloc_1);
 
+            var dontRethrowLabel = il.DefineLabel();
+
             if (backingAfterErrorMethod is not null)
             {
                 GenerateImplementationCode(
@@ -198,13 +186,12 @@ public class CodeCreation
                     true
                 );
 
-                var dontRethrowLabel = il.DefineLabel();
-
                 il.Emit(OpCodes.Brfalse_S, dontRethrowLabel);
-                il.Emit(OpCodes.Rethrow);
-
-                il.MarkLabel(dontRethrowLabel);
             }
+
+            il.Emit(OpCodes.Rethrow);
+
+            il.MarkLabel(dontRethrowLabel);
 
             il.EndExceptionBlock();
         }
@@ -331,6 +318,7 @@ public class CodeCreation
                         generator.Emit(OpCodes.Ldloc_1);
                         break;
                     case ImplementationTypeArgumentKind.Value:
+                    case ImplementationTypeArgumentKind.Handler:
                     case ImplementationTypeArgumentKind.Return:
                         switch (valueOrReturnAt)
                         {

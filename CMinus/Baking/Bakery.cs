@@ -190,12 +190,14 @@ public class Bakery : AbstractlyBakery
     {
         var processor = new AnalyzingBakingProcessor(generators);
 
-        processor.Visit(interfaceOrBaseType);
+        processor.VisitFirst(interfaceOrBaseType);
 
         var interfaceTypes = processor.Interfaces;
         var mixinTypes = processor.PublicMixins;
 
         var mapping = new ImplementationMapping(interfaceTypes.Concat(mixinTypes).ToHashSet());
+
+        var _ = mapping.ImplementationReport;
 
         return (mapping, mixinTypes.ToArray());
     }
@@ -235,9 +237,9 @@ public class ImplementationMapping
             {
                 var implementationName = p.Value.Name;
 
-                if (!implementationName.Contains('.'))
+                if (TryParsePrivateName(implementationName, out var _, out var methodName))
                 {
-                    implementationName = $"{p.Value.DeclaringType?.Name}.{implementationName}";
+                    implementationName = $"{p.Value.DeclaringType!.Name}.{methodName}";
                 }
 
                 writer.WriteLine($"{p.Key.DeclaringType?.Name}.{p.Key.Name} -> {implementationName}");
@@ -256,16 +258,24 @@ public class ImplementationMapping
 
         var bindingFlags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly;
 
-        var implementableMethodsByName = (
+        var implementableMethods = (
             from ifc in interfaces
             from method in ifc.GetMethods(bindingFlags)
             where !method.Name.Contains('.')
             select (ifc, method)
-        ).ToLookup(e => (e.ifc.FullName?.Replace('+', '.'), e.method.Name), e => e.method);
+        ).ToArray();
+
+        var implementableMethodsByName = implementableMethods
+            .ToLookup(e => (e.ifc.FullName?.Replace('+', '.'), e.method.Name), e => e.method);
+
+        var implementableMethodsByMethodName = implementableMethods
+            .ToLookup(e => e.method.Name, e => e.method);
 
         foreach (var ifc in types)
         {
-            foreach (var method in ifc.GetMethods(bindingFlags))
+            var methods = ifc.GetMethods(bindingFlags);
+
+            foreach (var method in methods)
             {
                 var body = method.GetMethodBody();
 
@@ -290,18 +300,27 @@ public class ImplementationMapping
 
                     methodBase = candidates.Single();
                 }
+                else if (method.DeclaringType!.IsValueType)
+                {
+                    var candidates = implementableMethodsByMethodName[method.Name].ToArray();
+
+                    if (candidates.Length > 1)
+                    {
+                        throw new Exception($"Internal error: There are multiple candidates for {method.Name}");
+                    }
+
+                    methodBase = candidates.SingleOrDefault() ?? method;
+                }
                 else
                 {
                     methodBase = method;
                 }
 
-                //var implementableMethodCandidates = implementableMethods[()]
-
                 implementations.Add(method);
 
-                if (declarationsToImplementations.ContainsKey(methodBase))
+                if (declarationsToImplementations.TryGetValue(methodBase, out var anotherMethod))
                 {
-                    throw new Exception($"We have multiple implementations for {method}, this is not supported yet");
+                    throw new Exception($"We have multiple implementations for {method}, this is not supported yet; two implementations are {method.GetQualifiedName()} {anotherMethod.GetQualifiedName()}");
                 }
 
                 if (methodBase.DeclaringType!.IsInterface)

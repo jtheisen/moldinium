@@ -55,7 +55,7 @@ public class ComponentGenerators : IBakeryComponentGenerators
         => new ComponentGenerators(
             MethodGenerator.Create(methodWrapperType ?? typeof(TrivialMethodWrapper)),
             PropertyGenerator.Create(propertyImplementationType ?? typeof(SimplePropertyImplementation<>), propertyWrapperType ?? typeof(TrivialPropertyWrapper)),
-            EventGenerator.Create(eventImplementationType ?? typeof(GenericEventImplementation<>))
+            EventGenerator.Create(eventImplementationType ?? typeof(GenericEventImplementation<>), typeof(TrivialEventWrapper))
         );
 
     public static ComponentGenerators Create(params Type[] implementations)

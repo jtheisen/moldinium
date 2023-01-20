@@ -73,6 +73,8 @@ public abstract class AbstractGenerator
         {
             if (haveBeforeOrAfter) throw new Exception($"Implementation type can't define both a {name} method and the respective Before and After methods");
 
+            if (wrappedMethod?.IsImplememtedByInterface ?? false) throw new Exception($"Internal error: Can't wrap outer implementation with a direct method implementation");
+
             return method;
         }
         else if (haveBeforeOrAfter || TypeInterfaces.Get(type).DoesTypeImplement(typeof(IEmptyImplementation)))
