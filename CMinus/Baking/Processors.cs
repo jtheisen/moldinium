@@ -54,11 +54,14 @@ public abstract class BakingProcessorWithComponentGenerators
     protected abstract void VisitMethod(MethodInfo method, AbstractMethodGenerator? generator);
 }
 
+public delegate void AccessEnsurer(Assembly assembly);
+
 public class BuildingBakingProcessor : BakingProcessorWithComponentGenerators, IBuildingContext
 {
     private readonly ImplementationMapping implementationMapping;
     private readonly IDefaultProvider defaultProvider;
     private readonly IBakeryComponentGenerators generators;
+    private readonly AccessEnsurer ensureAccess;
     private readonly TypeBuilder typeBuilder;
     private readonly ILGenerator constructorGenerator;
 
@@ -74,14 +77,14 @@ public class BuildingBakingProcessor : BakingProcessorWithComponentGenerators, I
 
     public BuildingBakingProcessor(
         String name, Type? baseType, TypeAttributes typeAttributes, ImplementationMapping implementationMapping,
-        IDefaultProvider defaultProvider, IBakeryComponentGenerators generators, ModuleBuilder moduleBuilder
+        IDefaultProvider defaultProvider, IBakeryComponentGenerators generators, AccessEnsurer ensureAccess, ModuleBuilder moduleBuilder
     )
         : base(generators)
     {
         this.implementationMapping = implementationMapping;
         this.defaultProvider = defaultProvider;
         this.generators = generators;
-
+        this.ensureAccess = ensureAccess;
         typeBuilder = moduleBuilder.DefineType(name, typeAttributes, baseType);
 
         var constructorBuilder = typeBuilder.DefineConstructor(MethodAttributes.Public, CallingConventions.Standard, new Type[] { });
@@ -102,6 +105,8 @@ public class BuildingBakingProcessor : BakingProcessorWithComponentGenerators, I
 
         foreach (var ifc in interfaces)
         {
+            ensureAccess(ifc.Assembly);
+
             Visit(ifc);
         }
 

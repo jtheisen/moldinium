@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 
 namespace CMinus;
 
@@ -34,27 +35,30 @@ public abstract class AbstractBakery
     {
         if (!bakedTypes.TryGetValue(interfaceOrBaseType, out var bakedType))
         {
-            bakedTypes[interfaceOrBaseType] = bakedType = Create(interfaceOrBaseType);
+            bakedTypes[interfaceOrBaseType] = bakedType = GetCreatedType(interfaceOrBaseType);
         }
 
         return bakedType;
     }
 
-    public abstract Type Create(Type interfaceOrBaseType);
+    public abstract Type GetCreatedType(Type interfaceOrBaseType);
 }
 
 public class AbstractlyBakery : AbstractBakery
 {
     protected readonly string name;
     protected readonly bool makeAbstract;
+    protected readonly AssemblyBuilder assemblyBuilder;
     protected readonly ModuleBuilder moduleBuilder;
     protected readonly TypeAttributes typeAttributes;
+
+    HashSet<Assembly> accessedAssemblies = new HashSet<Assembly>();
 
     public AbstractlyBakery(String name, TypeAttributes typeAttributes = TypeAttributes.Public | TypeAttributes.Abstract)
     {
         this.name = name;
         this.typeAttributes = typeAttributes;
-        var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName(name), AssemblyBuilderAccess.Run);
+        assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName(name), AssemblyBuilderAccess.Run);
         moduleBuilder = assemblyBuilder.DefineDynamicModule(name);
     }
 
@@ -77,13 +81,14 @@ public class AbstractlyBakery : AbstractBakery
         }
     }
 
-    public override Type Create(Type interfaceOrBaseType)
+    public override Type GetCreatedType(Type interfaceOrBaseType)
     {
         var name = GetTypeName(interfaceOrBaseType);
-        return moduleBuilder.GetType(name) ?? Create(name, interfaceOrBaseType);
+
+        return moduleBuilder.GetType(name) ?? CreateImpl(name, interfaceOrBaseType);
     }
 
-    protected virtual Type Create(String name, Type interfaceOrBaseType)
+    protected virtual Type CreateImpl(String name, Type interfaceOrBaseType)
     {
         var typeBuilder = moduleBuilder.DefineType(name, typeAttributes);
 
@@ -165,6 +170,21 @@ public class AbstractlyBakery : AbstractBakery
 
         return true;
     }
+
+    protected void EnsureAccessToAssembly(Assembly assembly)
+    {
+        if (accessedAssemblies.Add(assembly))
+        {
+            var ignoresAccessChecksTo = new CustomAttributeBuilder
+            (
+                typeof(IgnoresAccessChecksToAttribute).GetConstructor(new Type[] { typeof(String) })
+                ?? throw new InternalErrorException("Can't get constructor for IgnoresAccessChecksToAttribute"),
+                new object[] { assembly.GetName().Name ?? throw new InternalErrorException("Can't get name for assembly") }
+            );
+
+            assemblyBuilder.SetCustomAttribute(ignoresAccessChecksTo);
+        }
+    }
 }
 
 public class Bakery : AbstractlyBakery
@@ -202,13 +222,14 @@ public class Bakery : AbstractlyBakery
         return (mapping, mixinTypes.ToArray());
     }
 
-    protected override Type Create(String name, Type interfaceOrBaseType)
+    protected override Type CreateImpl(String name, Type interfaceOrBaseType)
     {
         var baseType = interfaceOrBaseType.IsClass ? interfaceOrBaseType : null;
 
         var (interfaceMapping, publicMixins) = Analyze(interfaceOrBaseType);
 
-        var processor = new BuildingBakingProcessor(name, baseType, typeAttributes, interfaceMapping, defaultProvider, generators, moduleBuilder);
+        var processor = new BuildingBakingProcessor(
+            name, baseType, typeAttributes, interfaceMapping, defaultProvider, generators, EnsureAccessToAssembly, moduleBuilder);
 
         return processor.Create(interfaceMapping.Interfaces, publicMixins);
     }
