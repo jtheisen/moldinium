@@ -29,7 +29,7 @@ public class CheekyCallingTests
         where TConcrete : TTarget, new()
     {
         var delegateTypeCreator = new DelegateTypeCreator();
-        var delegateCreator = delegateTypeCreator.CreateDelegateCreatorForSpecificTargetMethod(typeof(TTarget).GetSingleMethod(methodName));
+        var delegateCreator = delegateTypeCreator.CreateDelegateCreatorAsDynamicMethod(typeof(TTarget).GetSingleMethod(methodName));
         var cheekyDelegate = delegateCreator(new TConcrete());
         return cheekyDelegate.DynamicInvoke(arguments)!;
     }

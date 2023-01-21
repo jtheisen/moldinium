@@ -10,23 +10,35 @@ public class DelegateTypeCreator
 {
     ModuleBuilder moduleBuilder;
 
+    public struct DelegateTypeInfo
+    {
+        public Type type;
+        public ConstructorInfo ctor;
+        public MethodInfo? bind;
+    }
+
     public DelegateTypeCreator()
     {
         var name = "Delegates";
-        delegateTypes = new ConcurrentDictionary<MethodInfo, Type>();
+        delegateTypes = new ConcurrentDictionary<(MethodInfo, MethodInfo?), DelegateTypeInfo>();
         var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName(name), AssemblyBuilderAccess.Run);
         moduleBuilder = assemblyBuilder.DefineDynamicModule(name);
     }
 
-    ConcurrentDictionary<MethodInfo, Type> delegateTypes;
+    ConcurrentDictionary<(MethodInfo baseMethod, MethodInfo? targetMethod), DelegateTypeInfo> delegateTypes;
 
-    public Type GetDelegateType(MethodInfo method) => delegateTypes.GetOrAdd(method, CreateDelegateType);
+    public DelegateTypeInfo GetDelegateTypeInfo(MethodInfo baseMethod, MethodInfo? targetMethod = null) => delegateTypes.GetOrAdd((baseMethod, targetMethod), CreateDelegateType);
 
-    public Func<Object, Delegate> CreateDelegateCreatorForSpecificTargetMethod(MethodInfo targetMethod)
+    public Delegate CreateDelegateForSpecificTarget(MethodInfo baseMethod, MethodInfo targetMethod, Object target)
     {
-        var delegateType = GetDelegateType(targetMethod);
+        var delegateTypeInfo = GetDelegateTypeInfo(baseMethod, targetMethod);
 
-        var delegateConstructor = delegateType.GetConstructors().Single();
+        return (Delegate)delegateTypeInfo.bind!.Invoke(null, new[] { target })!;
+    }
+
+    public Func<Object, Delegate> CreateDelegateCreatorAsDynamicMethod(MethodInfo targetMethod)
+    {
+        var delegateTypeInfo = GetDelegateTypeInfo(targetMethod);
 
         var cheekyCallerMethod = new DynamicMethod(
             "CreateDelegateForSpecifcTargetMethod",
@@ -38,16 +50,18 @@ public class DelegateTypeCreator
 
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Ldftn, targetMethod);
-        il.Emit(OpCodes.Newobj, delegateConstructor);
+        il.Emit(OpCodes.Newobj, delegateTypeInfo.ctor);
         il.Emit(OpCodes.Ret);
 
         return cheekyCallerMethod.CreateDelegate<Func<Object, Delegate>>();
     }
 
-    Type CreateDelegateType(MethodInfo method)
+    DelegateTypeInfo CreateDelegateType((MethodInfo baseMethod, MethodInfo? targetMethod) parameters) => CreateDelegateType(parameters.baseMethod, parameters.targetMethod);
+
+    DelegateTypeInfo CreateDelegateType(MethodInfo baseMethod, MethodInfo? targetMethod)
     {
         var typeBuilder = moduleBuilder.DefineType(
-            method.Name,
+            baseMethod.Name,
             TypeAttributes.Public | TypeAttributes.Class | TypeAttributes.AnsiClass | TypeAttributes.AutoClass | TypeAttributes.Sealed,
             typeof(MulticastDelegate)
         );
@@ -59,22 +73,42 @@ public class DelegateTypeCreator
         );
         ctorBuilder.SetImplementationFlags(MethodImplAttributes.Runtime | MethodImplAttributes.Managed);
 
-        var parameters = method.GetParameters();
+        var parameters = baseMethod.GetParameters();
         var invokeMethodBuilder = typeBuilder.DefineMethod(
             "Invoke",
             MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.NewSlot | MethodAttributes.Virtual,
-            method.CallingConvention, // this right?
-            method.ReturnType,
-            method.ReturnParameter.GetRequiredCustomModifiers(),
-            method.ReturnParameter.GetOptionalCustomModifiers(),
+            baseMethod.CallingConvention, // this right?
+            baseMethod.ReturnType,
+            baseMethod.ReturnParameter.GetRequiredCustomModifiers(),
+            baseMethod.ReturnParameter.GetOptionalCustomModifiers(),
             parameters.Select(p => p.ParameterType).ToArray(),
             parameters.Select(p => p.GetRequiredCustomModifiers()).ToArray(),
             parameters.Select(p => p.GetOptionalCustomModifiers()).ToArray()
         );
         invokeMethodBuilder.SetImplementationFlags(MethodImplAttributes.Runtime | MethodImplAttributes.Managed);
 
+        if (targetMethod is not null)
+        {
+            var bindingMethod = typeBuilder.DefineMethod(
+                "Bind",
+                MethodAttributes.Public | MethodAttributes.Static,
+                typeof(Func<Object, Delegate>),
+                new[] { typeof(Object) }
+            );
+
+            var il = bindingMethod.GetILGenerator();
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldftn, targetMethod);
+            il.Emit(OpCodes.Newobj, ctorBuilder);
+            il.Emit(OpCodes.Ret);
+        }
+
         var delegateType = typeBuilder.CreateType() ?? throw new Exception($"TypeBuilder didn't build a type");
 
-        return delegateType;
+        var delegateConstructor = delegateType.GetConstructors().Single();
+
+        var bindMethod = delegateType.GetMethod("Bind");
+
+        return new DelegateTypeInfo { type = delegateType, ctor = delegateConstructor, bind = bindMethod };
     }
 }
