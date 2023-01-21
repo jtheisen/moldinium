@@ -1,5 +1,5 @@
 ﻿using Castle.DynamicProxy.Generators.Emitters.SimpleAST;
-using CMinus.Misc;
+using CMinus.Delegates;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;

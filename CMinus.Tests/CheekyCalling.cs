@@ -1,16 +1,14 @@
-﻿using CMinus.Baking.CheekyCalling;
+﻿using CMinus.Delegates;
+using CMinus.Delegates.TestStuff;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace CMinus.Tests.CheekyCalling;
 
 [TestClass]
 public class CheekyCallingTests
 {
+    // Calli worked once in a LINQPad query, at least after first using the delegate way, but right now I can't get it to work at all
     //[TestMethod]
     //public void CalliCallerTest()
     //{
@@ -30,7 +28,8 @@ public class CheekyCallingTests
     public static Object DynamicInvoke<TConcrete, TTarget>(String methodName, params Object[] arguments)
         where TConcrete : TTarget, new()
     {
-        var delegateCreator = typeof(TTarget).GetSingleMethod(methodName).CreateDelegateCreator();
+        var delegateTypeCreator = new DelegateTypeCreator();
+        var delegateCreator = delegateTypeCreator.CreateDelegateCreatorForSpecificTargetMethod(typeof(TTarget).GetSingleMethod(methodName));
         var cheekyDelegate = delegateCreator(new TConcrete());
         return cheekyDelegate.DynamicInvoke(arguments)!;
     }
@@ -59,7 +58,7 @@ public class CheekyCallingTests
     public void TestB()
     {
         var bs = new BoxedString();
-        Cheeky.DynamicInvoke<CWithImpls, IDerived>("FooVB", bs);
+        DynamicInvoke<CWithImpls, IDerived>("FooVB", bs);
         Assert.AreEqual("IDerived", bs.Value);
     }
 }

@@ -2,7 +2,7 @@
 using System.Linq;
 using System.Reflection.Emit;
 
-namespace CMinus.Misc;
+namespace CMinus.Delegates;
 
 public delegate object DelegateImplementation(params object[] args);
 

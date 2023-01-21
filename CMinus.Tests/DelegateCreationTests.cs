@@ -1,4 +1,4 @@
-﻿using CMinus.Misc;
+﻿using CMinus.Delegates;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 
