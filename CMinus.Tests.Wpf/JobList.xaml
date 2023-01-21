@@ -14,7 +14,7 @@
         <StackPanel Orientation="Horizontal" VerticalAlignment="Top">
             <Button Margin="4" Padding="4" Command="{Binding AddSimpleJobCommand}" Content="Add simple job" />
             <Button Margin="4" Padding="4" Command="{Binding AddComplexJobCommand}" Content="Add complex job" />
-            <Button Margin="4" Padding="4" Command="{Binding CancelCommand}" Content="Add complex job" />
+            <Button Margin="4" Padding="4" Command="{Binding CancelCommand}" Content="Cancel" />
         </StackPanel>
         <ItemsControl ItemsSource="{Binding Items}" Grid.Row="1">
             <ItemsControl.ItemTemplate>

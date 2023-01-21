@@ -96,8 +96,6 @@ public class BuildingBakingProcessor : BakingProcessorWithComponentGenerators, I
     {
         if (createdType is not null) throw new Exception("Internal error: Type already created");
 
-        ImplementPrivateMethodDelegates();
-
         foreach (var mixin in publicMixins)
         {
             CreateMixin(mixin, out _);
@@ -113,34 +111,6 @@ public class BuildingBakingProcessor : BakingProcessorWithComponentGenerators, I
         constructorGenerator.Emit(OpCodes.Ret);
 
         return createdType = typeBuilder.CreateType() ?? throw new Exception("Internal error: got no type from type builder");
-    }
-
-    void ImplementPrivateMethodDelegates()
-    {
-        var delegateTypeCreator = new DelegateTypeCreator(/*typeBuilder*/);
-
-        foreach (var (declaration, implementation) in implementationMapping.DeclarationsToImplementations)
-        {
-            if (implementation.IsPublic) continue;
-
-            var delegateTypeInfo = delegateTypeCreator.GetDelegateTypeInfo(declaration, implementation);
-
-            if (delegateTypeInfo.bind is null) throw new Exception();
-
-            var delegateField = typeBuilder.DefineField($"_delegate_to_{implementation.Name}", delegateTypeInfo.type, FieldAttributes.Private);
-
-            var il = constructorGenerator;
-
-            il.Emit(OpCodes.Ldarg_0);
-
-            il.Emit(OpCodes.Dup);
-            il.Emit(OpCodes.Ldftn, implementation);
-            il.Emit(OpCodes.Newobj, delegateTypeInfo.ctor);
-
-            il.Emit(OpCodes.Stfld, delegateField);
-
-            privateMethodDelegates.Add(implementation, delegateField);
-        }
     }
 
     public override void Visit(Type type)
