@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection.Emit;
 using System.Reflection;
+using CMinus.Delegates;
 
 namespace CMinus;
 
@@ -55,7 +56,7 @@ public abstract class BakingProcessorWithComponentGenerators
 
 public class BuildingBakingProcessor : BakingProcessorWithComponentGenerators, IBuildingContext
 {
-    private readonly ImplementationMapping interfaceMapping;
+    private readonly ImplementationMapping implementationMapping;
     private readonly IDefaultProvider defaultProvider;
     private readonly IBakeryComponentGenerators generators;
     private readonly TypeBuilder typeBuilder;
@@ -63,18 +64,21 @@ public class BuildingBakingProcessor : BakingProcessorWithComponentGenerators, I
 
     private readonly HashSet<Type> interfacesAndBases = new HashSet<Type>();
     private readonly Dictionary<Type, FieldBuilder> mixins = new Dictionary<Type, FieldBuilder>();
+    private readonly Dictionary<MethodInfo, FieldBuilder> privateMethodDelegates = new Dictionary<MethodInfo, FieldBuilder>();
 
     public IDefaultProvider DefaultProvider => defaultProvider;
     public TypeBuilder TypeBuilder => typeBuilder;
     public ILGenerator ConstructorGenerator => constructorGenerator;
 
+    Type? createdType;
+
     public BuildingBakingProcessor(
-        String name, Type? baseType, TypeAttributes typeAttributes, ImplementationMapping interfaceMapping,
+        String name, Type? baseType, TypeAttributes typeAttributes, ImplementationMapping implementationMapping,
         IDefaultProvider defaultProvider, IBakeryComponentGenerators generators, ModuleBuilder moduleBuilder
     )
         : base(generators)
     {
-        this.interfaceMapping = interfaceMapping;
+        this.implementationMapping = implementationMapping;
         this.defaultProvider = defaultProvider;
         this.generators = generators;
 
@@ -87,6 +91,10 @@ public class BuildingBakingProcessor : BakingProcessorWithComponentGenerators, I
 
     public Type Create(Type[] interfaces, Type[] publicMixins)
     {
+        if (createdType is not null) throw new Exception("Internal error: Type already created");
+
+        ImplementPrivateMethodDelegates();
+
         foreach (var mixin in publicMixins)
         {
             CreateMixin(mixin, out _);
@@ -99,7 +107,35 @@ public class BuildingBakingProcessor : BakingProcessorWithComponentGenerators, I
 
         constructorGenerator.Emit(OpCodes.Ret);
 
-        return typeBuilder.CreateType() ?? throw new Exception("Internal error: got no type from type builder");
+        return createdType = typeBuilder.CreateType() ?? throw new Exception("Internal error: got no type from type builder");
+    }
+
+    void ImplementPrivateMethodDelegates()
+    {
+        var delegateTypeCreator = new DelegateTypeCreator(/*typeBuilder*/);
+
+        foreach (var (declaration, implementation) in implementationMapping.DeclarationsToImplementations)
+        {
+            if (implementation.IsPublic) continue;
+
+            var delegateTypeInfo = delegateTypeCreator.GetDelegateTypeInfo(declaration, implementation);
+
+            if (delegateTypeInfo.bind is null) throw new Exception();
+
+            var delegateField = typeBuilder.DefineField($"_delegate_to_{implementation.Name}", delegateTypeInfo.type, FieldAttributes.Private);
+
+            var il = constructorGenerator;
+
+            il.Emit(OpCodes.Ldarg_0);
+
+            il.Emit(OpCodes.Dup);
+            il.Emit(OpCodes.Ldftn, implementation);
+            il.Emit(OpCodes.Newobj, delegateTypeInfo.ctor);
+
+            il.Emit(OpCodes.Stfld, delegateField);
+
+            privateMethodDelegates.Add(implementation, delegateField);
+        }
     }
 
     public override void Visit(Type type)
@@ -162,7 +198,7 @@ public class BuildingBakingProcessor : BakingProcessorWithComponentGenerators, I
     }
 
     MethodImplementationInfo IBuildingContext.GetOuterImplementationInfo(MethodInfo? method)
-        => new MethodImplementationInfo(interfaceMapping, mixins, method);
+        => new MethodImplementationInfo(implementationMapping, mixins, method);
 }
 
 public class AnalyzingBakingProcessor : BakingProcessorWithComponentGenerators

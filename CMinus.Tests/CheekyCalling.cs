@@ -2,34 +2,28 @@
 using CMinus.Delegates.TestStuff;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using System.Linq;
+using System.Reflection;
 
 namespace CMinus.Tests.CheekyCalling;
 
 [TestClass]
 public class CheekyCallingTests
 {
-    // Calli worked once in a LINQPad query, at least after first using the delegate way, but right now I can't get it to work at all
-    //[TestMethod]
-    //public void CalliCallerTest()
-    //{
-    //    Func<String> a = (new CInnocent() as IBase).FooS;
-
-    //    var calliCaller = Cheeky.CreateCalliCaller<Func<IBase, String>, IBase>(typeof(IDerived), "FooS");
-
-    //    var cWithImpls = new CWithImpls();
-
-    //    // this is required for the below to work - I guess the delegate internally assures
-    //    // that the private implementation is loaded
-    //    a();
-
-    //    Assert.AreEqual("IDerived", () => calliCaller(cWithImpls));
-    //}
-
     public static Object DynamicInvoke<TConcrete, TTarget>(String methodName, params Object[] arguments)
         where TConcrete : TTarget, new()
     {
+        return DynamicInvoke<TConcrete, TTarget>(typeof(TTarget).GetSingleMethod(methodName), arguments);
+    }
+
+    public static Object DynamicInvoke<TConcrete, TTarget>(MethodInfo method, params Object[] arguments)
+        where TConcrete : TTarget, new()
+    {
         var delegateTypeCreator = new DelegateTypeCreator();
-        var delegateCreator = delegateTypeCreator.CreateDelegateCreatorAsDynamicMethod(typeof(TTarget).GetSingleMethod(methodName));
+
+        var useBind = false; // using bind gives MethodAccessException?
+
+        var delegateCreator = delegateTypeCreator.CreateDelegateCreatorAsDynamicMethod(method, useBind);
         var cheekyDelegate = delegateCreator(new TConcrete());
         return cheekyDelegate.DynamicInvoke(arguments)!;
     }
@@ -38,6 +32,19 @@ public class CheekyCallingTests
     public void GetSecretTest()
     {
         Assert.AreEqual("secret", DynamicInvoke<CWithImpls, CWithImpls>("GetSecret"));
+    }
+
+    [TestMethod]
+    public void TestProp()
+    {
+        Assert.AreEqual("CWithImpls", (new CWithImpls() as IBase).FooProp);
+
+        var fooProp = typeof(IDerived)
+            .GetProperties(BindingFlags.NonPublic | BindingFlags.Instance)
+            .Where(p => p.Name.EndsWith(".FooProp"))
+            .Single();
+
+        Assert.AreEqual("IDerived", DynamicInvoke<CWithImpls, IDerived>(fooProp.GetMethod ?? throw new Exception()));
     }
 
     [TestMethod]
@@ -61,5 +68,22 @@ public class CheekyCallingTests
         DynamicInvoke<CWithImpls, IDerived>("FooVB", bs);
         Assert.AreEqual("IDerived", bs.Value);
     }
+
+    // Calli worked once in a LINQPad query, at least after first using the delegate way, but right now I can't get it to work at all
+    //[TestMethod]
+    //public void CalliCallerTest()
+    //{
+    //    Func<String> a = (new CInnocent() as IBase).FooS;
+
+    //    var calliCaller = Cheeky.CreateCalliCaller<Func<IBase, String>, IBase>(typeof(IDerived), "FooS");
+
+    //    var cWithImpls = new CWithImpls();
+
+    //    // this is required for the below to work - I guess the delegate internally assures
+    //    // that the private implementation is loaded
+    //    a();
+
+    //    Assert.AreEqual("IDerived", () => calliCaller(cWithImpls));
+    //}
 }
 

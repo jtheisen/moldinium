@@ -197,7 +197,7 @@ public class Bakery : AbstractlyBakery
 
         var mapping = new ImplementationMapping(interfaceTypes.Concat(mixinTypes).ToHashSet());
 
-        var _ = mapping.ImplementationReport;
+
 
         return (mapping, mixinTypes.ToArray());
     }
@@ -222,7 +222,11 @@ public class ImplementationMapping
 
     public Type[] Interfaces => interfaces;
 
+    public MethodInfo[] Implementations => implementations.ToArray();
+
     public Boolean IsImplemented(MethodInfo method) => declarationsToImplementations.ContainsKey(method);
+
+    public IReadOnlyDictionary<MethodInfo, MethodInfo> DeclarationsToImplementations => declarationsToImplementations;
 
     public MethodInfo? GetImplementationMethod(MethodInfo? method)
         => method is not null ? declarationsToImplementations.GetValueOrDefault(method) : null;
@@ -316,8 +320,6 @@ public class ImplementationMapping
                     methodBase = method;
                 }
 
-                implementations.Add(method);
-
                 if (declarationsToImplementations.TryGetValue(methodBase, out var anotherMethod))
                 {
                     throw new Exception($"We have multiple implementations for {method}, this is not supported yet; two implementations are {method.GetQualifiedName()} {anotherMethod.GetQualifiedName()}");
@@ -325,6 +327,8 @@ public class ImplementationMapping
 
                 if (methodBase.DeclaringType!.IsInterface)
                 {
+                    implementations.Add(method);
+
                     declarationsToImplementations[methodBase] = method;
                 }
             }

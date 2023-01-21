@@ -14,6 +14,8 @@ public interface IBase
 {
     private String OwnName => nameof(IBase);
 
+    String FooProp => OwnName;
+
     String FooS() => OwnName;
 
     void FooVB(BoxedString boxedString) => boxedString.Value = OwnName;
@@ -24,6 +26,8 @@ public interface IBase
 public interface IDerived : IBase
 {
     private String OwnName => nameof(IDerived);
+
+    String IBase.FooProp => OwnName;
 
     String IBase.FooS() => OwnName;
 
@@ -39,6 +43,8 @@ public class CWithImpls : IDerived
     private String OwnName => nameof(CWithImpls);
 
     private String GetSecret() => "secret";
+
+    String IBase.FooProp => OwnName;
 
     String IBase.FooS() => OwnName;
 

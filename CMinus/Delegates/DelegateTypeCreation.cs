@@ -8,7 +8,11 @@ namespace CMinus.Delegates;
 
 public class DelegateTypeCreator
 {
-    ModuleBuilder moduleBuilder;
+    ModuleBuilder? moduleBuilder = null;
+    TypeBuilder? containerTypeBuilder = null;
+    
+    ConcurrentDictionary<(MethodInfo baseMethod, MethodInfo? targetMethod), DelegateTypeInfo> delegateTypes
+        = new ConcurrentDictionary<(MethodInfo baseMethod, MethodInfo? targetMethod), DelegateTypeInfo>();
 
     public struct DelegateTypeInfo
     {
@@ -17,15 +21,25 @@ public class DelegateTypeCreator
         public MethodInfo? bind;
     }
 
-    public DelegateTypeCreator()
+    public DelegateTypeCreator(ModuleBuilder moduleBuilder)
     {
-        var name = "Delegates";
-        delegateTypes = new ConcurrentDictionary<(MethodInfo, MethodInfo?), DelegateTypeInfo>();
-        var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName(name), AssemblyBuilderAccess.Run);
-        moduleBuilder = assemblyBuilder.DefineDynamicModule(name);
+        this.moduleBuilder = moduleBuilder;
     }
 
-    ConcurrentDictionary<(MethodInfo baseMethod, MethodInfo? targetMethod), DelegateTypeInfo> delegateTypes;
+    public DelegateTypeCreator(TypeBuilder containerTypeBuilder)
+    {
+        this.containerTypeBuilder = containerTypeBuilder;
+    }
+
+    public DelegateTypeCreator()
+        : this("DelegateTypeCreation")
+    {
+    }
+
+    public DelegateTypeCreator(String name)
+        : this(AssemblyBuilder.DefineDynamicAssembly(new AssemblyName(name), AssemblyBuilderAccess.Run).DefineDynamicModule(name))
+    {
+    }
 
     public DelegateTypeInfo GetDelegateTypeInfo(MethodInfo baseMethod, MethodInfo? targetMethod = null) => delegateTypes.GetOrAdd((baseMethod, targetMethod), CreateDelegateType);
 
@@ -36,7 +50,40 @@ public class DelegateTypeCreator
         return (Delegate)delegateTypeInfo.bind!.Invoke(null, new[] { target })!;
     }
 
-    public Func<Object, Delegate> CreateDelegateCreatorAsDynamicMethod(MethodInfo targetMethod)
+    public Func<Object, Delegate> CreateDelegateCreatorAsDynamicMethod(MethodInfo targetMethod, Boolean useBind)
+    {
+        if (useBind)
+        {
+            return CreateDelegateCreatorAsDynamicMethodUsingCilCallingBind(targetMethod);
+        }
+        else
+        {
+            return CreateDelegateCreatorAsDynamicMethodByCilCreatingDelegate(targetMethod);
+        }
+    }
+
+    public Func<Object, Delegate> CreateDelegateCreatorAsDynamicMethodUsingCilCallingBind(MethodInfo targetMethod)
+    {
+        var delegateTypeInfo = GetDelegateTypeInfo(targetMethod, targetMethod);
+
+        var cheekyCallerMethod = new DynamicMethod(
+            "CreateDelegateForSpecifcTargetMethod",
+            typeof(Func<Object, Delegate>),
+            new[] { typeof(Object) }
+        );
+
+        if (delegateTypeInfo.bind is null) throw new Exception();
+
+        var il = cheekyCallerMethod.GetILGenerator();
+
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Call, delegateTypeInfo.bind);
+        il.Emit(OpCodes.Ret);
+
+        return cheekyCallerMethod.CreateDelegate<Func<Object, Delegate>>();
+    }
+
+    public Func<Object, Delegate> CreateDelegateCreatorAsDynamicMethodByCilCreatingDelegate(MethodInfo targetMethod)
     {
         var delegateTypeInfo = GetDelegateTypeInfo(targetMethod);
 
@@ -60,11 +107,28 @@ public class DelegateTypeCreator
 
     DelegateTypeInfo CreateDelegateType(MethodInfo baseMethod, MethodInfo? targetMethod)
     {
-        var typeBuilder = moduleBuilder.DefineType(
-            baseMethod.Name,
-            TypeAttributes.Public | TypeAttributes.Class | TypeAttributes.AnsiClass | TypeAttributes.AutoClass | TypeAttributes.Sealed,
-            typeof(MulticastDelegate)
-        );
+        TypeBuilder typeBuilder;
+
+        if (moduleBuilder is not null)
+        {
+            typeBuilder = moduleBuilder.DefineType(
+                baseMethod.Name,
+                TypeAttributes.Public | TypeAttributes.Class | TypeAttributes.AnsiClass | TypeAttributes.AutoClass | TypeAttributes.Sealed,
+                typeof(MulticastDelegate)
+            );
+        }
+        else if (containerTypeBuilder is not null)
+        {
+            typeBuilder = containerTypeBuilder.DefineNestedType(
+                baseMethod.Name,
+                TypeAttributes.NestedPublic | TypeAttributes.Class | TypeAttributes.AnsiClass | TypeAttributes.AutoClass | TypeAttributes.Sealed,
+                typeof(MulticastDelegate)
+            );
+        }
+        else
+        {
+            throw new Exception("InternalError: No module or type builder");
+        }
 
         var ctorBuilder = typeBuilder.DefineConstructor(
             MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName,
@@ -74,6 +138,11 @@ public class DelegateTypeCreator
         ctorBuilder.SetImplementationFlags(MethodImplAttributes.Runtime | MethodImplAttributes.Managed);
 
         var parameters = baseMethod.GetParameters();
+
+        var parameterTypes = parameters.Select(p => p.ParameterType).ToArray();
+        var parameterReqMods = parameters.Select(p => p.GetRequiredCustomModifiers()).ToArray();
+        var parameterOptMods = parameters.Select(p => p.GetOptionalCustomModifiers()).ToArray();
+
         var invokeMethodBuilder = typeBuilder.DefineMethod(
             "Invoke",
             MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.NewSlot | MethodAttributes.Virtual,
@@ -81,9 +150,9 @@ public class DelegateTypeCreator
             baseMethod.ReturnType,
             baseMethod.ReturnParameter.GetRequiredCustomModifiers(),
             baseMethod.ReturnParameter.GetOptionalCustomModifiers(),
-            parameters.Select(p => p.ParameterType).ToArray(),
-            parameters.Select(p => p.GetRequiredCustomModifiers()).ToArray(),
-            parameters.Select(p => p.GetOptionalCustomModifiers()).ToArray()
+            parameterTypes,
+            parameterReqMods,
+            parameterOptMods
         );
         invokeMethodBuilder.SetImplementationFlags(MethodImplAttributes.Runtime | MethodImplAttributes.Managed);
 

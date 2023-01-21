@@ -23,6 +23,24 @@ public class MultipleElementsException : InvalidOperationException
     }
 }
 
+public class InternalErrorException : Exception
+{
+    public InternalErrorException()
+        : base("An internal error occured")
+    {
+    }
+
+    public InternalErrorException(String message)
+        : base($"Internal error: {message}")
+    {
+    }
+
+    public InternalErrorException(String message, Exception inner)
+        : base($"Internal error: {message}", inner)
+    {
+    }
+}
+
 public static partial class Extensions
 {
     public static T Return<T>(this Object _, T value) => value;
