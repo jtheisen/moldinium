@@ -3,10 +3,25 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:app="clr-namespace:SampleApp;assembly=SampleApp"
              xmlns:local="clr-namespace:CMinus.Tests.Wpf"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
-    <Grid>
-        <TextBlock Text="adf" />
-    </Grid>
+    <StackPanel Orientation="Vertical">
+        <TextBlock Text="job" />
+        <ContentControl Content="{Binding}">
+            <ContentControl.ContentTemplateSelector>
+                <local:ChooseByInterfaceDataTemplateSelector>
+                    <DataTemplate DataType="{x:Type app:SimpleJob}">
+                        <local:SimpleJob DataContext="{Binding}" />
+                    </DataTemplate>
+                    <DataTemplate DataType="{x:Type app:ComplexJob}">
+                        <local:ComplexJob DataContext="{Binding}" />
+                    </DataTemplate>
+                </local:ChooseByInterfaceDataTemplateSelector>
+            </ContentControl.ContentTemplateSelector>
+            <ContentControl.Resources>
+            </ContentControl.Resources>
+        </ContentControl>
+    </StackPanel>
 </UserControl>
