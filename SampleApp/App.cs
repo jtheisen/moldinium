@@ -3,11 +3,11 @@ using System.Security.Cryptography;
 
 namespace SampleApp;
 
-public interface IJobListApp
+public interface JobListApp
 {
-    Func<SimpleJobConfig, IJobList> CreateJobList { get; init; }
+    Func<SimpleJobConfig, JobList> CreateJobList { get; init; }
 
-    IJobList CreateDefaultJobList()
+    JobList CreateDefaultJobList()
     {
         return CreateJobList(new SimpleJobConfig(TimeSpan.FromSeconds(3), 100));
     }
@@ -15,7 +15,7 @@ public interface IJobListApp
 
 public record CommandConfig(Action Execute, Boolean CanExecute = true);
 
-public interface ICommand : System.Windows.Input.ICommand
+public interface Command : System.Windows.Input.ICommand
 {
     CommandConfig Config { get; init; }
 
@@ -26,9 +26,14 @@ public interface ICommand : System.Windows.Input.ICommand
     void System.Windows.Input.ICommand.Execute(object? parameter) => Config.Execute();
 }
 
-public interface IJobList
+public interface ILogger
 {
-    Func<CommandConfig, ICommand> NewCommand { get; init; }
+    void Log(String message);
+}
+
+public interface JobList
+{
+    Func<CommandConfig, Command> NewCommand { get; init; }
 
     Func<CancellationToken, SimpleJob> NewSimpleJob { get; init; }
     Func<CancellationToken, ComplexJob> NewComplexJob { get; init; }
@@ -37,15 +42,15 @@ public interface IJobList
 
     CancellationToken Ct => GetCts().Token;
 
-    IList<IJob> Items { get; set; }
+    IList<Job> Items { get; set; }
 
     CancellationTokenSource GetCts() => Cts ?? (Cts = new CancellationTokenSource());
 
-    ICommand AddSimpleJobCommand => NewCommand(new CommandConfig(() => AddAndRunJob(NewSimpleJob(Ct))));
-    ICommand AddComplexJobCommand => NewCommand(new CommandConfig(() => AddAndRunJob(NewComplexJob(Ct))));
-    ICommand CancelCommand => NewCommand(new CommandConfig(() => Cancel()));
+    Command AddSimpleJobCommand => NewCommand(new CommandConfig(() => AddAndRunJob(NewSimpleJob(Ct))));
+    Command AddComplexJobCommand => NewCommand(new CommandConfig(() => AddAndRunJob(NewComplexJob(Ct))));
+    Command CancelCommand => NewCommand(new CommandConfig(() => Cancel()));
 
-    async void AddAndRunJob(IJob job)
+    async void AddAndRunJob(Job job)
     {
         Items.Add(job);
 
@@ -66,9 +71,11 @@ public interface IJobList
     }
 }
 
-public interface IJob
+public interface Job
 {
     CancellationToken Ct { get; init; }
+
+    ILogger? Logger { get; init; }
 
     Boolean HasEnded { get; set; }
 
@@ -90,7 +97,7 @@ public interface IJob
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"Job cancelled at {DateTime.Now}");
+            Logger?.Log($"Job aborted at {DateTime.Now}");
 
             Exception = ex;
         }
@@ -105,13 +112,13 @@ public interface IJob
 
 public record SimpleJobConfig(TimeSpan Duration, Int32 Steps);
 
-public interface SimpleJob : IJob
+public interface SimpleJob : Job
 {
     SimpleJobConfig Config { get; init; }
 
     Int32 Progress { get; set; }
 
-    async Task IJob.RunImpl()
+    async Task Job.RunImpl()
     {
         var n = Config.Steps;
 
@@ -126,13 +133,13 @@ public interface SimpleJob : IJob
     }
 }
 
-public interface ComplexJob : IJob
+public interface ComplexJob : Job
 {
     Func<SimpleJob> CreateSimpleJob { get; init; }
 
-    IList<IJob> SubJobs { get; set; }
+    IList<Job> SubJobs { get; set; }
 
-    async Task IJob.RunImpl()
+    async Task Job.RunImpl()
     {
         for (var i = 0; i < 3; ++i)
         {

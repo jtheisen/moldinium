@@ -18,7 +18,7 @@ var configuration = new DefaultDependencyProviderConfiguration(
 
 var provider = DependencyProvider.Create(configuration);
 
-services.AddScoped<IJobListApp>(sp => provider.CreateInstance<IJobListApp>());
+services.AddScoped<JobListApp>(sp => provider.CreateInstance<JobListApp>());
 
 var app = builder.Build();
 

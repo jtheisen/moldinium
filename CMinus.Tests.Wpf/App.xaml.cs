@@ -1,5 +1,7 @@
 ﻿using CMinus.Injection;
+using Microsoft.Extensions.DependencyInjection;
 using SampleApp;
+using System;
 using System.Windows;
 
 namespace CMinus.Tests.Wpf
@@ -7,23 +9,36 @@ namespace CMinus.Tests.Wpf
     /// <summary>
     /// Interaction logic for App.xaml
     /// </summary>
-    public partial class App : Application
+    public partial class App : Application, ILogger
     {
-        public IJobListApp JobListApp { get; private set; } = null!;
+        public JobListApp JobListApp { get; private set; } = null!;
+
+        public Action<String>? Log { get; set; }
 
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
 
+            var services = new ServiceCollection();
+            services.AddSingleton<ILogger>(this);
+            var serviceProvider = services.BuildServiceProvider();
+
             var configuration = new DefaultDependencyProviderConfiguration(
                 Baking: DefaultDependencyProviderBakingMode.TrackingAndNotifyPropertyChanged,
                 BakeAbstract: false,
-                EnableOldModliniumModels: true
+                EnableOldModliniumModels: true,
+                Services: serviceProvider,
+                IsMoldiniumType: t => t.IsInterface && !t.Name.StartsWith("I")
             );
 
             var provider = DependencyProvider.Create(configuration);
 
-            JobListApp = provider.CreateInstance<IJobListApp>();
+            JobListApp = provider.CreateInstance<JobListApp>();
+        }
+
+        void ILogger.Log(string message)
+        {
+            Log?.Invoke(message);
         }
     }
 }

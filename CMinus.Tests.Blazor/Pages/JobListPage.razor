@@ -1,6 +1,6 @@
 ﻿@inherits LocalComponentBase
 
-@inject IJobListApp App
+@inject JobListApp App
 
 @page "/joblist"
 
@@ -20,7 +20,7 @@
 </div>
 
 @code {
-    IJobList jobList = default!;
+    JobList jobList = default!;
 
     protected override void OnInitialized()
     {

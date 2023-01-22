@@ -61,7 +61,8 @@ public record DefaultDependencyProviderConfiguration(
     Boolean InitializeInits = true,
     Boolean EnableFactories = true,
     Action<DependencyProviderBuilder>? Build = null,
-    IServiceProvider? Services = null
+    IServiceProvider? Services = null,
+    Predicate<Type>? IsMoldiniumType = null
 );
 
 public static class DependencyProvider
@@ -95,7 +96,7 @@ public static class DependencyProvider
 
             var bakeryconfiguration = new BakeryConfiguration(componentGenerators, Defaults.GetDefaultDefaultProvider(), config.BakeAbstract);
 
-            providers.Add(new BakeryDependencyProvider(new Bakery("TestBakery", bakeryconfiguration)));
+            providers.Add(new BakeryDependencyProvider(new Bakery("TestBakery", bakeryconfiguration), config.IsMoldiniumType));
         }
 
         if (config.EnableFactories)

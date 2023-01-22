@@ -6,7 +6,8 @@
         xmlns:local="clr-namespace:CMinus.Tests.Wpf"
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="800">
-    <Grid>
+    <DockPanel LastChildFill="False">
         <local:JobList x:Name="JobList" />
-    </Grid>
+        <local:LogView Width="300" DockPanel.Dock="Right" />
+    </DockPanel>
 </Window>

@@ -100,15 +100,19 @@ public interface IDependencyProvider
 public class BakeryDependencyProvider : IDependencyProvider
 {
     private readonly AbstractlyBakery bakery;
+    private readonly Predicate<Type>? predicate;
 
-    public BakeryDependencyProvider(AbstractlyBakery bakery)
+    public BakeryDependencyProvider(AbstractlyBakery bakery, Predicate<Type>? predicate = null)
     {
         this.bakery = bakery;
+        this.predicate = predicate;
     }
 
     public DependencyResolution? Query(Dependency dep)
     {
         if (!dep.Type.IsInterface) return null;
+
+        if (!predicate?.Invoke(dep.Type) ?? false) return null;
 
         var bakedType = bakery.Resolve(dep.Type);
 
