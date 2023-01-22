@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Security.Cryptography;
 
 namespace SampleApp;
 
@@ -72,6 +73,14 @@ public interface IJob
     Boolean HasEnded { get; set; }
 
     Exception? Exception { get; set; }
+
+    String StatusString => this switch
+    {
+        { Exception: OperationCanceledException } => "cancelled",
+        { Exception: Exception e } => $"error: {e.Message}",
+        { HasEnded: true } => "completed",
+        _ => "running"
+    };
 
     async Task Run()
     {

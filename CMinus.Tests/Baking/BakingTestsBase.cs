@@ -57,7 +57,7 @@ public class BakingTestsBase
     {
         String? Value { get; set; }
 
-        void SetValue(String value) => Value = value;
+        void SetValueByMethod(String value) => Value = value;
 
         void Validate()
         {

@@ -6,9 +6,10 @@
              xmlns:app="clr-namespace:SampleApp;assembly=SampleApp"
              xmlns:local="clr-namespace:CMinus.Tests.Wpf"
              mc:Ignorable="d" 
-             d:DesignHeight="450" d:DesignWidth="800">
+             d:DesignHeight="450" d:DesignWidth="800"
+>
     <StackPanel Orientation="Vertical">
-        <TextBlock Text="job" />
+        <TextBlock Text="{Binding StatusString}" />
         <ContentControl Content="{Binding}">
             <ContentControl.ContentTemplateSelector>
                 <local:ChooseByInterfaceDataTemplateSelector>

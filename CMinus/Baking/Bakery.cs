@@ -1,9 +1,5 @@
-﻿using CMinus.Injection;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
-using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -44,7 +40,7 @@ public abstract class AbstractBakery
     public abstract Type GetCreatedType(Type interfaceOrBaseType);
 }
 
-public class AbstractlyBakery : AbstractBakery
+public abstract class AbstractlyBakery : AbstractBakery
 {
     protected readonly string name;
     protected readonly bool makeAbstract;
@@ -88,88 +84,7 @@ public class AbstractlyBakery : AbstractBakery
         return moduleBuilder.GetType(name) ?? CreateImpl(name, interfaceOrBaseType);
     }
 
-    protected virtual Type CreateImpl(String name, Type interfaceOrBaseType)
-    {
-        var typeBuilder = moduleBuilder.DefineType(name, typeAttributes);
-
-        RedeclareInterface(typeBuilder, interfaceOrBaseType);
-
-        return typeBuilder.CreateType() ?? throw new Exception("TypeBuilder gave no built type");
-    }
-
-    void RedeclareInterface(TypeBuilder typeBuilder, Type type)
-    {
-        typeBuilder.AddInterfaceImplementation(type);
-
-        foreach (var property in type.GetProperties())
-        {
-            var propertyBuilder = typeBuilder.DefineProperty(property.Name, property.Attributes, property.PropertyType, null);
-
-            var info = TypeProperties.Get(property.DeclaringType ?? throw new Exception("Unexpectedly not having a declaring type"));
-
-            var requiresDefault = info.Properties.Single(p => p.info == property).requiresDefault;
-
-            if (requiresDefault)
-            {
-                var attributeConstructor = typeof(RequiresDefaultAttribute).GetConstructor(new Type[] { })!;
-
-                propertyBuilder.SetCustomAttribute(new CustomAttributeBuilder(attributeConstructor, new Object[] { }));
-            }
-
-            if (RedeclareMethodIfApplicable(typeBuilder, property.GetGetMethod(), out var getMethodBuilder))
-                propertyBuilder.SetGetMethod(getMethodBuilder);
-            if (RedeclareMethodIfApplicable(typeBuilder, property.GetSetMethod(), out var setMethodBuilder))
-                propertyBuilder.SetSetMethod(setMethodBuilder);
-        }
-
-        foreach (var evt in type.GetEvents())
-        {
-            var eventBuilder = typeBuilder.DefineEvent(evt.Name, evt.Attributes, evt.EventHandlerType ?? throw new Exception($"No event handler type"));
-
-            if (RedeclareMethodIfApplicable(typeBuilder, evt.GetAddMethod(), out var addMethodBuilder))
-                eventBuilder.SetAddOnMethod(addMethodBuilder);
-            if (RedeclareMethodIfApplicable(typeBuilder, evt.GetRemoveMethod(), out var removeMethodBuilder))
-                eventBuilder.SetRemoveOnMethod(removeMethodBuilder);
-        }
-
-        foreach (var method in type.GetMethods())
-        {
-            if (method.IsSpecialName) continue;
-
-            RedeclareMethodIfApplicable(typeBuilder, method, out _);
-        }
-    }
-
-    // can be merged with the method declarer in the generation classes
-    Boolean RedeclareMethodIfApplicable(TypeBuilder typeBuilder, MethodInfo? methodTemplate, [MaybeNullWhen(false)] out MethodBuilder methodBuilder)
-    {
-        methodBuilder = null;
-
-        if (methodTemplate is null) return false;
-
-        var attributes = methodTemplate.Attributes;
-
-        //if (!methodTemplate.DeclaringType!.IsInterface) throw new Exception($"Expecting to derive an interface");
-
-        //// Implemented interface methods don't show as abstract here
-        //attributes |= MethodAttributes.Abstract;
-
-        var parameters = methodTemplate.GetParameters();
-
-        methodBuilder = typeBuilder.DefineMethod(
-            methodTemplate.Name,
-            attributes,
-            methodTemplate.CallingConvention,
-            methodTemplate.ReturnType,
-            methodTemplate.ReturnParameter.GetRequiredCustomModifiers(),
-            methodTemplate.ReturnParameter.GetOptionalCustomModifiers(),
-            parameters.Select(p => p.ParameterType).ToArray(),
-            parameters.Select(p => p.GetRequiredCustomModifiers()).ToArray(),
-            parameters.Select(p => p.GetOptionalCustomModifiers()).ToArray()
-        );
-
-        return true;
-    }
+    protected abstract Type CreateImpl(String name, Type interfaceOrBaseType);
 
     protected void EnsureAccessToAssembly(Assembly assembly)
     {
@@ -232,147 +147,5 @@ public class Bakery : AbstractlyBakery
             name, baseType, typeAttributes, interfaceMapping, defaultProvider, generators, EnsureAccessToAssembly, moduleBuilder);
 
         return processor.Create(interfaceMapping.Interfaces, publicMixins);
-    }
-}
-
-public class ImplementationMapping
-{
-    Type[] interfaces;
-    HashSet<MethodInfo> implementations;
-    Dictionary<MethodInfo, MethodInfo> declarationsToImplementations;
-
-    public Type[] Interfaces => interfaces;
-
-    public MethodInfo[] Implementations => implementations.ToArray();
-
-    public Boolean IsImplemented(MethodInfo method) => declarationsToImplementations.ContainsKey(method);
-
-    public IReadOnlyDictionary<MethodInfo, MethodInfo> DeclarationsToImplementations => declarationsToImplementations;
-
-    public MethodInfo? GetImplementationMethod(MethodInfo? method)
-        => method is not null ? declarationsToImplementations.GetValueOrDefault(method) : null;
-
-    public String ImplementationReport
-    {
-        get
-        {
-            var writer = new StringWriter();
-
-            foreach (var p in declarationsToImplementations)
-            {
-                var implementationName = p.Value.Name;
-
-                if (TryParsePrivateName(implementationName, out var _, out var methodName))
-                {
-                    implementationName = $"{p.Value.DeclaringType!.Name}.{methodName}";
-                }
-
-                writer.WriteLine($"{p.Key.DeclaringType?.Name}.{p.Key.Name} -> {implementationName}");
-            }
-
-            return writer.ToString();
-        }
-    }
-
-    public ImplementationMapping(HashSet<Type> types)
-    {
-        implementations = new HashSet<MethodInfo>();
-        declarationsToImplementations = new Dictionary<MethodInfo, MethodInfo>();
-
-        interfaces = types.Where(t => t.IsInterface).ToArray();
-
-        var bindingFlags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly;
-
-        var implementableMethods = (
-            from ifc in interfaces
-            from method in ifc.GetMethods(bindingFlags)
-            where !method.Name.Contains('.')
-            select (ifc, method)
-        ).ToArray();
-
-        var implementableMethodsByName = implementableMethods
-            .ToLookup(e => (e.ifc.FullName?.Replace('+', '.'), e.method.Name), e => e.method);
-
-        var implementableMethodsByMethodName = implementableMethods
-            .ToLookup(e => e.method.Name, e => e.method);
-
-        foreach (var ifc in types)
-        {
-            var methods = ifc.GetMethods(bindingFlags);
-
-            foreach (var method in methods)
-            {
-                var body = method.GetMethodBody();
-
-                if (body is null) continue;
-
-                MethodInfo methodBase;
-
-                if (TryParsePrivateName(method.Name, out var containerName, out var methodName))
-                {
-                    var candidates = implementableMethodsByName[(containerName, methodName)].ToArray();
-
-                    // TODO: check signatures
-
-                    if (candidates.Length == 0)
-                    {
-                        throw new Exception($"Internal error: There's a private implementation {method.Name} but the declaration for the method could not be found");
-                    }
-                    else if (candidates.Length > 1)
-                    {
-                        throw new Exception($"Internal error: There are multiple candidates for {method.Name}");
-                    }
-
-                    methodBase = candidates.Single();
-                }
-                else if (method.DeclaringType!.IsValueType)
-                {
-                    var candidates = implementableMethodsByMethodName[method.Name].ToArray();
-
-                    if (candidates.Length > 1)
-                    {
-                        throw new Exception($"Internal error: There are multiple candidates for {method.Name}");
-                    }
-
-                    methodBase = candidates.SingleOrDefault() ?? method;
-                }
-                else
-                {
-                    methodBase = method;
-                }
-
-                if (declarationsToImplementations.TryGetValue(methodBase, out var anotherMethod))
-                {
-                    throw new Exception($"We have multiple implementations for {method}, this is not supported yet; two implementations are {method.GetQualifiedName()} {anotherMethod.GetQualifiedName()}");
-                }
-
-                if (methodBase.DeclaringType!.IsInterface)
-                {
-                    implementations.Add(method);
-
-                    declarationsToImplementations[methodBase] = method;
-                }
-            }
-        }
-    }
-
-    Boolean TryParsePrivateName(String methodName, out String containerName, out String baseMethodName)
-    {
-        var lastDotAt = methodName.LastIndexOf('.');
-
-        if (lastDotAt >= 0)
-        {
-            containerName = methodName[..lastDotAt];
-            baseMethodName = methodName[(lastDotAt + 1)..];
-
-            return true;
-        }
-        else
-        {
-            containerName = String.Empty;
-            baseMethodName = String.Empty;
-
-            return false;
-        }
     }
 }

@@ -6,14 +6,14 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Metadata;
 
-namespace CMinus.Injection;
+namespace CMinus.Misc;
 
 [AttributeUsage(AttributeTargets.Class)]
 public class RequiresDefaultAttribute : Attribute { }
 
 public class TypeTraits
 {
-    public Boolean IsDefaultConstructible { get; }
+    public bool IsDefaultConstructible { get; }
 
     private TypeTraits(Type type)
     {
@@ -58,7 +58,7 @@ public class TypeInterfaces
         }
     }
 
-    public Boolean DoesTypeImplement(Type i)
+    public bool DoesTypeImplement(Type i)
         => interfaces.Contains(i);
 
     static ConcurrentDictionary<Type, TypeInterfaces> cache = new ConcurrentDictionary<Type, TypeInterfaces>();
@@ -69,19 +69,19 @@ public class TypeProperties
 {
     public PropertyInfoStruct[] Properties { get; }
 
-    public Boolean HasAnyInitSetters { get; }
+    public bool HasAnyInitSetters { get; }
 
-    public Boolean HasAnyDefaultRequirements { get; }
+    public bool HasAnyDefaultRequirements { get; }
 
     public struct PropertyInfoStruct
     {
         public PropertyInfo info;
-        public Boolean requiresDefault;
-        public Boolean hasInitSetter;
+        public bool requiresDefault;
+        public bool hasInitSetter;
     }
 
-	public TypeProperties(Type type)
-	{
+    public TypeProperties(Type type)
+    {
         var nullabilityContext = new NullabilityInfoContext();
 
         var props =
@@ -119,7 +119,7 @@ public struct ComparableArray<T> : IEquatable<ComparableArray<T>>
         this.values = values;
     }
 
-    public override Int32 GetHashCode()
+    public override int GetHashCode()
     {
         var hash = 0;
 
@@ -131,7 +131,7 @@ public struct ComparableArray<T> : IEquatable<ComparableArray<T>>
         return hash;
     }
 
-    public override Boolean Equals([NotNullWhen(true)] Object? obj)
+    public override bool Equals([NotNullWhen(true)] object? obj)
     {
         if (obj is null) return false;
 
@@ -145,7 +145,7 @@ public struct ComparableArray<T> : IEquatable<ComparableArray<T>>
         }
     }
 
-    public Boolean Equals(ComparableArray<T> other)
+    public bool Equals(ComparableArray<T> other)
     {
         if (values.Length != other.values.Length) return false;
 

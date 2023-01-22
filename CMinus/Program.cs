@@ -2,8 +2,6 @@
 
 class Program
 {
-    static AbstractlyBakery classFactory = new AbstractlyBakery("Funky");
-
     static void Main(string[] args)
     {
         //var container = new Container();

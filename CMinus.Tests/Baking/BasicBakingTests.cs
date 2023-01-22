@@ -18,7 +18,7 @@ public class BasicBakingTests : BakingTestsBase
 
         Assert.AreEqual("foo", test.Value);
 
-        test.SetValue("bar");
+        test.SetValueByMethod("bar");
 
         Assert.AreEqual("bar", test.Value);
     }
