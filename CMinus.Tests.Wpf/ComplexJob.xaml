@@ -6,7 +6,7 @@
              xmlns:local="clr-namespace:CMinus.Tests.Wpf"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
-    <Border BorderThickness="0, 1, 0, 0" BorderBrush="Black">
+    <Border BorderThickness="0, 1, 0, 0" BorderBrush="{StaticResource MaterialDesignDivider}">
         <ItemsControl ItemsSource="{Binding SubJobs}" Opacity=".75">
             <ItemsControl.ItemTemplate>
                 <DataTemplate>

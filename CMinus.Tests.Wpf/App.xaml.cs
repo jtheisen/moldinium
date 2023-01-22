@@ -28,7 +28,7 @@ namespace CMinus.Tests.Wpf
                 BakeAbstract: false,
                 EnableOldModliniumModels: true,
                 Services: serviceProvider,
-                IsMoldiniumType: t => t.IsInterface && !t.Name.StartsWith("I")
+                IsMoldiniumType: t => t.IsInterface && !t.Name.StartsWithCapitalIAndContinuesWithAnotherCapital()
             );
 
             var provider = DependencyProvider.Create(configuration);

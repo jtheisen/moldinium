@@ -150,7 +150,7 @@ public interface ComplexJob : Job
     {
         for (var i = 0; i < 3; ++i)
         {
-            var subJob = CreateSimpleJob(new JobNestingLevel(NestingLevel?.Level ?? 0 + 1));
+            var subJob = CreateSimpleJob(new JobNestingLevel((NestingLevel?.Level ?? 0) + 1));
 
             SubJobs.Add(subJob);
 

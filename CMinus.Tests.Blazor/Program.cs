@@ -13,7 +13,8 @@ services.AddServerSideBlazor();
 var configuration = new DefaultDependencyProviderConfiguration(
     Baking: DefaultDependencyProviderBakingMode.Tracking,
     BakeAbstract: false,
-    EnableOldModliniumModels: true
+    EnableOldModliniumModels: true,
+    IsMoldiniumType: t => t.IsInterface && !t.Name.StartsWithCapitalIAndContinuesWithAnotherCapital()
 );
 
 var provider = DependencyProvider.Create(configuration);

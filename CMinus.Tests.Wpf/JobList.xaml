@@ -16,7 +16,7 @@
             <Button Style="{StaticResource MaterialDesignFlatButton}" Margin="2,0" Command="{Binding AddComplexJobCommand}" Content="Add complex job" />
             <Button DockPanel.Dock="Right" Style="{StaticResource MaterialDesignFlatSecondaryDarkBgButton}" Margin="4,0" Command="{Binding CancelCommand}" Content="Cancel" />
         </DockPanel>
-        <ItemsControl ItemsSource="{Binding Items}" Grid.Row="1">
+        <ItemsControl ItemsSource="{Binding Items}" Grid.Row="1" BorderBrush="{StaticResource MaterialDesignDivider}" BorderThickness="0,1,0,0">
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
                     <local:Job DataContext="{Binding}" />

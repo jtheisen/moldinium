@@ -15,8 +15,10 @@
         FontFamily="{DynamicResource MaterialDesignFont}"
         Title="MainWindow" Height="450" Width="800"
 >
-    <DockPanel LastChildFill="False">
-        <local:JobList x:Name="JobList" />
-        <local:LogView Width="300" DockPanel.Dock="Right" />
+    <DockPanel>
+        <Border DockPanel.Dock="Right" BorderThickness="1, 0, 0, 0" BorderBrush="{StaticResource MaterialDesignDivider}">
+            <local:LogView Width="300" />
+        </Border>
+        <local:JobList HorizontalAlignment="Stretch" x:Name="JobList" />
     </DockPanel>
 </Window>

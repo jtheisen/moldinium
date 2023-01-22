@@ -126,3 +126,9 @@ public static class DependencyProvider
         _ => throw new NotImplementedException()
     };
 }
+
+public static partial class Extensions
+{
+    public static Boolean StartsWithCapitalIAndContinuesWithAnotherCapital(this String name)
+        => name.Length > 1 && name[0] == 'I' && Char.IsUpper(name[1]);
+}
