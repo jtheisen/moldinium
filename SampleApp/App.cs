@@ -5,11 +5,12 @@ namespace SampleApp;
 
 public interface JobListApp
 {
-    Func<SimpleJobConfig, JobList> CreateJobList { get; init; }
+    // FIXME: passing job nesting level shouldn't be necessary
+    Func<SimpleJobConfig, JobNestingLevel, JobList> CreateJobList { get; init; }
 
     JobList CreateDefaultJobList()
     {
-        return CreateJobList(new SimpleJobConfig(TimeSpan.FromSeconds(3), 100));
+        return CreateJobList(new SimpleJobConfig(TimeSpan.FromSeconds(3), 100), new JobNestingLevel(0));
     }
 }
 
@@ -71,9 +72,13 @@ public interface JobList
     }
 }
 
+public record JobNestingLevel(Int32 Level);
+
 public interface Job
 {
     CancellationToken Ct { get; init; }
+
+    JobNestingLevel? NestingLevel { get; init; }
 
     ILogger? Logger { get; init; }
 
@@ -130,12 +135,14 @@ public interface SimpleJob : Job
 
             Progress = 100 * i / n;
         }
+
+        Progress = 100;
     }
 }
 
 public interface ComplexJob : Job
 {
-    Func<SimpleJob> CreateSimpleJob { get; init; }
+    Func<JobNestingLevel, SimpleJob> CreateSimpleJob { get; init; }
 
     IList<Job> SubJobs { get; set; }
 
@@ -143,7 +150,7 @@ public interface ComplexJob : Job
     {
         for (var i = 0; i < 3; ++i)
         {
-            var subJob = CreateSimpleJob();
+            var subJob = CreateSimpleJob(new JobNestingLevel(NestingLevel?.Level ?? 0 + 1));
 
             SubJobs.Add(subJob);
 

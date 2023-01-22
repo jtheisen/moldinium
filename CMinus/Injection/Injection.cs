@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Runtime.Intrinsics.Arm;
 
 namespace CMinus.Injection;
@@ -42,7 +43,35 @@ namespace CMinus.Injection;
  * 
  */
 
-public record Dependency(Type Type, DependencyRuntimeMaturity Maturity = DependencyRuntimeMaturity.OnlyType);
+public record Dependency(Type Type, DependencyRuntimeMaturity Maturity, Boolean IsOptional)
+{
+    public void Validate()
+    {
+        if (IsOutlawed(Type)) throw new Exception($"Type {Type} can't be used as a dependency");
+    }
+
+    static Type[] outlawedTypes = new[] { typeof(byte), typeof(int), typeof(uint), typeof(short), typeof(ushort), typeof(long), typeof(ulong), typeof(Guid) };
+
+    public static Boolean IsOutlawed(Type type)
+    {
+        if (type == typeof(String))
+        {
+            return true;
+        }
+        else if (!type.IsValueType)
+        {
+            return false;
+        }
+        else if (outlawedTypes.Contains(type))
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+}
 
 public enum DependencyRuntimeMaturity
 {
@@ -53,9 +82,7 @@ public enum DependencyRuntimeMaturity
     UntouchedInstance,
 
     // We're done
-    InitSettersSetInstance,
-
-    Finished = InitSettersSetInstance
+    InitializedInstance,
 }
 
 public class DependencyBag
@@ -67,16 +94,25 @@ public class DependencyBag
     public IImmutableSet<Dependency> Items => dependencies;
 
     public DependencyBag(IImmutableSet<Dependency> dependencies)
-        => this.dependencies = ImmutableHashSet.CreateRange(dependencies);
+        => this.dependencies = Validate(ImmutableHashSet.CreateRange(dependencies));
 
     public DependencyBag(IEnumerable<Dependency> dependencies)
-        => this.dependencies = ImmutableHashSet.CreateRange(dependencies);
+        => this.dependencies = Validate(ImmutableHashSet.CreateRange(dependencies));
 
     public DependencyBag(Dependency dependency)
-        => dependencies = ImmutableHashSet.Create(dependency);
+        => dependencies = Validate(ImmutableHashSet.Create(dependency));
 
     public DependencyBag Concat(DependencyBag rhs)
         => new DependencyBag(dependencies.Union(rhs.dependencies));
+
+    IImmutableSet<Dependency> Validate(IImmutableSet<Dependency> dependencies)
+    {
+        foreach (var dep in dependencies)
+        {
+            dep.Validate();
+        }
+        return dependencies;
+    }
 }
 
 public delegate Scope SubscopeCreator(Scope scope);
@@ -116,12 +152,12 @@ public class BakeryDependencyProvider : IDependencyProvider
 
         var bakedType = bakery.Resolve(dep.Type);
 
-        var bakedInstanceDependency = new Dependency(bakedType, DependencyRuntimeMaturity.Finished);
+        var bakedInstanceDependency = dep with { Type = bakedType };
 
         return new DependencyResolution(
             this,
             dep,
-            new Dependency(bakedType, DependencyRuntimeMaturity.Finished),
+            bakedInstanceDependency,
             DependencyBag.Empty,
             Get: scope => scope.Get(bakedInstanceDependency)
         );
@@ -207,18 +243,22 @@ public class ActivatorDependencyProvider : IDependencyProvider
     }
 }
 
+
+
+// FIXME: this provider often attempts to resolve types that it can't handle when the real dependency is missing
+// - this then gives a confusing error
 public class InitSetterDependencyProvider : IDependencyProvider
 {
     public DependencyResolution? Query(Dependency dep)
     {
-        if (dep.Maturity != DependencyRuntimeMaturity.InitSettersSetInstance) return null;
+        if (dep.Maturity != DependencyRuntimeMaturity.InitializedInstance) return null;
 
         var reflection = TypeProperties.Get(dep.Type);
 
         var dependencies =
             from p in reflection.Properties
             where p.hasInitSetter
-            select new Dependency(p.info.PropertyType, DependencyRuntimeMaturity.Finished);
+            select new Dependency(p.info.PropertyType, DependencyRuntimeMaturity.InitializedInstance, !p.requiresDefault);
 
         var embryoDependency = dep with { Maturity = DependencyRuntimeMaturity.UntouchedInstance };
 
@@ -231,11 +271,20 @@ public class InitSetterDependencyProvider : IDependencyProvider
             {
                 var embryo = scope.Get(embryoDependency);
 
-                foreach (var prop in reflection.Properties)
+                foreach (var p in reflection.Properties)
                 {
-                    if (!prop.hasInitSetter) continue;
+                    if (!p.hasInitSetter) continue;
 
-                    prop.info.SetValue(embryo, scope.Get(new Dependency(prop.info.PropertyType, DependencyRuntimeMaturity.Finished)));
+                    var instance = scope.Get(new Dependency(p.info.PropertyType, DependencyRuntimeMaturity.InitializedInstance, !p.requiresDefault));
+
+                    if (instance is not null)
+                    {
+                        p.info.SetValue(embryo, instance);
+                    }
+                    else if (p.requiresDefault)
+                    {
+                        throw new InternalErrorException("Should have an instance");
+                    }
                 }
 
                 return embryo;
@@ -253,12 +302,15 @@ public class FactoryDependencyProvider : IDependencyProvider
 
         public FactoryArgumentsDependencyProvider(Type[] types)
         {
-            dependencies = types.Select(t => new Dependency(t, DependencyRuntimeMaturity.Finished)).ToHashSet();
+            dependencies = types.Select(t => new Dependency(t, DependencyRuntimeMaturity.InitializedInstance, false))
+                .ToHashSet();
         }
 
         public DependencyResolution? Query(Dependency dependency)
         {
-            if (!dependencies.Contains(dependency)) return null;
+            var lookupDependency = dependency with { IsOptional = false };
+
+            if (!dependencies.Contains(lookupDependency)) return null;
 
             return new DependencyResolution(
                 this,
@@ -267,7 +319,7 @@ public class FactoryDependencyProvider : IDependencyProvider
                 {
                     if (Arguments is null) throw new Exception($"{nameof(FactoryArgumentsDependencyProvider)} was not provided with arguments yet");
 
-                    return Arguments[dependency];
+                    return Arguments[lookupDependency];
                 }
             );
         }
@@ -298,7 +350,7 @@ public class FactoryDependencyProvider : IDependencyProvider
                 parent.Provider
             );
 
-            var subScope = new Scope(provider, new Dependency(returnType, DependencyRuntimeMaturity.Finished));
+            var subScope = new Scope(provider, new Dependency(returnType, DependencyRuntimeMaturity.InitializedInstance, false));
 
             return subScope;
         }
@@ -313,7 +365,7 @@ public class FactoryDependencyProvider : IDependencyProvider
             {
                 factoryArgumentsProvider.Arguments = parameterTypes
                     .Select((type, i) => (type, instance: args[i]))
-                    .ToDictionary(d => new Dependency(d.type, DependencyRuntimeMaturity.Finished), d => d.instance);
+                    .ToDictionary(d => new Dependency(d.type, DependencyRuntimeMaturity.InitializedInstance, false), d => d.instance);
 
                 var runtimeScope = subScope.CreateRuntimeScope();
 
@@ -350,7 +402,7 @@ public class ConcreteImplementationDependencyProvider : IDependencyProvider
     {
         if (implementations.TryGetValue(dep.Type, out var implementationType))
         {
-            var implementation = new Dependency(implementationType, dep.Maturity);
+            var implementation = dep with { Type = implementationType, Maturity = dep.Maturity };
 
             return new DependencyResolution(this, dep, implementation, Get: scope => scope.Get(implementation));
         }
@@ -372,29 +424,28 @@ public class ConcreteDependencyProvider : IDependencyProvider
     public ConcreteDependencyProvider(params (Type type, Object instance)[] dependencies)
         => dependencies.ToList().ForEach(p => AddInstance(p.type, p.instance));
 
-    public ConcreteDependencyProvider(params (Dependency dependency, Object instance)[] dependencies)
-        => dependencies.ToList().ForEach(p => AddInstance(p.dependency, p.instance));
-
-    public ConcreteDependencyProvider(params Dependency[] dependencies)
-        => dependencies.ToList().ForEach(d => Accept(d));
-
     public ConcreteDependencyProvider(params Type[] dependencies)
         => dependencies.ToList().ForEach(t => Accept(t));
 
     public Boolean IsEmpty => dependencies.Count == 0;
 
-    public ConcreteDependencyProvider AddInstance(Dependency dep, Object instance) => Add(dep, new DependencyResolution(this, dep, Get: scope => instance));
-    public ConcreteDependencyProvider AddInstance(Type type, Object instance) => AddInstance(new Dependency(type, DependencyRuntimeMaturity.Finished), instance);
-    public ConcreteDependencyProvider Accept(Dependency dep) => Add(dep, new DependencyResolution(this, dep));
-    public ConcreteDependencyProvider Accept(Type type) => Accept(new Dependency(type, DependencyRuntimeMaturity.OnlyType));
+    public ConcreteDependencyProvider AddInstance(Type type, Object instance) => Add(type, DependencyRuntimeMaturity.InitializedInstance, _ => instance);
+    public ConcreteDependencyProvider Accept(Type type) => Add(type, DependencyRuntimeMaturity.OnlyType, null);
 
-    public ConcreteDependencyProvider Add(Dependency dep, DependencyResolution resolution)
+    public ConcreteDependencyProvider Add(Type type, DependencyRuntimeMaturity maturity, InstanceGetter? get)
     {
         if (isClosed) throw new Exception($"{nameof(ConcreteDependencyProvider)} has already been used and can't be modified");
 
-        dependencies.Add(dep, resolution);
+        Add(type, maturity, get, true);
+        Add(type, maturity, get, false);
 
         return this;
+    }
+
+    void Add(Type type, DependencyRuntimeMaturity maturity, InstanceGetter? get, Boolean isOptional)
+    {
+        var dep = new Dependency(type, maturity, isOptional);
+        dependencies.Add(dep, new DependencyResolution(this, dep, Get: get));
     }
 
     public DependencyResolution? Query(Dependency dep)
@@ -404,14 +455,6 @@ public class ConcreteDependencyProvider : IDependencyProvider
         if (dependencies.TryGetValue(dep, out var resolution))
         {
             return resolution;
-
-            //return new DependencyResolution(
-            //    this,
-            //    type,
-            //    null,
-            //    DependencyBag.Empty,
-            //    Get: _ => instance ?? throw new InvalidOperationException("There is no instance")
-            //);
         }
         else
         {
@@ -445,7 +488,7 @@ public class CombinedDependencyProvider : IDependencyProvider
 public class Scope<T> : Scope
 {
     public Scope(IDependencyProvider provider, DependencyRuntimeMaturity maturity)
-        : base(provider, new Dependency(typeof(T), maturity))
+        : base(provider, new Dependency(typeof(T), maturity, true))
     {
     }
 
@@ -507,9 +550,26 @@ public class Scope
         {
             var next = pending.Dequeue();
 
-            var resolution = provider.Query(next);
+            DependencyResolution? resolution = null;
 
-            if (resolution is null) throw new Exception($"Can't resolve dependency {next}\n\n{CreateDependencyIssueReport(next)}");
+            try
+            {
+                resolution = provider.Query(next);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(
+                    $"Exception during dependency resolution for {next} on provider {provider.GetType().Name}\n\n"
+                    + CreateDependencyIssueReport(next), ex
+                );
+            }
+
+            if (resolution is null)
+            {
+                if (next.IsOptional) continue;
+
+                throw new Exception($"Can't resolve dependency {next}\n\n{CreateDependencyIssueReport(next)}");
+            }
 
             resolutions.Add(next, resolution);
 
@@ -574,7 +634,7 @@ public class Scope
                 break;
             }
 
-            writer.WriteLine($"{dependency} required by {resolution.Dep} provided by {resolution.Provider.GetType().Name}");
+            writer.WriteLine($"{resolution.Provider.GetType().Name} provided {dependency} required by {resolution.Dep}");
 
             dependency = resolution.Dep;
         }
@@ -641,7 +701,7 @@ public static class Extensions
 
     public static Type ResolveType(this IDependencyProvider provider, Type type)
     {
-        var root = new Dependency(type, DependencyRuntimeMaturity.OnlyType);
+        var root = new Dependency(type, DependencyRuntimeMaturity.OnlyType, true);
 
         var scope = new Scope(provider.AcceptDefaultConstructibles(), root);
 
@@ -650,9 +710,9 @@ public static class Extensions
         return final.Type;
     }
 
-    public static Object CreateInstance(this IDependencyProvider provider, Type type, DependencyRuntimeMaturity maturity = DependencyRuntimeMaturity.InitSettersSetInstance)
-        => new Scope(provider, new Dependency(type, maturity)).CreateRuntimeScope().Root;
+    public static Object CreateInstance(this IDependencyProvider provider, Type type, DependencyRuntimeMaturity maturity = DependencyRuntimeMaturity.InitializedInstance)
+        => new Scope(provider, new Dependency(type, maturity, true)).CreateRuntimeScope().Root;
 
-    public static T CreateInstance<T>(this IDependencyProvider provider, DependencyRuntimeMaturity maturity = DependencyRuntimeMaturity.InitSettersSetInstance) where T : class
+    public static T CreateInstance<T>(this IDependencyProvider provider, DependencyRuntimeMaturity maturity = DependencyRuntimeMaturity.InitializedInstance) where T : class
         => (T)provider.CreateInstance(typeof(T), maturity);
 }

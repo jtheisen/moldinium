@@ -9,7 +9,7 @@
              d:DesignHeight="450" d:DesignWidth="800"
 >
     <StackPanel Orientation="Vertical">
-        <TextBlock Text="{Binding StatusString}" />
+        <TextBlock Margin="{Binding NestingLevel, Converter={StaticResource NestingLevelConverter}}" Text="{Binding StatusString, Converter={StaticResource UpperCaseConverter}}" Style="{StaticResource MaterialDesignButtonTextBlock}" d:Text="qwer" />
         <ContentControl Content="{Binding}">
             <ContentControl.ContentTemplateSelector>
                 <local:ChooseByInterfaceDataTemplateSelector>

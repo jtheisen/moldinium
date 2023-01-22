@@ -23,8 +23,6 @@ public class DependencyProviderBuilder
     List<IDependencyProvider> extraProviders = new List<IDependencyProvider>();
 
     public DependencyProviderBuilder AddInstance(Type type, Object instance) => concretes.AddInstance(type, instance).Return(this);
-    public DependencyProviderBuilder AddInstance(Dependency dep, Object instance) => concretes.AddInstance(dep, instance).Return(this);
-    public DependencyProviderBuilder Accept(Dependency dep) => concretes.Accept(dep).Return(this);
     public DependencyProviderBuilder Accept(Type type) => concretes.Accept(type).Return(this);
 
     public DependencyProviderBuilder AddImplementation(Type interfaceType, Type implementationType)
