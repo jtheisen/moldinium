@@ -182,8 +182,6 @@ public class GenericEventGenerator : AbstractImplementationTypeEventGenerator
             }
         }
 
-        if (outerAddImplementation.IsImplementedPrivately || outerRemoveImplementation.IsImplementedPrivately) return null;
-
         if (outerAddImplementation.Kind == MethodImplementationKind.ImplementedByMixin)
         {
             return (null, new EventImplementation(

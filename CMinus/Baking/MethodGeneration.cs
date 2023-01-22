@@ -84,8 +84,6 @@ public class GenericMethodGenerator : AbstractMethodGenerator
         var outerMethodImplementation = state.GetOuterImplementationInfo(method);
 
 
-        if (outerMethodImplementation.IsImplementedPrivately) return null;
-
         var methodImplementationType = implementation.MakeImplementationType(returnType: method.ReturnType);
 
         var fieldBuilder = typeBuilder.DefineField($"backing_{method.Name}", methodImplementationType, FieldAttributes.Private);

@@ -188,8 +188,6 @@ public class GenericPropertyGenerator : AbstractPropertyGenerator
             }
         }
 
-        if (outerGetImplementation.IsImplementedPrivately || outerSetImplementation.IsImplementedPrivately) return null;
-
         if (outerGetImplementation.Kind == MethodImplementationKind.ImplementedByMixin)
         {
             return (null, new PropertyImplementation(
