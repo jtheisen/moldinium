@@ -1,6 +1,6 @@
-# CMinus/Moldinium
+# Moldinium/Moldinium
 
-This repo is called CMinus but it's going to merge with my
+This repo is called Moldinium but it's going to merge with my
 old Moldinium project under the name Moldinium.
 
 It's a library to write code entirely in C# interfaces and

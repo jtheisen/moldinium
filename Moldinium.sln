@@ -1,0 +1,60 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.4.33122.133
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Moldinium", "Moldinium\Moldinium.csproj", "{97A6C666-81D9-4101-95DD-08C5CE26A1F7}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{4FFAC576-5650-4A42-8A1A-574DF3320093}"
+	ProjectSection(SolutionItems) = preProject
+		readme.md = readme.md
+	EndProjectSection
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Moldinium.Tests", "Moldinium.Tests\Moldinium.Tests.csproj", "{B3EA884C-8AA6-4FE1-8779-4A6FD86E7EF8}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Moldinium.Tests.Blazor", "Moldinium.Tests.Blazor\Moldinium.Tests.Blazor.csproj", "{A77D9E00-1D73-46FF-BFFB-28AF1E568583}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SampleApp", "SampleApp\SampleApp.csproj", "{0246ED7D-61DF-4243-BDCB-655CA0FB7D30}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Moldinium.Blazor", "Moldinium.Blazor\Moldinium.Blazor.csproj", "{31E21125-3FCC-427E-9553-76CA1D744266}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Moldinium.Tests.Wpf", "Moldinium.Tests.Wpf\Moldinium.Tests.Wpf.csproj", "{D33AF4E7-8E83-429A-B4AF-F7236DCB2AD9}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{97A6C666-81D9-4101-95DD-08C5CE26A1F7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{97A6C666-81D9-4101-95DD-08C5CE26A1F7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{97A6C666-81D9-4101-95DD-08C5CE26A1F7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{97A6C666-81D9-4101-95DD-08C5CE26A1F7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B3EA884C-8AA6-4FE1-8779-4A6FD86E7EF8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B3EA884C-8AA6-4FE1-8779-4A6FD86E7EF8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B3EA884C-8AA6-4FE1-8779-4A6FD86E7EF8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B3EA884C-8AA6-4FE1-8779-4A6FD86E7EF8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A77D9E00-1D73-46FF-BFFB-28AF1E568583}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A77D9E00-1D73-46FF-BFFB-28AF1E568583}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A77D9E00-1D73-46FF-BFFB-28AF1E568583}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A77D9E00-1D73-46FF-BFFB-28AF1E568583}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0246ED7D-61DF-4243-BDCB-655CA0FB7D30}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0246ED7D-61DF-4243-BDCB-655CA0FB7D30}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0246ED7D-61DF-4243-BDCB-655CA0FB7D30}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0246ED7D-61DF-4243-BDCB-655CA0FB7D30}.Release|Any CPU.Build.0 = Release|Any CPU
+		{31E21125-3FCC-427E-9553-76CA1D744266}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{31E21125-3FCC-427E-9553-76CA1D744266}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{31E21125-3FCC-427E-9553-76CA1D744266}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{31E21125-3FCC-427E-9553-76CA1D744266}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D33AF4E7-8E83-429A-B4AF-F7236DCB2AD9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D33AF4E7-8E83-429A-B4AF-F7236DCB2AD9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D33AF4E7-8E83-429A-B4AF-F7236DCB2AD9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D33AF4E7-8E83-429A-B4AF-F7236DCB2AD9}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {D0AD2966-0ABB-491C-AEAC-92BDB5544D7D}
+	EndGlobalSection
+EndGlobal
