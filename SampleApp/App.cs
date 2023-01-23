@@ -59,7 +59,7 @@ public interface JobList
 
         await Task.Delay(3000);
 
-        Items.Remove(job);
+        //Items.Remove(job);
     }
 
     void Cancel()

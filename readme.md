@@ -1,113 +1,45 @@
-# Moldinium/Moldinium
+# Moldinium
 
-This repo is called Moldinium but it's going to merge with my
-old Moldinium project under the name Moldinium.
+## Teaser
 
-It's a library to write code entirely in C# interfaces and
-consists of three independent parts:
-
-- dynamic type creation from interfaces
-- dependency injection
-- dependency tracking
-
-## State
-
-The repo shows the creation of type from interfaces,
-with dependencies resolved, and
-
-- implemented properties wrapped as computed,
-- methods wrapped as actions (but see below) and
-- unimplemented properties implemented as trackable and
-  - get resolved if not-nullable and with an init setter,
-  - get default-initialized from a default provider if
-    not-nullable and with a set setter
-
-The Moldinium types can implement INotifyPropertyChanged
-but this is only tried separately from the tracking
-in the test suite as of yet.
-
-## The major downer
-
-The major downside of using moldinium models is that lose
-the nice syntax of object creation: new T { ... }
-
-This will be especially annoying in LINQ queries and
-exceptionally so with EF, where EF won't understand a
-different means of creating the object.
-
-Also, all usage of fluent APIs will have to be wrapped
-in something generic to allow Moldinium to provide the
-correct types later.
-
-At least this is possible:
+Moldinium allows you to write code in interfaces such as these:
 
 ```c#
-I Foo<I>()
-    where I : Is.I, new()
+interface IParentJob
 {
-    return new I { Name = "foo" };
+    IList<IChildJob> Jobs { get; init; }
+
+    String ParentName { get; set; }
+}
+
+interface IChildJob
+{
+    IOperationGroup Parent { get; init; }
+
+    String ChildName { get; set; }
+
+    String QualifiedName => $"{Parent.ParentName}.{ChildName}";
 }
 ```
 
-Thinking about this some more, it may be not that big
-of a deal.
+It will then create class implementations of these at runtime that
 
-EF Entities themselves rarely need initializing from within
-LINQ. They are usually loaded as they are. The `new` syntax
-is used mostly for projection entities that aren't part
-of the storage model and could still be classic types.
+- implement `INotifyPropertyChanged` on for xaml-based UIs to bind against, or
+- implement a different update notification mechanism for Blazor (see below), and
+- have both update mechanisms trigger even for calculated properties
+  (eg. `QualifiedName` will have a change trigger fired if *either* the child or the parent's namechanges)
 
-Also, there is presence of init props here, these are classic
-set setters in this context. So an EF query could do this:
+## The three parts of Moldinium
 
-```c#
-var results = (
-    from t in myThings
-    select t
-).ToArray().Select(t => Create<MyI>().Modify(dto =>
-{
-    dto.Name = e.Name;
-    // ...
-})
-)
-```
+Moldinium consists of three parts that are not dependent on each other and can be used in isolation,
+but they shine brighter when used together. Those are
 
-Not super beautiful, but acceptable.
+- the bakery: dynamic type creation
+- the compositor: type and instance dependency injection
+- the tracker: value dependency tracking
 
-## Todo
+## Dependency tracking and the way this works on Blazor
 
-The following notes are for myself to remember what issues
-still need tackling:
-
-### Derived type's properties need to be derived themselves
-
-This is necessary to allow tools that do reflection themselves,
-such as EF or JsonConvert to construct the correct types
-to put into properties.
-
-### Derived types need to form a hierarchy
-
-This is necessary for EF and serialization tools to understand
-the hierarchy.
-
-### Attributes need to be converted
-
-For the same reasons
-
-### Tracking needs an action context
-
-Apparantly this wasn't done yet, so there's nothing to call
-in the implementation of function wrappers.
-
-### The bakery should support nested wrappers
-
-Not strictly necessary, but this would be really useful.
-
-### Internal dependency resolving
-
-Not strictly necessary as long as the tracking repository
-is statically located, as it currently still is, but it has
-other advantages, such as that dependencies can be injected
-into types created by EF or deserializers.
-
-This requires the dependency resolver to be ambient.
+Dependency tracking a way to track a computed expression to be notified when it's dependent
+values change. In the teaser above, `QualifiedName` has the dependencies `ChildName`,
+`Parent` and `Parent.ParentName`. So how can 

@@ -1,13 +1,11 @@
 ﻿@inherits LocalComponentBase
 
-<div class="mt-2 border-light border-top border-4">
-    <MiniInfo Name="@nameof(ComplexJobView)" DateTime="@DateTime.Now" />
+<MiniInfo IsSecondary="@true" Name="@nameof(ComplexJobView)" DateTime="@DateTime.Now" />
 
+<div class="opacity-75">
     @foreach (var subJob in Job.SubJobs)
     {
-        <div class="ms-4">
-            <JobView Job="@subJob" />
-        </div>
+        <JobView Job="@subJob" />
     }
 </div>
 

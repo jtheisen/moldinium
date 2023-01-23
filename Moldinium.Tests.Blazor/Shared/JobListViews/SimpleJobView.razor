@@ -1,8 +1,12 @@
 ﻿@inherits LocalComponentBase
 
-<MiniInfo Name="@(nameof(SimpleJobView) + " ")" DateTime="@DateTime.Now" />
+<MiniInfo IsSecondary="@true" Name="@(nameof(SimpleJobView) + " ")" DateTime="@DateTime.Now" />
+
+<div class="progress" style="height: 4px;">
+    <div class="progress-bar" role="progressbar" style="width: @Job.Progress%;"></div>
+</div>
 
 @code {
     [Parameter]
-    public SimpleJob Job { get; set; }
+    public SimpleJob Job { get; set; } = null!;
 }

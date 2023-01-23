@@ -1,32 +1,11 @@
 ﻿@inherits LocalComponentBase
 
-<div class="border-top border-bottom">
-    <MiniInfo Name="@nameof(JobView)" DateTime="@DateTime.Now" />
+<div class="position-relative border-top">
+    <MiniInfo IsSecondary="@false" Name="@nameof(JobView)" DateTime="@DateTime.Now" />
 
-    @if (!Job.HasEnded)
-    {
-        <div>
-            running
-        </div>
-    }
-    else if (Job.Exception is OperationCanceledException)
-    {
-        <div>
-            Cancelled
-        </div>
-    }
-    else if (Job.Exception is Exception)
-    {
-        <div>
-            Error
-        </div>
-    }
-    else
-    {
-        <div>
-            completed
-        </div>
-    }
+    <div class="status-string d-flex flex-column justify-content-center text-secondary text-uppercase" style="@Style">
+        @Job.StatusString
+    </div>
 
     @if (Job is SimpleJob simpleJob)
     {
@@ -45,5 +24,7 @@
 
 @code {
     [Parameter]
-    public Job Job { get; set; }
+    public Job Job { get; set; } = null!;
+
+    String Style => $"margin-left: {1 + Job.NestingLevel?.Level ?? 0}em";
 }
