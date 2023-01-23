@@ -4,6 +4,7 @@ using CMinus.Misc;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -43,8 +44,41 @@ namespace CMinus.Injection;
  * 
  */
 
-public record Dependency(Type Type, DependencyRuntimeMaturity Maturity, Boolean IsOptional)
+public enum RuntimeResolutionType
 {
+    Missing,
+    Instance,
+    TypeResolved
+}
+
+public struct RuntimeResolution
+{
+    public static RuntimeResolution Missing = new RuntimeResolution(RuntimeResolutionType.Missing);
+    public static RuntimeResolution TypeResolved = new RuntimeResolution(RuntimeResolutionType.TypeResolved);
+
+    public RuntimeResolutionType Type { get; }
+    public Object? Instance { get; }
+
+    public RuntimeResolution(Object instance)
+    {
+        Type = RuntimeResolutionType.Instance;
+        Instance = instance;
+    }
+
+    public RuntimeResolution(RuntimeResolutionType type)
+    {
+        Type = type;
+        Instance = null;
+    }
+}
+
+public record Dependency(Type Type, DependencyRuntimeMaturity Maturity, Boolean IsOptional, Boolean IsRootDependency)
+{
+    public override string ToString()
+    {
+        return $"{Char.ToLower(Maturity.ToString()[0])}{(IsOptional ? 'o' : 'r')}`{Type.Name}";
+    }
+
     public void Validate()
     {
         if (IsOutlawed(Type)) throw new Exception($"Type {Type} can't be used as a dependency");
@@ -76,7 +110,7 @@ public record Dependency(Type Type, DependencyRuntimeMaturity Maturity, Boolean 
 public enum DependencyRuntimeMaturity
 {
     // There's only the type yet and no instance is available
-    OnlyType,
+    TypeOnly,
 
     // We have an uninitialized instance
     UntouchedInstance,
@@ -117,7 +151,7 @@ public class DependencyBag
 
 public delegate Scope SubscopeCreator(Scope scope);
 
-public delegate Object InstanceGetter(RuntimeScope scope);
+public delegate RuntimeResolution InstanceGetter(RuntimeScope scope);
 
 public record DependencyResolution(
     IDependencyProvider Provider,
@@ -130,7 +164,7 @@ public record DependencyResolution(
 
 public interface IDependencyProvider
 {
-    DependencyResolution? Query(Dependency type);
+    DependencyResolution? Query(Dependency dep);
 }
 
 public class BakeryDependencyProvider : IDependencyProvider
@@ -177,7 +211,7 @@ public class OldMoldiniumModelDependencyProvider : IDependencyProvider
         return new DependencyResolution(
             this,
             dep,
-            Get: scope => Models.Create(type)
+            Get: scope => new RuntimeResolution(Models.Create(type))
         );
     }
 }
@@ -199,7 +233,7 @@ public class ServiceProviderDependencyProvider : IDependencyProvider
 
         if (service is null) return null;
 
-        return new DependencyResolution(this, dep, null, DependencyBag.Empty, Get: _ => service);
+        return new DependencyResolution(this, dep, null, DependencyBag.Empty, Get: _ => new RuntimeResolution(service));
     }
 }
 
@@ -207,7 +241,7 @@ public class AcceptingDefaultConstructiblesDependencyProvider : IDependencyProvi
 {
     public DependencyResolution? Query(Dependency dep)
     {
-        if (dep.Maturity != DependencyRuntimeMaturity.OnlyType) return null;
+        if (dep.Maturity != DependencyRuntimeMaturity.TypeOnly) return null;
 
         var traits = TypeTraits.Get(dep.Type);
 
@@ -223,6 +257,21 @@ public class AcceptingDefaultConstructiblesDependencyProvider : IDependencyProvi
     }
 }
 
+public class AcceptRootTypeDependencyProvider : IDependencyProvider
+{
+    public DependencyResolution? Query(Dependency dep)
+    {
+        if (dep.IsRootDependency && dep.Maturity == DependencyRuntimeMaturity.TypeOnly)
+        {
+            return new DependencyResolution(this, dep);
+        }
+        else
+        {
+            return null;
+        }
+    }
+}
+
 public class ActivatorDependencyProvider : IDependencyProvider
 {
     public DependencyResolution? Query(Dependency dep)
@@ -233,17 +282,37 @@ public class ActivatorDependencyProvider : IDependencyProvider
 
         if (!traits.IsDefaultConstructible) return null;
 
+        var nestedDependency = dep with { Maturity = DependencyRuntimeMaturity.TypeOnly };
+
+        RuntimeResolution Get(RuntimeScope scope)
+        {
+            var typeOnlyResolution = scope.Get(nestedDependency!);
+
+            if (typeOnlyResolution.Type == RuntimeResolutionType.TypeResolved)
+            {
+                var obj = Activator.CreateInstance(dep.Type) ?? throw new Exception($"Activator failed to provide an instance");
+
+                return new RuntimeResolution(obj);
+            }
+            else if (dep.IsOptional)
+            {
+                return RuntimeResolution.Missing;
+            }
+            else
+            {
+                throw new InternalErrorException($"Dependency was not optional");
+            }
+        }
+
         return new DependencyResolution(
             this,
             dep,
-            dep with { Maturity = DependencyRuntimeMaturity.OnlyType },
+            nestedDependency,
             DependencyBag.Empty,
-            Get: _ => Activator.CreateInstance(dep.Type) ?? throw new Exception($"Activator failed to provide a type")
+            Get: Get
         );
     }
 }
-
-
 
 // FIXME: this provider often attempts to resolve types that it can't handle when the real dependency is missing
 // - this then gives a confusing error
@@ -258,7 +327,7 @@ public class InitSetterDependencyProvider : IDependencyProvider
         var dependencies =
             from p in reflection.Properties
             where p.hasInitSetter
-            select new Dependency(p.info.PropertyType, DependencyRuntimeMaturity.InitializedInstance, !p.requiresDefault);
+            select new Dependency(p.info.PropertyType, DependencyRuntimeMaturity.InitializedInstance, !p.requiresDefault, false);
 
         var embryoDependency = dep with { Maturity = DependencyRuntimeMaturity.UntouchedInstance };
 
@@ -271,15 +340,22 @@ public class InitSetterDependencyProvider : IDependencyProvider
             {
                 var embryo = scope.Get(embryoDependency);
 
+                if (embryo.Instance is null)
+                {
+                    return dep.IsOptional ? RuntimeResolution.Missing : throw new InternalErrorException($"Got null for an embryo");
+                }
+
                 foreach (var p in reflection.Properties)
                 {
                     if (!p.hasInitSetter) continue;
 
-                    var instance = scope.Get(new Dependency(p.info.PropertyType, DependencyRuntimeMaturity.InitializedInstance, !p.requiresDefault));
+                    var runtimeResolution = scope.Get(new Dependency(p.info.PropertyType, DependencyRuntimeMaturity.InitializedInstance, !p.requiresDefault, false));
+
+                    var instance = runtimeResolution.Instance;
 
                     if (instance is not null)
                     {
-                        p.info.SetValue(embryo, instance);
+                        p.info.SetValue(embryo.Instance, instance);
                     }
                     else if (p.requiresDefault)
                     {
@@ -302,7 +378,7 @@ public class FactoryDependencyProvider : IDependencyProvider
 
         public FactoryArgumentsDependencyProvider(Type[] types)
         {
-            dependencies = types.Select(t => new Dependency(t, DependencyRuntimeMaturity.InitializedInstance, false))
+            dependencies = types.Select(t => new Dependency(t, DependencyRuntimeMaturity.InitializedInstance, false, false))
                 .ToHashSet();
         }
 
@@ -319,7 +395,9 @@ public class FactoryDependencyProvider : IDependencyProvider
                 {
                     if (Arguments is null) throw new Exception($"{nameof(FactoryArgumentsDependencyProvider)} was not provided with arguments yet");
 
-                    return Arguments[lookupDependency];
+                    var argument = Arguments[lookupDependency];
+
+                    return argument is not null ? new RuntimeResolution(argument) : RuntimeResolution.Missing;
                 }
             );
         }
@@ -341,6 +419,8 @@ public class FactoryDependencyProvider : IDependencyProvider
 
         var factoryArgumentsProvider = new FactoryArgumentsDependencyProvider(parameterTypes);
 
+        var subScopeDependency = new Dependency(returnType, DependencyRuntimeMaturity.InitializedInstance, false, true);
+
         Scope MakeSubscope(Scope parent)
         {
             if (factoryArgumentsProvider is null) throw new Exception($"Internal error in {nameof(FactoryDependencyProvider)}");
@@ -350,12 +430,12 @@ public class FactoryDependencyProvider : IDependencyProvider
                 parent.Provider
             );
 
-            var subScope = new Scope(provider, new Dependency(returnType, DependencyRuntimeMaturity.InitializedInstance, false));
+            var subScope = new Scope(provider, subScopeDependency);
 
             return subScope;
         }
 
-        Object Get(RuntimeScope runtimeScope)
+        RuntimeResolution Get(RuntimeScope runtimeScope)
         {
             var scope = runtimeScope.Scope;
 
@@ -365,7 +445,7 @@ public class FactoryDependencyProvider : IDependencyProvider
             {
                 factoryArgumentsProvider.Arguments = parameterTypes
                     .Select((type, i) => (type, instance: args[i]))
-                    .ToDictionary(d => new Dependency(d.type, DependencyRuntimeMaturity.InitializedInstance, false), d => d.instance);
+                    .ToDictionary(d => new Dependency(d.type, DependencyRuntimeMaturity.InitializedInstance, false, false), d => d.instance);
 
                 var runtimeScope = subScope.CreateRuntimeScope();
 
@@ -374,7 +454,7 @@ public class FactoryDependencyProvider : IDependencyProvider
 
             var dlg = DelegateCreation.CreateDelegate(dep.Type, Create);
 
-            return dlg;
+            return new RuntimeResolution(dlg);
         }
 
         return new DependencyResolution(this, dep, MakeSubscope: MakeSubscope, Get: Get);
@@ -429,8 +509,8 @@ public class ConcreteDependencyProvider : IDependencyProvider
 
     public Boolean IsEmpty => dependencies.Count == 0;
 
-    public ConcreteDependencyProvider AddInstance(Type type, Object instance) => Add(type, DependencyRuntimeMaturity.InitializedInstance, _ => instance);
-    public ConcreteDependencyProvider Accept(Type type) => Add(type, DependencyRuntimeMaturity.OnlyType, null);
+    public ConcreteDependencyProvider AddInstance(Type type, Object instance) => Add(type, DependencyRuntimeMaturity.InitializedInstance, _ => new RuntimeResolution(instance));
+    public ConcreteDependencyProvider Accept(Type type) => Add(type, DependencyRuntimeMaturity.TypeOnly, null);
 
     public ConcreteDependencyProvider Add(Type type, DependencyRuntimeMaturity maturity, InstanceGetter? get)
     {
@@ -444,7 +524,7 @@ public class ConcreteDependencyProvider : IDependencyProvider
 
     void Add(Type type, DependencyRuntimeMaturity maturity, InstanceGetter? get, Boolean isOptional)
     {
-        var dep = new Dependency(type, maturity, isOptional);
+        var dep = new Dependency(type, maturity, isOptional, false);
         dependencies.Add(dep, new DependencyResolution(this, dep, Get: get));
     }
 
@@ -488,7 +568,7 @@ public class CombinedDependencyProvider : IDependencyProvider
 public class Scope<T> : Scope
 {
     public Scope(IDependencyProvider provider, DependencyRuntimeMaturity maturity)
-        : base(provider, new Dependency(typeof(T), maturity, true))
+        : base(provider, new Dependency(typeof(T), maturity, false, true))
     {
     }
 
@@ -515,7 +595,7 @@ public class Scope
 
     public IDependencyProvider Provider => provider;
 
-    public DependencyResolution GetResolution(Dependency dep) => resolutions[dep];
+    public DependencyResolution? GetResolutionOrNull(Dependency dep) => resolutions.GetValueOrDefault(dep);
 
     public Scope(IDependencyProvider provider, Dependency root)
     {
@@ -617,6 +697,76 @@ public class Scope
         }
     }
 
+    public String CreateDependencyReport()
+    {
+        var reportWriter = new ReportWriter();
+        reportWriter.WriteDependencyReport(this, root, 0);
+        return reportWriter.GetReport();
+    }
+
+    public class ReportWriter
+    {
+        StringWriter writer = new StringWriter();
+
+        public String GetReport() => writer.ToString();
+
+        public void WriteDependencyReport(Scope scope, Dependency dependency, Int32 nesting = 0)
+        {
+            var reported = new HashSet<Dependency>();
+
+            WriteDependencyReportForDependencies(scope, dependency, reported, nesting);
+
+            foreach (var (subScopeDependency, subScope) in scope.subscopes)
+            {
+                AddNesting(nesting);
+                writer.WriteLine($"\n- subscope for {subScopeDependency}");
+                WriteDependencyReport(subScope, subScope.root, nesting + 1);
+            }
+        }
+
+        void AddNesting(Int32 nesting)
+        {
+            writer.Write(new String(' ', nesting * 2));
+        }
+
+        void WriteDependencyReportForDependencies(Scope scope, Dependency dependency, HashSet<Dependency> reported, Int32 nesting = 0)
+        {
+            if (reported.Contains(dependency))
+            {
+                AddNesting(nesting);
+                writer.Write($"- see above for {dependency}");
+
+                return;
+            }
+
+            reported.Add(dependency);
+
+            if (scope.resolutions.TryGetValue(dependency, out var resolution))
+            {
+                AddNesting(nesting);
+                writer.WriteLine($"- {resolution.Provider.GetName()} resolved {dependency}");
+
+                if (resolution.SameInstanceDependency is Dependency sameInstanceDependency)
+                {
+                    WriteDependencyReportForDependencies(scope, sameInstanceDependency, reported, nesting + 1);
+                }
+
+                if (resolution.Dependencies is DependencyBag bag)
+                {
+                    foreach (var nestedDependency in bag.Items)
+                    {
+                        WriteDependencyReportForDependencies(scope, nestedDependency, reported, nesting + 1);
+                    }
+                }
+            }
+            else
+            {
+                AddNesting(nesting);
+                writer.Write($"- unresolved {dependency}");
+            }
+        }
+    }
+
     String CreateDependencyIssueReport(Dependency dependency)
     {
         var writer = new StringWriter();
@@ -647,7 +797,7 @@ public class RuntimeScope
 {
     Scope scope;
 
-    Dictionary<Dependency, Object> instances = new Dictionary<Dependency, Object>();
+    Dictionary<Dependency, RuntimeResolution> instances = new Dictionary<Dependency, RuntimeResolution>();
 
     Object root;
 
@@ -659,22 +809,39 @@ public class RuntimeScope
     {
         this.scope = scope;
 
-        var resolution = scope.GetResolution(scope.Root);
+        var resolution = scope.GetResolutionOrNull(scope.Root);
 
-        if (resolution.Get is null) throw new Exception($"Runtime scope can't be created for root without a {nameof(DependencyResolution.Get)} method");
+        if (resolution?.Get is null) throw new Exception($"Runtime scope can't be created for root without a resolution with a {nameof(DependencyResolution.Get)} method");
 
-        root = resolution.Get(this);
+        var rootResolution = resolution.Get(this);
+
+        root = rootResolution.Instance ?? throw new InternalErrorException("Internal error: Got null for root instance");
     }
 
-    public Object Get(Dependency dependency)
+    public RuntimeResolution Get(Dependency dependency)
     {
         if (!instances.TryGetValue(dependency, out var instance))
         {
-            var resolution = scope.GetResolution(dependency);
+            var resolution = scope.GetResolutionOrNull(dependency);
 
-            if (resolution.Get is null) throw new Exception($"Can't create {scope.Root.Type} as dependency resolution {resolution} doesn't have a {nameof(DependencyResolution.Get)} method");
+            if (resolution is null)
+            {
+                instances[dependency] = instance = RuntimeResolution.Missing;
+            }
+            else if (resolution?.Get is null)
+            {
+                instances[dependency] = instance =
+                    dependency.Maturity != DependencyRuntimeMaturity.TypeOnly ? RuntimeResolution.Missing : RuntimeResolution.TypeResolved;
+            }
+            else
+            {
+                instances[dependency] = instance = resolution.Get(this);
+            }
 
-            instances[dependency] = instance = resolution.Get(this);
+            if (dependency.Maturity != DependencyRuntimeMaturity.TypeOnly && !dependency.IsOptional && instance.Instance is null)
+            {
+                throw new InternalErrorException("Got no instance for optional dependency");
+            }
         }
 
         return instance;
@@ -701,7 +868,7 @@ public static class Extensions
 
     public static Type ResolveType(this IDependencyProvider provider, Type type)
     {
-        var root = new Dependency(type, DependencyRuntimeMaturity.OnlyType, true);
+        var root = new Dependency(type, DependencyRuntimeMaturity.TypeOnly, true, true);
 
         var scope = new Scope(provider.AcceptDefaultConstructibles(), root);
 
@@ -710,9 +877,27 @@ public static class Extensions
         return final.Type;
     }
 
-    public static Object CreateInstance(this IDependencyProvider provider, Type type, DependencyRuntimeMaturity maturity = DependencyRuntimeMaturity.InitializedInstance)
-        => new Scope(provider, new Dependency(type, maturity, true)).CreateRuntimeScope().Root;
+    public static String GetName(this IDependencyProvider provider)
+    {
+        var name = provider.GetType().Name;
 
-    public static T CreateInstance<T>(this IDependencyProvider provider, DependencyRuntimeMaturity maturity = DependencyRuntimeMaturity.InitializedInstance) where T : class
+        if (name.EndsWith("DependencyProvider"))
+        {
+            name = name[..(name.Length - "DependencyProvider".Length)];
+        }
+
+        return name;
+    }
+
+    public static IDependencyProvider Prepend(this IDependencyProvider provider, IDependencyProvider other)
+        => new CombinedDependencyProvider(other, provider);
+
+    public static String CreateReport(this IDependencyProvider provider, Type type, DependencyRuntimeMaturity maturity = DependencyRuntimeMaturity.InitializedInstance)
+        => new Scope(provider, new Dependency(type, maturity, false, true)).CreateDependencyReport();
+
+    public static Object CreateInstance(this IDependencyProvider provider, Type type, DependencyRuntimeMaturity maturity = DependencyRuntimeMaturity.InitializedInstance)
+        => new Scope(provider, new Dependency(type, maturity, false, true)).CreateRuntimeScope().Root;
+
+    public static T CreateInstance<T>(this IDependencyProvider provider, DependencyRuntimeMaturity maturity = DependencyRuntimeMaturity.InitializedInstance)
         => (T)provider.CreateInstance(typeof(T), maturity);
 }

@@ -20,8 +20,4 @@
     <ProjectReference Include="..\CMinus\CMinus.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Moldinium\" />
-  </ItemGroup>
-
 </Project>

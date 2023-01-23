@@ -58,6 +58,7 @@ public record DefaultDependencyProviderConfiguration(
     Boolean EnableOldModliniumModels = false,
     Boolean InitializeInits = true,
     Boolean EnableFactories = true,
+    Boolean AcceptDefaultConstructibles = false,
     Action<DependencyProviderBuilder>? Build = null,
     IServiceProvider? Services = null,
     Predicate<Type>? IsMoldiniumType = null
@@ -81,12 +82,17 @@ public static class DependencyProvider
             providers.Add(new ServiceProviderDependencyProvider(services));
         }
 
+        providers.Add(new AcceptRootTypeDependencyProvider());
+
         if (config.EnableOldModliniumModels)
         {
             providers.Add(new OldMoldiniumModelDependencyProvider());
         }
 
-        providers.Add(new AcceptingDefaultConstructiblesDependencyProvider());
+        if (config.AcceptDefaultConstructibles)
+        {
+            providers.Add(new AcceptingDefaultConstructiblesDependencyProvider());
+        }
 
         if (config.Baking is DefaultDependencyProviderBakingMode bakingMode)
         {
@@ -129,6 +135,12 @@ public static class DependencyProvider
 
 public static partial class Extensions
 {
-    public static Boolean StartsWithCapitalIAndContinuesWithAnotherCapital(this String name)
-        => name.Length > 1 && name[0] == 'I' && Char.IsUpper(name[1]);
+    /// <summary>
+    /// Checks whether <paramref name="name"/> starts with <paramref name="prefix"/> and that the
+    /// first letter following that prefix is in upper case.
+    /// Eg. <code>name.StartsWithFollowedByCapital("I")</code> detects interfaces
+    /// or styleguide violations
+    /// </summary>
+    public static Boolean StartsWithFollowedByCapital(this String name, String prefix)
+        => name.Length > prefix.Length && name.StartsWith(prefix) && Char.IsUpper(name[prefix.Length]);
 }

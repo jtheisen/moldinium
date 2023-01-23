@@ -14,7 +14,7 @@ var configuration = new DefaultDependencyProviderConfiguration(
     Baking: DefaultDependencyProviderBakingMode.Tracking,
     BakeAbstract: false,
     EnableOldModliniumModels: true,
-    IsMoldiniumType: t => t.IsInterface && !t.Name.StartsWithCapitalIAndContinuesWithAnotherCapital()
+    IsMoldiniumType: t => t.IsInterface && !t.Name.StartsWithFollowedByCapital("I")
 );
 
 var provider = DependencyProvider.Create(configuration);
