@@ -5,12 +5,11 @@ namespace SampleApp;
 
 public interface JobListApp
 {
-    // FIXME: passing job nesting level shouldn't be necessary
-    Func<SimpleJobConfig, JobNestingLevel, JobList> CreateJobList { get; init; }
+    Func<SimpleJobConfig, JobList> CreateJobList { get; init; }
 
     JobList CreateDefaultJobList()
     {
-        return CreateJobList(new SimpleJobConfig(TimeSpan.FromSeconds(3), 100), new JobNestingLevel(0));
+        return CreateJobList(new SimpleJobConfig(TimeSpan.FromSeconds(3), 100));
     }
 }
 

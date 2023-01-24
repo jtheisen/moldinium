@@ -45,6 +45,16 @@ public static partial class Extensions
 {
     public static T Return<T>(this Object _, T value) => value;
 
+    public static T BreakIf<T>(this T value, Boolean condition)
+    {
+        if (condition)
+        {
+            Debugger.Break();
+        }
+
+        return value;
+    }
+
     [DebuggerHidden]
     public static T Single<T>(this IEnumerable<T> source, String error)
     {

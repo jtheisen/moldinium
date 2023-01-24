@@ -76,6 +76,7 @@ public class TypeProperties
     public struct PropertyInfoStruct
     {
         public PropertyInfo info;
+        public bool isNotNullable;
         public bool requiresDefault;
         public bool hasInitSetter;
     }
@@ -90,11 +91,13 @@ public class TypeProperties
             let rpcm = set?.ReturnParameter.GetRequiredCustomModifiers()
             let nullabilityInfo = nullabilityContext.Create(p)
             let hasInitSetter = rpcm?.Contains(typeof(System.Runtime.CompilerServices.IsExternalInit)) ?? false
-            let requiresDefaultPerNullabilityInfo = nullabilityInfo.ReadState == NullabilityState.NotNull && !hasInitSetter
+            let isNotNullable = nullabilityInfo.ReadState == NullabilityState.NotNull
+            let requiresDefaultPerNullabilityInfo = isNotNullable && !hasInitSetter
             let requiresDefaultPerAttribute = p.GetCustomAttribute<RequiresDefaultAttribute>() is not null
             select new PropertyInfoStruct
             {
                 info = p,
+                isNotNullable = isNotNullable,
                 requiresDefault = requiresDefaultPerAttribute || requiresDefaultPerNullabilityInfo,
                 hasInitSetter = hasInitSetter
             };

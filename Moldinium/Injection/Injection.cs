@@ -78,12 +78,10 @@ public record Dependency(Type Type, DependencyRuntimeMaturity Maturity, Boolean 
     {
         return $"{Char.ToLower(Maturity.ToString()[0])}{(IsOptional ? 'o' : 'r')}`{Type.Name}";
     }
+}
 
-    public void Validate()
-    {
-        if (IsOutlawed(Type)) throw new Exception($"Type {Type} can't be used as a dependency");
-    }
-
+public static class FundamentallyOutlawedTypes
+{
     static Type[] outlawedTypes = new[] { typeof(byte), typeof(int), typeof(uint), typeof(short), typeof(ushort), typeof(long), typeof(ulong), typeof(Guid) };
 
     public static Boolean IsOutlawed(Type type)
@@ -128,25 +126,16 @@ public class DependencyBag
     public IImmutableSet<Dependency> Items => dependencies;
 
     public DependencyBag(IImmutableSet<Dependency> dependencies)
-        => this.dependencies = Validate(ImmutableHashSet.CreateRange(dependencies));
+        => this.dependencies = ImmutableHashSet.CreateRange(dependencies);
 
     public DependencyBag(IEnumerable<Dependency> dependencies)
-        => this.dependencies = Validate(ImmutableHashSet.CreateRange(dependencies));
+        => this.dependencies = ImmutableHashSet.CreateRange(dependencies);
 
     public DependencyBag(Dependency dependency)
-        => dependencies = Validate(ImmutableHashSet.Create(dependency));
+        => dependencies = ImmutableHashSet.Create(dependency);
 
     public DependencyBag Concat(DependencyBag rhs)
         => new DependencyBag(dependencies.Union(rhs.dependencies));
-
-    IImmutableSet<Dependency> Validate(IImmutableSet<Dependency> dependencies)
-    {
-        foreach (var dep in dependencies)
-        {
-            dep.Validate();
-        }
-        return dependencies;
-    }
 }
 
 public delegate Scope SubscopeCreator(Scope scope);
@@ -324,10 +313,11 @@ public class InitSetterDependencyProvider : IDependencyProvider
 
         var reflection = TypeProperties.Get(dep.Type);
 
-        var dependencies =
+        var dependencies = (
             from p in reflection.Properties
             where p.hasInitSetter
-            select new Dependency(p.info.PropertyType, DependencyRuntimeMaturity.InitializedInstance, !p.requiresDefault, false);
+            select new Dependency(p.info.PropertyType, DependencyRuntimeMaturity.InitializedInstance, !p.isNotNullable, false)
+        ).ToArray();
 
         var embryoDependency = dep with { Maturity = DependencyRuntimeMaturity.UntouchedInstance };
 
@@ -662,6 +652,13 @@ public class Scope
             {
                 foreach (var dep in dependencies.Items)
                 {
+                    if (FundamentallyOutlawedTypes.IsOutlawed(dep.Type))
+                    {
+                        throw new Exception(
+                            $"{resolution.Provider.GetName()} request dependency {dep} for {next}," +
+                            $" which has an outlawed type\n\n{CreateDependencyIssueReport(next)}");
+                    }
+
                     AddDependency(dep, resolution);
                 }
             }
