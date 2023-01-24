@@ -7,62 +7,6 @@ using System.Text;
 
 namespace Moldinium;
 
-public struct Blob : IEquatable<Blob>
-{
-    Byte[] bytes;
-    Int32 hash;
-
-    static HashAlgorithm hashAlgorithm;
-
-    static String[] algorithmsToTry = new[] { "MD5", "SHA1" }; 
-
-    static Blob()
-    {
-        foreach (var name in algorithmsToTry)
-        {
-            if (HashAlgorithm.Create(name) is HashAlgorithm found)
-            {
-                hashAlgorithm = found;
-
-                return;
-            }
-        }
-
-        throw new Exception($"The Platform supports none of these hash algorithms: {String.Join(", ", algorithmsToTry)}");
-    }
-
-    public Blob(Byte[] bytes)
-    {
-        this.bytes = bytes;
-
-        var hashBytes = hashAlgorithm.ComputeHash(bytes);
-
-        hash = BitConverter.ToInt32(hashBytes, 0);
-    }
-
-    public static implicit operator Blob(Byte[] bytes) => new Blob(bytes);
-
-    public override string ToString()
-    {
-        return Convert.ToHexString(bytes);
-    }
-
-    public override int GetHashCode()
-    {
-        return hash;
-    }
-
-    public override bool Equals(object? obj)
-    {
-        return obj is Blob other ? Equals(other) : false;
-    }
-
-    public bool Equals(Blob other)
-    {
-        return bytes.AsSpan().SequenceEqual(other.bytes.AsSpan());
-    }
-}
-
 public record EquatableMethodNameAndSignature(String MethodName, EquatableMethodSignature Signature);
 
 public class ExtraMethodInfo
@@ -140,10 +84,10 @@ public class ExtraMethodInfo
 
 }
 
-public record EquatableMethodSignature(Blob SignatureBlob, Int32 GenericParameterCount)
+public record EquatableMethodSignature(String SignatureToken, Int32 GenericParameterCount)
 {
     public EquatableMethodSignature(MethodInfo method)
-        : this(GetSignature(method), GetGenericTypeParameterCount(method))
+        : this(CustomSignatureHelper.GetSignatureToken(method), GetGenericTypeParameterCount(method))
     {
     }
 
@@ -154,20 +98,6 @@ public record EquatableMethodSignature(Blob SignatureBlob, Int32 GenericParamete
         if (genericParameters.Any(t => !t.IsGenericMethodParameter)) throw new Exception($"Expected {method} to have only generic type parameters");
 
         return genericParameters.Length;
-    }
-
-    static Byte[] GetSignature(MethodInfo method) => GetSignatureHelper(method).GetSignature();
-
-    static SignatureHelper GetSignatureHelper(MethodInfo method)
-    {
-        var s = SignatureHelper.GetMethodSigHelper(method.CallingConvention, method.ReturnType);
-
-        foreach (var p in method.GetParameters())
-        {
-            s.AddArgument(p.ParameterType, p.GetRequiredCustomModifiers(), p.GetOptionalCustomModifiers());
-        }
-
-        return s;
     }
 }
 
@@ -183,27 +113,7 @@ public static class MethodSignatures
         => GetExtraMethodInfo(method).MethodNameAndSignature.Signature;
 }
 
-public abstract class AbstractSignatureHelper
-{
-    public abstract Byte[] GetSignature(MethodInfo methodInfo);
-}
-
-public class DotNetSignatureHelper : AbstractSignatureHelper
-{
-    public override byte[] GetSignature(MethodInfo method)
-    {
-        var s = SignatureHelper.GetMethodSigHelper(method.CallingConvention, method.ReturnType);
-
-        foreach (var p in method.GetParameters())
-        {
-            s.AddArgument(p.ParameterType, p.GetRequiredCustomModifiers(), p.GetOptionalCustomModifiers());
-        }
-
-        return s.GetSignature();
-    }
-}
-
-public class CustomSignatureHelper : AbstractSignatureHelper
+static class CustomSignatureHelper
 {
     class SignatureEncoder
     {
@@ -260,12 +170,12 @@ public class CustomSignatureHelper : AbstractSignatureHelper
         }
     }
 
-    public override byte[] GetSignature(MethodInfo method)
+    public static String GetSignatureToken(MethodInfo method)
     {
         var encoder = new SignatureEncoder();
 
         encoder.EncodeMethod(method);
 
-        return Encoding.UTF8.GetBytes(encoder.GetString());
+        return encoder.GetString();
     }
 }
