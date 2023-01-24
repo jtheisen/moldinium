@@ -1,4 +1,4 @@
-﻿namespace Moldinium.Tests.Blazor;
+﻿namespace SampleApp.BlazorWebAssembly;
 
 public class LocalComponentBase : Moldinium.Blazor.MoldiniumComponentBase
 {

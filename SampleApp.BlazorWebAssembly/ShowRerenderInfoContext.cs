@@ -1,4 +1,3 @@
-﻿namespace Moldinium.Tests.Blazor
-{
-    public record ShowRerenderInfoContext(Boolean Value);
-}
+﻿namespace SampleApp.BlazorWebAssembly;
+
+public record ShowRerenderInfoContext(Boolean Value);

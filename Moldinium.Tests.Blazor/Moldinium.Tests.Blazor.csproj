@@ -7,16 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="Pages\JobListPage.razor.css" />
-    <None Remove="Shared\JobListViews\JobView.razor.css" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Content Include="Pages\JobListPage.razor.css" />
-    <Content Include="Shared\JobListViews\JobView.razor.css" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\Moldinium.Blazor\Moldinium.Blazor.csproj" />
     <ProjectReference Include="..\SampleApp\SampleApp.csproj" />
   </ItemGroup>
