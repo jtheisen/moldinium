@@ -7,6 +7,10 @@ namespace Moldinium.Tests.Baking;
 
 public interface INullabilityTestInterface
 {
+    String? NullableInit { get; init; }
+
+    String NotNullableInit { get; init; }
+
     String? Nullable { get; set; }
 
     String NotNullable { get; set; }
@@ -24,6 +28,8 @@ public class NullabilityTests : BakingTestsBase
 
         AssertState(NullabilityState.Nullable, type, nameof(INullabilityTestInterface.Nullable));
         AssertState(NullabilityState.NotNull, type, nameof(INullabilityTestInterface.NotNullable));
+        AssertState(NullabilityState.Nullable, type, nameof(INullabilityTestInterface.NullableInit));
+        AssertState(NullabilityState.NotNull, type, nameof(INullabilityTestInterface.NotNullableInit));
     }
 
     [TestMethod]
@@ -47,6 +53,8 @@ public class NullabilityTests : BakingTestsBase
 
         AssertState(NullabilityState.Nullable, type, nameof(INullabilityTestInterface.Nullable));
         AssertState(NullabilityState.NotNull, type, nameof(INullabilityTestInterface.NotNullable));
+        AssertState(NullabilityState.Nullable, type, nameof(INullabilityTestInterface.NullableInit));
+        AssertState(NullabilityState.NotNull, type, nameof(INullabilityTestInterface.NotNullableInit));
     }
 
     void AssertState(NullabilityState state, Type type, String name)
