@@ -131,7 +131,35 @@ has all its components derive indirectly from `MoldiniumComponentBase`
 which makes the magic work (see the section about dependency tracking
 below for details).
 
-## Configuring Moldinium
+## Collections and default values
+
+The Moldinium type creator also allows to ensure defaults to non-nullable
+properties of certain types. Besides the common case of `String`s
+(which are then defaulted to the empty string), this is mostly a
+concern with collections.
+
+
+
+
+Besides `INotifyPropertChanged`, there's also `INotifyCollectionChanged`
+for collections, which xaml-based UIs want to see lest they either
+don't update their list views or recreate all item components when
+the whole collection instance changes.
+
+Blazor is more forgiving in the latter case as it reconciles anyway,
+but the former case still necessitates a collection type that can
+be tracked.
+
+.NET itself provides `ObservableCollection<>` which is only sufficient
+if no dependency tracking is desired.
+
+Moldinium provides `LiveList`, which also implements
+`INotifyCollectionChanged` but can be tracked at well.
+
+
+
+
+## Default configurations
 
 The entry to your Moldinium-created types is the dependency injection system.
 
@@ -144,12 +172,11 @@ There's a helper to create configurations that allow the following options:
 - default values
 - default configurations
 
-| First Header        | Basic             | Notifying only    | Tracking only     | Notif. + Track.   |
-| ------------------- | ----------------- | ----------------- | ----------------- | ----------------- |
-| ICollection<> def.  | List<>            | ObservableCol.<>  | LiveList<>        | LiveList<>        |
-| IList<> def.        | List<>            | LiveList<>        | LiveList<>        | LiveList<>        |
-| Variable            | Trivial           | Setter notifies   | Trackable         | Both              |
-| Computation cached  | no                | no                | yes               | yes               |
+| First Header          | Basic     | Notifying only         | Tracking only     | Notif. + Track.   |
+| --------------------- | --------- | ---------------------- | ----------------- | ----------------- |
+| ICollection<> default | List<>    | ObservableCollection<> | LiveList<>        | LiveList<>        |
+| IList<> default       | List<>    | LiveList<>             | LiveList<>        | LiveList<>        |
+| Computations cached   | no        | no                     | yes               | yes               |
 
 
 ## Notes on the implementation
