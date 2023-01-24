@@ -13,9 +13,7 @@ public class CombinedTests
 
     public CombinedTests()
     {
-        configuration = new DefaultDependencyProviderConfiguration(
-            EnableOldModliniumModels: true
-        );
+        configuration = new DefaultDependencyProviderConfiguration();
     }
 
     public interface ITodoListEntry

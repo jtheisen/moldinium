@@ -26,7 +26,6 @@ namespace Moldinium.Tests.Wpf
             var configuration = new DefaultDependencyProviderConfiguration(
                 Baking: DefaultDependencyProviderBakingMode.TrackingAndNotifyPropertyChanged,
                 BakeAbstract: false,
-                EnableOldModliniumModels: true,
                 Services: serviceProvider,
                 IsMoldiniumType: t => t.IsInterface && !t.Name.StartsWithFollowedByCapital("I")
             );

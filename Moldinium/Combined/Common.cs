@@ -55,7 +55,6 @@ public class DependencyProviderBuilder
 public record DefaultDependencyProviderConfiguration(
     DefaultDependencyProviderBakingMode? Baking = DefaultDependencyProviderBakingMode.Basic,
     Boolean BakeAbstract = false,
-    Boolean EnableOldModliniumModels = false,
     Boolean InitializeInits = true,
     Boolean EnableFactories = true,
     Boolean AcceptDefaultConstructibles = false,
@@ -83,11 +82,6 @@ public static class DependencyProvider
         }
 
         providers.Add(new AcceptRootTypeDependencyProvider());
-
-        if (config.EnableOldModliniumModels)
-        {
-            providers.Add(new OldMoldiniumModelDependencyProvider());
-        }
 
         if (config.AcceptDefaultConstructibles)
         {

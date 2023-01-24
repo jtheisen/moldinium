@@ -45,7 +45,7 @@ class ConcreteTrackable : ITrackable
 
     public ITrackSubscription Subscribe(Object? agent, Action tracker)
     {
-        Repository.logger?.WriteLine($"{agent} subscribing to {this}");
+        Repository.Logger?.WriteLine($"{agent} subscribing to {this}");
 
         trackers += tracker;
 
@@ -54,7 +54,7 @@ class ConcreteTrackable : ITrackable
 
         return TrackSubscription.Create(this, () =>
         {
-            Repository.logger?.WriteLine($"{agent} unsubscribing from {this}");
+            Repository.Logger?.WriteLine($"{agent} unsubscribing from {this}");
 
             trackers -= tracker;
             if (--noOfTrackers == 0)
@@ -127,7 +127,7 @@ class TrackableVariable<T> : TrackableVariable, ITrackableVariable<T>
     {
         get
         {
-            Repository.logger?.WriteLine($"{this} returning its value, notifying its evaluation.");
+            Repository.Logger?.WriteLine($"{this} returning its value, notifying its evaluation.");
 
             Repository.Instance.NoteEvaluation(this);
 
@@ -135,7 +135,7 @@ class TrackableVariable<T> : TrackableVariable, ITrackableVariable<T>
         }
         set
         {
-            Repository.logger?.WriteLine($"{this} setting its value, notifying its change.");
+            Repository.Logger?.WriteLine($"{this} setting its value, notifying its change.");
 
             this.value = value;
 
@@ -186,7 +186,7 @@ internal class CachedBeforeAndAfterComputedTrackable<T> : ITrackable
 
     public ITrackSubscription Subscribe(Object? agent, Action tracker)
     {
-        Repository.logger?.WriteLine($"{agent} subscribing to {this}");
+        Repository.Logger?.WriteLine($"{agent} subscribing to {this}");
 
         trackers += tracker;
 
@@ -195,7 +195,7 @@ internal class CachedBeforeAndAfterComputedTrackable<T> : ITrackable
 
         return TrackSubscription.Create(this, () =>
         {
-            Repository.logger?.WriteLine($"{agent} unsubscribing from {this}");
+            Repository.Logger?.WriteLine($"{agent} unsubscribing from {this}");
 
             trackers -= tracker;
             if (--noOfTrackers == 0)
@@ -217,7 +217,7 @@ internal class CachedBeforeAndAfterComputedTrackable<T> : ITrackable
 
             if (IsTracked)
             {
-                loggingScope = Repository.logger?.WriteLineWithScope($"{this} is tracked and dirty, so we're evaluating tracked.");
+                loggingScope = Repository.Logger?.WriteLineWithScope($"{this} is tracked and dirty, so we're evaluating tracked.");
 
                 Repository.Instance.BeginEvaluation(Name, evaluationNestingLevel++);
 
@@ -225,11 +225,11 @@ internal class CachedBeforeAndAfterComputedTrackable<T> : ITrackable
             }
             else if (alert)
             {
-                loggingScope = Repository.logger?.WriteLineWithScope($"{this} is dirty but untracked, so we're evaluating untracked.");
+                loggingScope = Repository.Logger?.WriteLineWithScope($"{this} is dirty but untracked, so we're evaluating untracked.");
             }
             else
             {
-                loggingScope = Repository.logger?.WriteLineWithScope($"{this} is not alert, so we're evaluating.");
+                loggingScope = Repository.Logger?.WriteLineWithScope($"{this} is not alert, so we're evaluating.");
             }
         }
         else if (exception is not null)
@@ -317,7 +317,7 @@ internal class CachedBeforeAndAfterComputedTrackable<T> : ITrackable
 
     protected void Activate()
     {
-        Repository.logger?.WriteLine($"{this} is activated, let's look what we missed.");
+        Repository.Logger?.WriteLine($"{this} is activated, let's look what we missed.");
 
         dirty = true;
         alert = true;
@@ -329,7 +329,7 @@ internal class CachedBeforeAndAfterComputedTrackable<T> : ITrackable
 
         if (subscriptions != null)
         {
-            Repository.logger?.WriteLine($"{this} is relaxing.");
+            Repository.Logger?.WriteLine($"{this} is relaxing.");
 
             subscriptions.Subscription = null;
         }
@@ -396,18 +396,18 @@ class CachedComputedTrackable<T> : TrackableValueBase, ITrackable<T>
             {
                 if (IsTracked)
                 {
-                    using (Repository.logger?.WriteLineWithScope($"{this} is tracked and dirty, so we're evaluating tracked."))
+                    using (Repository.Logger?.WriteLineWithScope($"{this} is tracked and dirty, so we're evaluating tracked."))
                         value = Repository.Instance.EvaluateAndSubscribe(
                             Name, ref subscriptions, evaluation, invalidateAndNotify);
                 }
                 else if (alert)
                 {
-                    using (Repository.logger?.WriteLineWithScope($"{this} is dirty but untracked, so we're evaluating untracked."))
+                    using (Repository.Logger?.WriteLineWithScope($"{this} is dirty but untracked, so we're evaluating untracked."))
                         value = evaluation();
                 }
                 else
                 {
-                    using (Repository.logger?.WriteLineWithScope($"{this} is not alert, so we're evaluating."))
+                    using (Repository.Logger?.WriteLineWithScope($"{this} is not alert, so we're evaluating."))
                         value = evaluation();
                 }
 
@@ -430,7 +430,7 @@ class CachedComputedTrackable<T> : TrackableValueBase, ITrackable<T>
 
     protected override void Activate()
     {
-        Repository.logger?.WriteLine($"{this} is activated, let's look what we missed.");
+        Repository.Logger?.WriteLine($"{this} is activated, let's look what we missed.");
 
         dirty = true;
         alert = true;
@@ -444,7 +444,7 @@ class CachedComputedTrackable<T> : TrackableValueBase, ITrackable<T>
 
         if (subscriptions != null)
         {
-            Repository.logger?.WriteLine($"{this} is relaxing.");
+            Repository.Logger?.WriteLine($"{this} is relaxing.");
 
             subscriptions.Subscription = null;
         }
@@ -617,11 +617,18 @@ class Repository
 
     static Lazy<Repository> instance = new Lazy<Repository>(() => new Repository());
 
-    public static ITrackablesLogger? logger; // = new TrackablesLogger();
+    static ITrackablesLogger? logger;
+
+    public static ITrackablesLogger? Logger => logger;
 
     Repository()
     {
         evaluationStack.Push(new EvaluationRecord());
+    }
+
+    public void EnableDebugLogging()
+    {
+        logger = new TrackablesLogger();
     }
 
     class EvaluationRecord
@@ -635,7 +642,7 @@ class Repository
 
     TSource Evaluate<TSource>(Object evaluator, Func<TSource> evaluation, out IEnumerable<ITrackable> dependencies)
     {
-        logger?.BeginEvaluationFrame(evaluator);
+        Logger?.BeginEvaluationFrame(evaluator);
 
         evaluationStack.Push(new EvaluationRecord { evaluator = evaluator });
 
@@ -645,7 +652,7 @@ class Repository
 
             dependencies = evaluationStack.Pop().evaluatedTrackables;
 
-            logger?.CloseEvaluationFrameWithResult(result!, dependencies);
+            Logger?.CloseEvaluationFrameWithResult(result!, dependencies);
 
             return result;
         }
@@ -653,7 +660,7 @@ class Repository
         {
             dependencies = evaluationStack.Pop().evaluatedTrackables;
 
-            logger?.CloseEvaluationFrameWithException(ex, dependencies);
+            Logger?.CloseEvaluationFrameWithException(ex, dependencies);
 
             throw;
         }
@@ -661,7 +668,7 @@ class Repository
 
     TSource Evaluate<TSource, TContext>(Object evaluator, Func<TContext, TSource> evaluation, TContext context, out IEnumerable<ITrackable> dependencies)
     {
-        logger?.BeginEvaluationFrame(evaluator);
+        Logger?.BeginEvaluationFrame(evaluator);
 
         evaluationStack.Push(new EvaluationRecord());
 
@@ -671,7 +678,7 @@ class Repository
 
             dependencies = evaluationStack.Pop().evaluatedTrackables;
 
-            logger?.CloseEvaluationFrameWithResult(result!, dependencies);
+            Logger?.CloseEvaluationFrameWithResult(result!, dependencies);
 
             return result;
         }
@@ -679,7 +686,7 @@ class Repository
         {
             dependencies = evaluationStack.Pop().evaluatedTrackables;
 
-            logger?.CloseEvaluationFrameWithException(ex, dependencies);
+            Logger?.CloseEvaluationFrameWithException(ex, dependencies);
 
             throw;
         }
@@ -687,7 +694,7 @@ class Repository
 
     internal void BeginEvaluation(Object evaluator, Int32 id)
     {
-        logger?.BeginEvaluationFrame(evaluator);
+        Logger?.BeginEvaluationFrame(evaluator);
 
         evaluationStack.Push(new EvaluationRecord { evaluator = evaluator, id = id });
     }
@@ -703,7 +710,7 @@ class Repository
 
         dependencies = frame.evaluatedTrackables;
 
-        logger?.CloseEvaluationFrameWithResult(result!, frame.evaluatedTrackables);
+        Logger?.CloseEvaluationFrameWithResult(result!, frame.evaluatedTrackables);
     }
 
     void EndEvaluationWithException<TSource>(Object evaluator, Int32 id, Exception exception, out IEnumerable<ITrackable> dependencies)
@@ -717,7 +724,7 @@ class Repository
 
         dependencies = frame.evaluatedTrackables;
 
-        logger?.CloseEvaluationFrameWithException(exception, frame.evaluatedTrackables);
+        Logger?.CloseEvaluationFrameWithException(exception, frame.evaluatedTrackables);
     }
 
     internal void EndEvaluationAndSubscribe<TSource>(Object evaluator, Int32 id, TSource result, ref SerialTrackSubscription? subscriptions, Action onChange)

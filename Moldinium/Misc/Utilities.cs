@@ -91,10 +91,6 @@ public static partial class Extensions
         => func(source);
 
     [DebuggerHidden]
-    public static Task<T> Ensure<T>(this Task<T> task)
-        => task ?? Task.FromResult<T>(default);
-
-    [DebuggerHidden]
     public static T Apply<T>(this T source, Boolean indeed, Func<T, T> func)
         => indeed ? func(source) : source;
 

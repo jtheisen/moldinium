@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Pages\JobListPage.razor.css" />
+    <None Remove="Shared\JobListViews\JobView.razor.css" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Pages\JobListPage.razor.css" />
+    <Content Include="Shared\JobListViews\JobView.razor.css" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="6.0.10" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="6.0.10" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Moldinium.Blazor\Moldinium.Blazor.csproj" />
+  </ItemGroup>
+
+</Project>

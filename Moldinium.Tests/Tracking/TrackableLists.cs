@@ -18,7 +18,7 @@ class CollectionChangeTestListener<T>
         this.lastEventArgs = e;
     }
 
-    public void AssertChangedAndClear(NotifyCollectionChangedAction action, T[] newItems, T[] oldItems, Int32 newIndex, Int32 oldIndex)
+    public void AssertChangedAndClear(NotifyCollectionChangedAction action, T[]? newItems, T[]? oldItems, Int32 newIndex, Int32 oldIndex)
     {
         if (lastEventArgs is null)
             Assert.Fail("List unexpectedly unchanged.");

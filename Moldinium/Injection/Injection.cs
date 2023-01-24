@@ -1,5 +1,4 @@
-﻿using Castle.DynamicProxy.Generators.Emitters.SimpleAST;
-using Moldinium.Delegates;
+﻿using Moldinium.Delegates;
 using Moldinium.Misc;
 using System;
 using System.Collections.Generic;
@@ -184,24 +183,6 @@ public class BakeryDependencyProvider : IDependencyProvider
             bakedInstanceDependency,
             DependencyBag.Empty,
             Get: scope => scope.Get(bakedInstanceDependency)
-        );
-    }
-}
-
-public class OldMoldiniumModelDependencyProvider : IDependencyProvider
-{
-    public DependencyResolution? Query(Dependency dep)
-    {
-        if (dep.Maturity != DependencyRuntimeMaturity.UntouchedInstance) return null;
-
-        var type = dep.Type;
-
-        if (!type.IsClass || !type.IsAbstract) return null;
-
-        return new DependencyResolution(
-            this,
-            dep,
-            Get: scope => new RuntimeResolution(Models.Create(type))
         );
     }
 }

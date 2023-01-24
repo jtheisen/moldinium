@@ -1,5 +1,4 @@
-﻿using SimpleInjector;
-using System;
+﻿using System;
 using System.ComponentModel;
 
 namespace Moldinium;
