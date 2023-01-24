@@ -9,6 +9,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Runtime.Intrinsics.Arm;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace Moldinium.Injection;
 
@@ -620,56 +621,68 @@ public class Scope
         {
             var next = pending.Dequeue();
 
-            DependencyResolution? resolution = null;
-
-            try
-            {
-                resolution = provider.Query(next);
-            }
-            catch (Exception ex)
-            {
-                throw new Exception(
-                    $"Exception during dependency resolution for {next} on provider {provider.GetType().Name}\n\n"
-                    + CreateDependencyIssueReport(next), ex
-                );
-            }
-
-            if (resolution is null)
-            {
-                if (next.IsOptional) continue;
-
-                throw new Exception($"Can't resolve dependency {next}\n\n{CreateDependencyIssueReport(next)}");
-            }
-
-            resolutions.Add(next, resolution);
-
-            if (resolution.SameInstanceDependency is Dependency sameInstanceDependency)
-            {
-                AddDependency(sameInstanceDependency, resolution);
-            }
-
-            if (resolution.Dependencies is DependencyBag dependencies)
-            {
-                foreach (var dep in dependencies.Items)
-                {
-                    if (FundamentallyOutlawedTypes.IsOutlawed(dep.Type))
-                    {
-                        throw new Exception(
-                            $"{resolution.Provider.GetName()} request dependency {dep} for {next}," +
-                            $" which has an outlawed type\n\n{CreateDependencyIssueReport(next)}");
-                    }
-
-                    AddDependency(dep, resolution);
-                }
-            }
-
-            if (resolution.MakeSubscope is not null)
-            {
-                pendingSubscopes.Enqueue(resolution);
-            }
+            HandleNext(next);
         }
 
         ResolveSubscopes();
+    }
+
+    Boolean HandleNext(Dependency next)
+    {
+        DependencyResolution? resolution = null;
+
+        try
+        {
+            resolution = provider.Query(next);
+        }
+        catch (Exception ex)
+        {
+            throw new Exception(
+                $"Exception during dependency resolution for {next} on provider {provider.GetType().Name}\n\n"
+                + CreateDependencyIssueReport(next), ex
+            );
+        }
+
+        if (resolution is null)
+        {
+            if (next.IsOptional) return false;
+
+            throw new Exception($"Can't resolve dependency {next}\n\n{CreateDependencyIssueReport(next)}");
+        }
+
+        resolutions.Add(next, resolution);
+
+        if (resolution.SameInstanceDependency is Dependency sameInstanceDependency)
+        {
+            // We're handling same-instance-dependencies before all others to skip
+            // enlisting the other dependencies when there's ultimately no instance
+
+            AddDependency(sameInstanceDependency, resolution, dontEnqueue: true);
+
+            if (!HandleNext(sameInstanceDependency)) return false;
+        }
+
+        if (resolution.Dependencies is DependencyBag dependencies)
+        {
+            foreach (var dep in dependencies.Items)
+            {
+                if (FundamentallyOutlawedTypes.IsOutlawed(dep.Type))
+                {
+                    throw new Exception(
+                        $"{resolution.Provider.GetName()} request dependency {dep} for {next}," +
+                        $" which has an outlawed type\n\n{CreateDependencyIssueReport(next)}");
+                }
+
+                AddDependency(dep, resolution);
+            }
+        }
+
+        if (resolution.MakeSubscope is not null)
+        {
+            pendingSubscopes.Enqueue(resolution);
+        }
+
+        return true;
     }
 
     void ResolveSubscopes()
@@ -684,13 +697,16 @@ public class Scope
         }
     }
 
-    void AddDependency(Dependency dep, DependencyResolution source)
+    void AddDependency(Dependency dep, DependencyResolution source, Boolean dontEnqueue = false)
     {
         if (!resolutions.ContainsKey(dep))
         {
             sources.Add(dep, source);
 
-            pending.Enqueue(dep);
+            if (!dontEnqueue)
+            {
+                pending.Enqueue(dep);
+            }
         }
     }
 

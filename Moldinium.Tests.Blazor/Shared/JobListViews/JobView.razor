@@ -26,5 +26,5 @@
     [Parameter]
     public Job Job { get; set; } = null!;
 
-    String Style => $"margin-left: {1 + Job.NestingLevel?.Level ?? 0}em";
+    String Style => $"margin-left: {1 + (Job.NestingLevel?.Level ?? 0)}em";
 }
