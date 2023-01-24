@@ -79,6 +79,22 @@ public class TypeProperties
         public bool isNotNullable;
         public bool requiresDefault;
         public bool hasInitSetter;
+
+        public override string ToString()
+        {
+            var writer = new StringWriter();
+
+            if (isNotNullable) writer.Write(" not-nullable");
+            if (requiresDefault) writer.Write(" default-requiring");
+            if (hasInitSetter) writer.Write(" with-init-setter");
+
+            writer.Write(' ');
+            writer.Write(info.Name);
+
+            return writer.ToString().TrimStart();
+        }
+
+
     }
 
     public TypeProperties(Type type)

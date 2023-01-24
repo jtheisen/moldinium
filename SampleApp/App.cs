@@ -130,7 +130,9 @@ public interface SimpleJob : Job
 
         for (var i = 0; i < n; ++i)
         {
-            await Task.Delay((Int32)(ms / n), Ct);
+            Ct.ThrowIfCancellationRequested();
+
+            await Task.Delay((Int32)(ms / n));
 
             Progress = 100 * i / n;
         }

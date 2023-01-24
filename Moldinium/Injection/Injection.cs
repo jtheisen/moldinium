@@ -1,48 +1,9 @@
 ﻿using Moldinium.Delegates;
 using Moldinium.Misc;
-using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Net;
-using System.Runtime.Intrinsics.Arm;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace Moldinium.Injection;
-
-/*
- * There are various IDependencyProviders with different demands and properties
- * 
- * 1. The Bakery
- * 
- * Requires only types (not instances) as dependencies to keep the door open for assembly weaving.
- * It also only provides types, not instances, but the provided types are default activatable.
- * 
- * 2. IServiceProvider
- * 
- * Requires nothing as dependencies as it is only used as a source for types. This is good, as
- * it can't tell you what resolved type you get for a service type until you request an instance.
- * 
- * 3. SimpleInjector
- * 
- * Could in principle be used as both a source and a sink as it allows resolving types without any instances.
- * Whether this can be used as a helper for the implementation remains an open question.
- * 
- * 4. Parent scope
- * 
- * Not sure what to say here.
- */
-
-/*
- * Various steps of construction can also be separated into different providers:
- * 
- * 1. Baking interfaces to classes
- * 2. Activation (Construction)
- * 3. Setting initializer props
- * 
- */
 
 public enum RuntimeResolutionType
 {
@@ -321,7 +282,7 @@ public class InitSetterDependencyProvider : IDependencyProvider
                 {
                     if (!p.hasInitSetter) continue;
 
-                    var runtimeResolution = scope.Get(new Dependency(p.info.PropertyType, DependencyRuntimeMaturity.InitializedInstance, !p.requiresDefault, false));
+                    var runtimeResolution = scope.Get(new Dependency(p.info.PropertyType, DependencyRuntimeMaturity.InitializedInstance, !p.isNotNullable, false));
 
                     var instance = runtimeResolution.Instance;
 
@@ -329,7 +290,7 @@ public class InitSetterDependencyProvider : IDependencyProvider
                     {
                         p.info.SetValue(embryo.Instance, instance);
                     }
-                    else if (p.requiresDefault)
+                    else if (p.hasInitSetter && p.isNotNullable)
                     {
                         throw new InternalErrorException("Should have an instance");
                     }
@@ -758,7 +719,7 @@ public class Scope
             else
             {
                 AddNesting(nesting);
-                writer.Write($"- unresolved {dependency}");
+                writer.WriteLine($"- unresolved {dependency}");
             }
         }
     }
