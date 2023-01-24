@@ -36,8 +36,8 @@ public class BasicBakingTests : BakingTestsBase
     {
         var test = BasicFactory.Create<IHasPropertiesWithCollection>();
 
-        Assert.IsTrue(test.StringList.GetType() == typeof(WatchableList<String>));
-        Assert.IsTrue(test.StringCollection.GetType() == typeof(WatchableList<String>));
+        Assert.IsTrue(test.StringList.GetType() == typeof(TrackableList<String>));
+        Assert.IsTrue(test.StringCollection.GetType() == typeof(TrackableList<String>));
     }
 
     [TestMethod]

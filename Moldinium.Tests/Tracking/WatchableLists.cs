@@ -39,12 +39,12 @@ class CollectionChangeTestListener<T>
 }
 
 [TestClass]
-public class WatchableListTests
+public class TrackableListTests
 {
     [TestMethod]
     public void CollectionChanged()
     {
-        var list = new WatchableList<Int32>(new[] { 1, 2, 3 });
+        var list = new TrackableList<Int32>(new[] { 1, 2, 3 });
 
         var listener = new CollectionChangeTestListener<Int32>(list);
 

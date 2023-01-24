@@ -36,7 +36,7 @@ public struct DefaultDefaultConstructible<Type, Implementation> : IDefault<Type>
 
 public struct DefaultTrackableList<T> : IDefault<ICollection<T>>
 {
-    public ICollection<T> Default => new WatchableList<T>();
+    public ICollection<T> Default => new TrackableList<T>();
 }
 
 public interface IDefaultProvider
@@ -96,7 +96,7 @@ public class DefaultDefaultProvider : IDefaultProvider
         {
             var typeArgument = arguments.Length == 1 ? arguments[0] : typeof(Object);
 
-            var implementationType = typeof(WatchableList<>).MakeGenericType(typeArgument);
+            var implementationType = typeof(TrackableList<>).MakeGenericType(typeArgument);
 
             var defaultImplementationType = typeof(DefaultDefaultConstructible<,>).MakeGenericType(type, implementationType);
 

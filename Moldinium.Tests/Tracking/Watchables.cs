@@ -4,12 +4,12 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Moldinium.Tests;
 
 [TestClass]
-public class WatchablesTests
+public class TrackablesTests
 {
     [TestMethod]
     public void Fundamentals()
     {
-        var foo = Watchable.Var(42);
+        var foo = Trackable.Var(42);
 
         Assert.AreEqual(42, foo.Value);
 
@@ -17,7 +17,7 @@ public class WatchablesTests
 
         Assert.AreEqual(43, foo.Value);
 
-        var bar = Watchable.React(() => foo.Value);
+        var bar = Trackable.React(() => foo.Value);
 
         Assert.AreEqual(43, bar.Value);
 
@@ -32,13 +32,13 @@ public class WatchablesTests
     {
         var counter = new Counter();
 
-        var foo = Watchable.Eval(() => counter.Get(42));
+        var foo = Trackable.Eval(() => counter.Get(42));
 
         Assert.AreEqual(0, counter.count);
 
-        // Only alert watchables can cache, as they're the only
+        // Only alert trackables can cache, as they're the only
         // ones who know when they become dirty.
-        using (Watchable.React(() => foo.Value))
+        using (Trackable.React(() => foo.Value))
         {
             Assert.AreEqual(1, counter.count);
 
@@ -62,11 +62,11 @@ public class WatchablesTests
     {
         var counter = new Counter();
 
-        var foo = Watchable.Var(42);
+        var foo = Trackable.Var(42);
 
-        var bar = Watchable.Eval(() => counter.Get(42) + foo.Value);
+        var bar = Trackable.Eval(() => counter.Get(42) + foo.Value);
 
-        // Unwatched evaluations are lazy.
+        // Untracked evaluations are lazy.
         Assert.AreEqual(0, counter.count);
 
         Ignore(bar.Value);
@@ -75,10 +75,10 @@ public class WatchablesTests
 
         foo.Value = 43;
 
-        // Unwatched evaluations are still lazy.
+        // Untracked evaluations are still lazy.
         Assert.AreEqual(1, counter.count);
 
-        var reaction = Watchable.React(() => Ignore(bar.Value));
+        var reaction = Trackable.React(() => Ignore(bar.Value));
 
         Assert.AreEqual(2, counter.count);
 
@@ -96,9 +96,9 @@ public class WatchablesTests
     [TestMethod]
     public void Exceptions()
     {
-        var shouldThrow = Watchable.Var(true);
+        var shouldThrow = Trackable.Var(true);
 
-        var throwing = Watchable.Eval(() => { if (shouldThrow.Value) throw new InvalidOperationException(); else return 0; });
+        var throwing = Trackable.Eval(() => { if (shouldThrow.Value) throw new InvalidOperationException(); else return 0; });
 
         AssertThrows(() => { Ignore(throwing.Value); }, typeof(InvalidOperationException));
 
@@ -122,11 +122,11 @@ public class WatchablesTests
     [TestMethod]
     public void ExceptionsIndirect()
     {
-        var shouldThrow = Watchable.Var("shouldThrow", true);
+        var shouldThrow = Trackable.Var("shouldThrow", true);
 
-        var throwing = Watchable.Eval("throwing", () => { if (shouldThrow.Value) throw new InvalidOperationException(); else return 0; });
+        var throwing = Trackable.Eval("throwing", () => { if (shouldThrow.Value) throw new InvalidOperationException(); else return 0; });
 
-        var relay = Watchable.Eval("relay", () => throwing.Value);
+        var relay = Trackable.Eval("relay", () => throwing.Value);
 
         AssertThrows(() => { Ignore(relay.Value); }, typeof(InvalidOperationException));
 

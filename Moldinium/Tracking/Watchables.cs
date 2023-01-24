@@ -7,65 +7,65 @@ using System.Xml.Linq;
 
 namespace Moldinium;
 
-interface IWatchSubscription : IDisposable
+interface ITrackSubscription : IDisposable
 {
-    IEnumerable<IWatchable> Dependencies { get; }
+    IEnumerable<ITrackable> Dependencies { get; }
 }
 
-interface IWatchable
+interface ITrackable
 {
-    IWatchSubscription Subscribe(Object? agent, Action watcher);
+    ITrackSubscription Subscribe(Object? agent, Action tracker);
 }
 
-interface IWatchableValue : IWatchable
+interface ITrackableValue : ITrackable
 {
     Object UntypedValue { get; }
 
     Type Type { get; }
 }
 
-interface IWatchable<out T> : IWatchableValue
+interface ITrackable<out T> : ITrackableValue
 {
     T Value { get; }
 }
 
-interface IWatchableVariable : IWatchable
+interface ITrackableVariable : ITrackable
 {
     Object UntypedValue { get; set; }
 }
 
-interface IWatchableVariable<T> : IWatchable<T>
+interface ITrackableVariable<T> : ITrackable<T>
 {
     new T Value { get; set; }
 }
 
-class ConcreteWatchable : IWatchable
+class ConcreteTrackable : ITrackable
 {
-    Action? watchers;
-    Int32 noOfWatchers = 0;
+    Action? trackers;
+    Int32 noOfTrackers = 0;
 
     internal String Name { get; set; } = "<unnamed>";
 
-    public IWatchSubscription Subscribe(Object? agent, Action watcher)
+    public ITrackSubscription Subscribe(Object? agent, Action tracker)
     {
         Repository.logger?.WriteLine($"{agent} subscribing to {this}");
 
-        watchers += watcher;
+        trackers += tracker;
 
-        if (noOfWatchers++ == 0)
+        if (noOfTrackers++ == 0)
             Activate();
 
-        return WatchSubscription.Create(this, () =>
+        return TrackSubscription.Create(this, () =>
         {
             Repository.logger?.WriteLine($"{agent} unsubscribing from {this}");
 
-            watchers -= watcher;
-            if (--noOfWatchers == 0)
+            trackers -= tracker;
+            if (--noOfTrackers == 0)
                 Relax();
         });
     }
 
-    protected Boolean IsWatched => noOfWatchers > 0;
+    protected Boolean IsTracked => noOfTrackers > 0;
 
     protected virtual void Activate() { }
 
@@ -73,7 +73,7 @@ class ConcreteWatchable : IWatchable
 
     public void Notify()
     {
-        watchers?.Invoke();
+        trackers?.Invoke();
     }
 
     public override string ToString()
@@ -82,19 +82,19 @@ class ConcreteWatchable : IWatchable
     }
 }
 
-abstract class WatchableValueBase : ConcreteWatchable, IWatchableValue
+abstract class TrackableValueBase : ConcreteTrackable, ITrackableValue
 {
     public abstract Type Type { get; }
 
-    Object IWatchableValue.UntypedValue
+    Object ITrackableValue.UntypedValue
         => GetUntypedValue();
 
-    Type IWatchableValue.Type => Type;
+    Type ITrackableValue.Type => Type;
 
     protected abstract Object GetUntypedValue();
 }
 
-abstract class WatchableVariable : WatchableValueBase, IWatchableVariable
+abstract class TrackableVariable : TrackableValueBase, ITrackableVariable
 {
     public Object UntypedValue
     {
@@ -112,16 +112,16 @@ abstract class WatchableVariable : WatchableValueBase, IWatchableVariable
     protected abstract void SetUntypedValue(Object value);
 }
 
-class WatchableVariable<T> : WatchableVariable, IWatchableVariable<T>
+class TrackableVariable<T> : TrackableVariable, ITrackableVariable<T>
 {
     T value;
 
-    public WatchableVariable()
+    public TrackableVariable()
     {
         this.value = default(T)!;
     }
 
-    public WatchableVariable(T def)
+    public TrackableVariable(T def)
     {
         this.value = def;
     }
@@ -164,7 +164,7 @@ public class RethrowException : Exception
     }
 }
 
-internal class CachedBeforeAndAfterComputedWatchable<T> : IWatchable
+internal class CachedBeforeAndAfterComputedTrackable<T> : ITrackable
 {
     Boolean dirty = true;
 
@@ -172,7 +172,7 @@ internal class CachedBeforeAndAfterComputedWatchable<T> : IWatchable
 
     Exception? exception;
 
-    SerialWatchSubscription? subscriptions = new SerialWatchSubscription();
+    SerialTrackSubscription? subscriptions = new SerialTrackSubscription();
 
     Boolean alert = false;
 
@@ -182,31 +182,31 @@ internal class CachedBeforeAndAfterComputedWatchable<T> : IWatchable
 
     Int32 evaluationNestingLevel;
 
-    Action? watchers;
-    Int32 noOfWatchers = 0;
+    Action? trackers;
+    Int32 noOfTrackers = 0;
 
     internal String Name { get; set; } = "<unnamed>";
 
-    public IWatchSubscription Subscribe(Object? agent, Action watcher)
+    public ITrackSubscription Subscribe(Object? agent, Action tracker)
     {
         Repository.logger?.WriteLine($"{agent} subscribing to {this}");
 
-        watchers += watcher;
+        trackers += tracker;
 
-        if (noOfWatchers++ == 0)
+        if (noOfTrackers++ == 0)
             Activate();
 
-        return WatchSubscription.Create(this, () =>
+        return TrackSubscription.Create(this, () =>
         {
             Repository.logger?.WriteLine($"{agent} unsubscribing from {this}");
 
-            watchers -= watcher;
-            if (--noOfWatchers == 0)
+            trackers -= tracker;
+            if (--noOfTrackers == 0)
                 Relax();
         });
     }
 
-    protected Boolean IsWatched => noOfWatchers > 0;
+    protected Boolean IsTracked => noOfTrackers > 0;
 
     public Boolean BeforeGet(ref T value)
     {
@@ -218,9 +218,9 @@ internal class CachedBeforeAndAfterComputedWatchable<T> : IWatchable
         {
             if (evaluationNestingLevel > 0) throw new Exception("Attempting to enter a nested evaluation");
 
-            if (IsWatched)
+            if (IsTracked)
             {
-                loggingScope = Repository.logger?.WriteLineWithScope($"{this} is watched and dirty, so we're evaluating watched.");
+                loggingScope = Repository.logger?.WriteLineWithScope($"{this} is tracked and dirty, so we're evaluating tracked.");
 
                 Repository.Instance.BeginEvaluation(Name, evaluationNestingLevel++);
 
@@ -228,7 +228,7 @@ internal class CachedBeforeAndAfterComputedWatchable<T> : IWatchable
             }
             else if (alert)
             {
-                loggingScope = Repository.logger?.WriteLineWithScope($"{this} is dirty but unwatched, so we're evaluating unwatched.");
+                loggingScope = Repository.logger?.WriteLineWithScope($"{this} is dirty but untracked, so we're evaluating untracked.");
             }
             else
             {
@@ -340,7 +340,7 @@ internal class CachedBeforeAndAfterComputedWatchable<T> : IWatchable
 
     void Notify()
     {
-        watchers?.Invoke();
+        trackers?.Invoke();
     }
 
     public void InvalidateAndNotify()
@@ -353,7 +353,7 @@ internal class CachedBeforeAndAfterComputedWatchable<T> : IWatchable
     }
 }
 
-class CachedComputedWatchable<T> : WatchableValueBase, IWatchable<T>
+class CachedComputedTrackable<T> : TrackableValueBase, ITrackable<T>
 {
     Func<T> evaluation;
 
@@ -365,11 +365,11 @@ class CachedComputedWatchable<T> : WatchableValueBase, IWatchable<T>
 
     Exception? exception;
 
-    SerialWatchSubscription? subscriptions = new SerialWatchSubscription();
+    SerialTrackSubscription? subscriptions = new SerialTrackSubscription();
 
     Boolean alert = false;
 
-    public CachedComputedWatchable(Func<T> evaluation)
+    public CachedComputedTrackable(Func<T> evaluation)
     {
         value = default!;
         this.evaluation = evaluation;
@@ -397,15 +397,15 @@ class CachedComputedWatchable<T> : WatchableValueBase, IWatchable<T>
         {
             try
             {
-                if (IsWatched)
+                if (IsTracked)
                 {
-                    using (Repository.logger?.WriteLineWithScope($"{this} is watched and dirty, so we're evaluating watched."))
+                    using (Repository.logger?.WriteLineWithScope($"{this} is tracked and dirty, so we're evaluating tracked."))
                         value = Repository.Instance.EvaluateAndSubscribe(
                             Name, ref subscriptions, evaluation, invalidateAndNotify);
                 }
                 else if (alert)
                 {
-                    using (Repository.logger?.WriteLineWithScope($"{this} is dirty but unwatched, so we're evaluating unwatched."))
+                    using (Repository.logger?.WriteLineWithScope($"{this} is dirty but untracked, so we're evaluating untracked."))
                         value = evaluation();
                 }
                 else
@@ -486,7 +486,7 @@ class Reaction<T> : IReaction<T>
 
     Exception? exception;
 
-    SerialWatchSubscription? subscriptions;
+    SerialTrackSubscription? subscriptions;
 
     public T Value { get; private set; } = default!;
 
@@ -547,17 +547,17 @@ class Reaction : Reaction<Object?>
     { }
 }
 
-interface IWatchablesLogger
+interface ITrackablesLogger
 {
     IDisposable WriteLineWithScope(String text);
     void WriteLine(String text);
 
     void BeginEvaluationFrame(Object evaluator);
-    void CloseEvaluationFrameWithResult(Object result, IEnumerable<IWatchable> dependencies);
-    void CloseEvaluationFrameWithException(Exception ex, IEnumerable<IWatchable> dependencies);
+    void CloseEvaluationFrameWithResult(Object result, IEnumerable<ITrackable> dependencies);
+    void CloseEvaluationFrameWithException(Exception ex, IEnumerable<ITrackable> dependencies);
 }
 
-class WatchablesLogger : IWatchablesLogger
+class TrackablesLogger : ITrackablesLogger
 {
     Int32 nesting = 0;
 
@@ -582,14 +582,14 @@ class WatchablesLogger : IWatchablesLogger
         evaluators.Push(evaluator);
     }
 
-    public void CloseEvaluationFrameWithResult(object result, IEnumerable<IWatchable> dependencies)
+    public void CloseEvaluationFrameWithResult(object result, IEnumerable<ITrackable> dependencies)
     {
         var evaluator = evaluators.Pop();
 
         WriteLine($"Evaluating [{evaluator}] completed with ({result}), now listening to [{String.Join(", ", dependencies)}].");
     }
 
-    public void CloseEvaluationFrameWithException(Exception ex, IEnumerable<IWatchable> dependencies)
+    public void CloseEvaluationFrameWithException(Exception ex, IEnumerable<ITrackable> dependencies)
     {
         var evaluator = evaluators.Pop();
 
@@ -604,7 +604,7 @@ class Repository
 
     static Lazy<Repository> instance = new Lazy<Repository>(() => new Repository());
 
-    public static IWatchablesLogger? logger; // = new WatchablesLogger();
+    public static ITrackablesLogger? logger; // = new TrackablesLogger();
 
     Repository()
     {
@@ -615,12 +615,12 @@ class Repository
     {
         internal Object? evaluator;
         internal Int32 id;
-        internal List<IWatchable> evaluatedWatchables = new List<IWatchable>();
+        internal List<ITrackable> evaluatedTrackables = new List<ITrackable>();
     }
 
     Stack<EvaluationRecord> evaluationStack = new Stack<EvaluationRecord>();
 
-    TSource Evaluate<TSource>(Object evaluator, Func<TSource> evaluation, out IEnumerable<IWatchable> dependencies)
+    TSource Evaluate<TSource>(Object evaluator, Func<TSource> evaluation, out IEnumerable<ITrackable> dependencies)
     {
         logger?.BeginEvaluationFrame(evaluator);
 
@@ -630,7 +630,7 @@ class Repository
         {
             var result = evaluation();
 
-            dependencies = evaluationStack.Pop().evaluatedWatchables;
+            dependencies = evaluationStack.Pop().evaluatedTrackables;
 
             logger?.CloseEvaluationFrameWithResult(result!, dependencies);
 
@@ -638,7 +638,7 @@ class Repository
         }
         catch (Exception ex)
         {
-            dependencies = evaluationStack.Pop().evaluatedWatchables;
+            dependencies = evaluationStack.Pop().evaluatedTrackables;
 
             logger?.CloseEvaluationFrameWithException(ex, dependencies);
 
@@ -646,7 +646,7 @@ class Repository
         }
     }
 
-    TSource Evaluate<TSource, TContext>(Object evaluator, Func<TContext, TSource> evaluation, TContext context, out IEnumerable<IWatchable> dependencies)
+    TSource Evaluate<TSource, TContext>(Object evaluator, Func<TContext, TSource> evaluation, TContext context, out IEnumerable<ITrackable> dependencies)
     {
         logger?.BeginEvaluationFrame(evaluator);
 
@@ -656,7 +656,7 @@ class Repository
         {
             var result =  evaluation(context);
 
-            dependencies = evaluationStack.Pop().evaluatedWatchables;
+            dependencies = evaluationStack.Pop().evaluatedTrackables;
 
             logger?.CloseEvaluationFrameWithResult(result!, dependencies);
 
@@ -664,7 +664,7 @@ class Repository
         }
         catch (Exception ex)
         {
-            dependencies = evaluationStack.Pop().evaluatedWatchables;
+            dependencies = evaluationStack.Pop().evaluatedTrackables;
 
             logger?.CloseEvaluationFrameWithException(ex, dependencies);
 
@@ -679,7 +679,7 @@ class Repository
         evaluationStack.Push(new EvaluationRecord { evaluator = evaluator, id = id });
     }
 
-    void EndEvaluation<TSource>(Object evaluator, Int32 id, TSource result, out IEnumerable<IWatchable> dependencies)
+    void EndEvaluation<TSource>(Object evaluator, Int32 id, TSource result, out IEnumerable<ITrackable> dependencies)
     {
         var frame = evaluationStack.Pop();
 
@@ -688,12 +688,12 @@ class Repository
             throw new Exception($"EndEvaluation didn't match the current frame");
         }
 
-        dependencies = frame.evaluatedWatchables;
+        dependencies = frame.evaluatedTrackables;
 
-        logger?.CloseEvaluationFrameWithResult(result!, frame.evaluatedWatchables);
+        logger?.CloseEvaluationFrameWithResult(result!, frame.evaluatedTrackables);
     }
 
-    void EndEvaluationWithException<TSource>(Object evaluator, Int32 id, Exception exception, out IEnumerable<IWatchable> dependencies)
+    void EndEvaluationWithException<TSource>(Object evaluator, Int32 id, Exception exception, out IEnumerable<ITrackable> dependencies)
     {
         var frame = evaluationStack.Pop();
 
@@ -702,30 +702,30 @@ class Repository
             throw new Exception($"EndEvaluation didn't match the current frame");
         }
 
-        dependencies = frame.evaluatedWatchables;
+        dependencies = frame.evaluatedTrackables;
 
-        logger?.CloseEvaluationFrameWithException(exception, frame.evaluatedWatchables);
+        logger?.CloseEvaluationFrameWithException(exception, frame.evaluatedTrackables);
     }
 
-    internal void EndEvaluationAndSubscribe<TSource>(Object evaluator, Int32 id, TSource result, ref SerialWatchSubscription? subscriptions, Action onChange)
+    internal void EndEvaluationAndSubscribe<TSource>(Object evaluator, Int32 id, TSource result, ref SerialTrackSubscription? subscriptions, Action onChange)
     {
         EndEvaluation<TSource>(evaluator, id, result, out var dependecies);
 
         SubscribeAll(evaluator, ref subscriptions, dependecies, onChange);
     }
 
-    internal void EndEvaluationWithExceptionAndSubscribe<TSource>(Object evaluator, Int32 id, Exception exception, ref SerialWatchSubscription? subscriptions, Action onChange)
+    internal void EndEvaluationWithExceptionAndSubscribe<TSource>(Object evaluator, Int32 id, Exception exception, ref SerialTrackSubscription? subscriptions, Action onChange)
     {
         EndEvaluationWithException<TSource>(evaluator, id, exception, out var dependecies);
 
         SubscribeAll(evaluator, ref subscriptions, dependecies, onChange);
     }
 
-    internal TResult EvaluateAndSubscribe<TResult>(Object evaluator, ref SerialWatchSubscription? subscriptions, Func<TResult> evaluation, Action onChange)
+    internal TResult EvaluateAndSubscribe<TResult>(Object evaluator, ref SerialTrackSubscription? subscriptions, Func<TResult> evaluation, Action onChange)
     {
         if (onChange == null) throw new ArgumentException(nameof(onChange));
 
-        IEnumerable<IWatchable>? dependencies = null;
+        IEnumerable<ITrackable>? dependencies = null;
 
         try
         {
@@ -743,11 +743,11 @@ class Repository
         }
     }
 
-    internal TResult EvaluateAndSubscribe<TResult, TContext>(Object evaluator, ref SerialWatchSubscription? subscriptions, Func<TContext, TResult> evaluation, TContext context, Action onChange)
+    internal TResult EvaluateAndSubscribe<TResult, TContext>(Object evaluator, ref SerialTrackSubscription? subscriptions, Func<TContext, TResult> evaluation, TContext context, Action onChange)
     {
         if (onChange == null) throw new ArgumentException(nameof(onChange));
 
-        IEnumerable<IWatchable>? dependencies = null;
+        IEnumerable<ITrackable>? dependencies = null;
 
         try
         {
@@ -765,14 +765,14 @@ class Repository
         }
     }
 
-    void SubscribeAll(Object evaluator, ref SerialWatchSubscription? subscriptions, IEnumerable<IWatchable>? dependencies, Action onChange)
+    void SubscribeAll(Object evaluator, ref SerialTrackSubscription? subscriptions, IEnumerable<ITrackable>? dependencies, Action onChange)
     {
         if (dependencies != null)
         {
             if (subscriptions == null)
-                subscriptions = new SerialWatchSubscription();
+                subscriptions = new SerialTrackSubscription();
 
-            subscriptions.Subscription = new CompositeWatchSubscription(
+            subscriptions.Subscription = new CompositeTrackSubscription(
                 from d in dependencies select d.Subscribe(evaluator, onChange));
         }
         else if (subscriptions != null)
@@ -781,23 +781,23 @@ class Repository
         }
     }
 
-    internal void NoteEvaluation(IWatchable watchable)
+    internal void NoteEvaluation(ITrackable trackable)
     {
-        evaluationStack.Peek().evaluatedWatchables.Add(watchable);
+        evaluationStack.Peek().evaluatedTrackables.Add(trackable);
     }
 }
 
 /// <summary>
-/// Represents a watchable variable that can be written to and read from. It can participate in automatic dependency tracking.
+/// Represents a trackable variable that can be written to and read from. It can participate in automatic dependency tracking.
 /// </summary>
 /// <typeparam name="T">The type of the variable.</typeparam>
 public struct Var<T>
 {
-    IWatchableVariable<T> watchable;
+    ITrackableVariable<T> trackable;
 
-    internal Var(IWatchableVariable<T> watchable)
+    internal Var(ITrackableVariable<T> trackable)
     {
-        this.watchable = watchable;
+        this.trackable = trackable;
     }
 
     /// <summary>
@@ -808,23 +808,23 @@ public struct Var<T>
     /// The result of the conversion.
     /// </returns>
     public static implicit operator Eval<T>(Var<T> var)
-        => new Eval<T>(var.watchable);
+        => new Eval<T>(var.trackable);
 
     /// <summary>
-    /// Gets or sets the watchable variable's value.
+    /// Gets or sets the trackable variable's value.
     /// </summary>
     /// <value>
-    /// The value of the watchable variable. Neither the setter nor the getter will ever throw.
+    /// The value of the trackable variable. Neither the setter nor the getter will ever throw.
     /// </value>
     public T Value
     {
-        get { return watchable.Value; }
-        set { watchable.Value = value; }
+        get { return trackable.Value; }
+        set { trackable.Value = value; }
     }
 }
 
 /// <summary>
-/// Represents a watchable evaluation that can be read from. It can participate in automatic dependency tracking.
+/// Represents a trackable evaluation that can be read from. It can participate in automatic dependency tracking.
 /// </summary>
 /// <typeparam name="T">The type.</typeparam>
 /// <remarks>
@@ -837,68 +837,68 @@ public struct Var<T>
 /// </remarks>
 public struct Eval<T>
 {
-    internal readonly IWatchable<T> watchable;
+    internal readonly ITrackable<T> trackable;
 
-    internal Eval(IWatchable<T> watchable)
+    internal Eval(ITrackable<T> trackable)
     {
-        this.watchable = watchable;
+        this.trackable = trackable;
     }
 
     /// <summary>
-    /// Gets the value of the watchable evaluation.
+    /// Gets the value of the trackable evaluation.
     /// </summary>
     /// <value>
     /// The value that the evaluation represents. This will throw if the evaluation throws.
     /// </value>
-    public T Value => watchable.Value;
+    public T Value => trackable.Value;
 
-    public IDisposable Subscribe(Action? watcher = null, Object? name = null) => watchable.Subscribe(name, watcher ?? (() => { }));
+    public IDisposable Subscribe(Action? tracker = null, Object? name = null) => trackable.Subscribe(name, tracker ?? (() => { }));
 }
 
 /// <summary>
-/// Provides a set of factory methods for watchables.
+/// Provides a set of factory methods for trackables.
 /// </summary>
-public static class Watchable
+public static class Trackable
 {
     /// <summary>
-    /// Creates a watchable variable.
+    /// Creates a trackable variable.
     /// </summary>
     /// <typeparam name="T">The type.</typeparam>
     /// <param name="def">The initial value.</param>
-    /// <returns>The new watchable variable.</returns>
+    /// <returns>The new trackable variable.</returns>
     public static Var<T> Var<T>(T def = default!)
-        => new Var<T>(new WatchableVariable<T>(def));
+        => new Var<T>(new TrackableVariable<T>(def));
 
     /// <summary>
-    /// Creates a watchable variable.
+    /// Creates a trackable variable.
     /// </summary>
     /// <typeparam name="T">The type.</typeparam>
     /// <param name="def">The initial value.</param>
-    /// <returns>The new watchable variable.</returns>
+    /// <returns>The new trackable variable.</returns>
     public static Var<T> Var<T>(String name, T def = default!)
-        => new Var<T>(new WatchableVariable<T>(def) { Name = name });
+        => new Var<T>(new TrackableVariable<T>(def) { Name = name });
 
-    internal static IWatchableVariable VarForType(Type type)
-        => (WatchableVariable)Activator.CreateInstance(
-            typeof(WatchableVariable<>).MakeGenericType(type))!;
+    internal static ITrackableVariable VarForType(Type type)
+        => (TrackableVariable)Activator.CreateInstance(
+            typeof(TrackableVariable<>).MakeGenericType(type))!;
 
     /// <summary>
-    /// Creates a watchable evaluation.
+    /// Creates a trackable evaluation.
     /// </summary>
     /// <typeparam name="T">The type.</typeparam>
     /// <param name="evaluation">The function to evaluate.</param>
-    /// <returns>The new watchable evaluation.</returns>
+    /// <returns>The new trackable evaluation.</returns>
     public static Eval<T> Eval<T>(Func<T> evaluation)
-        => new Eval<T>(new CachedComputedWatchable<T>(evaluation));
+        => new Eval<T>(new CachedComputedTrackable<T>(evaluation));
 
     /// <summary>
-    /// Creates a watchable evaluation.
+    /// Creates a trackable evaluation.
     /// </summary>
     /// <typeparam name="T">The type.</typeparam>
     /// <param name="evaluation">The function to evaluate.</param>
-    /// <returns>The new watchable evaluation.</returns>
+    /// <returns>The new trackable evaluation.</returns>
     public static Eval<T> Eval<T>(String name, Func<T> evaluation)
-        => new Eval<T>(new CachedComputedWatchable<T>(evaluation) { Name = name });
+        => new Eval<T>(new CachedComputedTrackable<T>(evaluation) { Name = name });
 
     /// <summary>
     /// Creates a reaction.

@@ -233,7 +233,7 @@ public struct TrackedPropertyImplementation<Value> : ITrackedPropertyImplementat
 {
     TrackableVariable<Value> variable;
 
-    public void Init(Value def) => variable = new WatchableVariable<Value>(def);
+    public void Init(Value def) => variable = new TrackableVariable<Value>(def);
 
     public Value Get() => variable.Value;
 

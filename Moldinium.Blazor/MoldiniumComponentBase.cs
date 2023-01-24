@@ -16,7 +16,7 @@ public abstract class MoldiniumComponentBase : MoldiniumComponentUpperBase
 
     protected override void BuildRenderTreeFromRazor(RenderTreeBuilder builder)
     {
-        trackingSubscription = Watchable.React(() =>
+        trackingSubscription = Trackable.React(() =>
         {
             BuildRenderTree(builder);
         }, () =>

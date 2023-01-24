@@ -92,16 +92,16 @@ class ModelFactoryInterceptor : IInterceptor
         private readonly PropertyChangedEventArgs eventArgs;
     }
 
-    class WatchableVariablePropertyImplementation : PropertyImplementation
+    class TrackableVariablePropertyImplementation : PropertyImplementation
     {
-        IWatchableVariable variable;
+        ITrackableVariable variable;
 
-        public WatchableVariablePropertyImplementation(PropertyInfo property, Object target)
+        public TrackableVariablePropertyImplementation(PropertyInfo property, Object target)
             : base(property, target)
         {
-            variable = Watchable.VarForType(property.PropertyType);
+            variable = Trackable.VarForType(property.PropertyType);
 
-            (variable as WatchableValueBase)!.Name = $"{property.DeclaringType!.Name}.{property.Name}";
+            (variable as TrackableValueBase)!.Name = $"{property.DeclaringType!.Name}.{property.Name}";
 
             variable.Subscribe(this, Notify);
         }
@@ -117,30 +117,30 @@ class ModelFactoryInterceptor : IInterceptor
         }
     }
 
-    class WatchableImplementationPropertyImplementation : PropertyImplementation
+    class TrackableImplementationPropertyImplementation : PropertyImplementation
     {
-        CachedComputedWatchable<Object> watchable;
+        CachedComputedTrackable<Object> trackable;
 
-        public WatchableImplementationPropertyImplementation(PropertyInfo property, Object target)
+        public TrackableImplementationPropertyImplementation(PropertyInfo property, Object target)
             : base(property, target)
         {
-            watchable = new CachedComputedWatchable<Object>(Invoke);
+            trackable = new CachedComputedTrackable<Object>(Invoke);
 
-            watchable.Name = $"{property.DeclaringType!.Name}.{property.Name}";
+            trackable.Name = $"{property.DeclaringType!.Name}.{property.Name}";
 
-            watchable.Subscribe(this, Notify);
+            trackable.Subscribe(this, Notify);
         }
 
         public override void Get(IInvocation invocation)
         {
-            invocation.ReturnValue = watchable.Value;
+            invocation.ReturnValue = trackable.Value;
         }
 
         public override void Set(IInvocation invocation)
         {
             invocation.Proceed();
 
-            watchable.InvalidateAndNotify();
+            trackable.InvalidateAndNotify();
         }
 
         Object Invoke()
@@ -184,11 +184,11 @@ class ModelFactoryInterceptor : IInterceptor
     {
         if (property.GetMethod!.IsAbstract)
         {
-            return new WatchableVariablePropertyImplementation(property, target);
+            return new TrackableVariablePropertyImplementation(property, target);
         }
         else
         {
-            return new WatchableImplementationPropertyImplementation(property, target);
+            return new TrackableImplementationPropertyImplementation(property, target);
         }
     }
 

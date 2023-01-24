@@ -19,20 +19,20 @@ class ActionDisposable : IDisposable
     }
 }
 
-class ActionWatchSubscription : IWatchSubscription
+class ActionTrackSubscription : ITrackSubscription
 {
-    IWatchable watchable;
+    ITrackable trackable;
 
     Action action;
 
-    public ActionWatchSubscription(IWatchable watchable, Action action)
+    public ActionTrackSubscription(ITrackable trackable, Action action)
     {
-        this.watchable = watchable;
+        this.trackable = trackable;
         this.action = action;
     }
 
-    public IEnumerable<IWatchable> Dependencies
-        => new[] { watchable };
+    public IEnumerable<ITrackable> Dependencies
+        => new[] { trackable };
 
     public void Dispose()
     {
@@ -40,14 +40,14 @@ class ActionWatchSubscription : IWatchSubscription
     }
 }
 
-class SerialWatchSubscription : IWatchSubscription
+class SerialTrackSubscription : ITrackSubscription
 {
-    IWatchSubscription? subscription;
+    ITrackSubscription? subscription;
 
-    public IEnumerable<IWatchable> Dependencies
-        => subscription?.Dependencies ?? Enumerable.Empty<IWatchable>();
+    public IEnumerable<ITrackable> Dependencies
+        => subscription?.Dependencies ?? Enumerable.Empty<ITrackable>();
 
-    public IWatchSubscription? Subscription
+    public ITrackSubscription? Subscription
     {
         get
         {
@@ -67,21 +67,21 @@ class SerialWatchSubscription : IWatchSubscription
     }
 }
 
-class CompositeWatchSubscription : IWatchSubscription
+class CompositeTrackSubscription : ITrackSubscription
 {
-    IWatchSubscription[] subscriptions;
+    ITrackSubscription[] subscriptions;
 
-    public CompositeWatchSubscription(params IWatchSubscription[] subscriptions)
+    public CompositeTrackSubscription(params ITrackSubscription[] subscriptions)
     {
         this.subscriptions = subscriptions;
     }
 
-    public CompositeWatchSubscription(IEnumerable<IWatchSubscription> subscriptions)
+    public CompositeTrackSubscription(IEnumerable<ITrackSubscription> subscriptions)
     {
         this.subscriptions = subscriptions.ToArray();
     }
 
-    public IEnumerable<IWatchable> Dependencies
+    public IEnumerable<ITrackable> Dependencies
         => from s in subscriptions from d in s.Dependencies select d;
 
     public void Dispose()
@@ -91,8 +91,8 @@ class CompositeWatchSubscription : IWatchSubscription
     }
 }
 
-static class WatchSubscription
+static class TrackSubscription
 {
-    public static IWatchSubscription Create(IWatchable watchable, Action action)
-        => new ActionWatchSubscription(watchable, action);
+    public static ITrackSubscription Create(ITrackable trackable, Action action)
+        => new ActionTrackSubscription(trackable, action);
 }

@@ -7,37 +7,37 @@ using System.Linq;
 
 namespace Moldinium;
 
-public class WatchableList<T> : INotifyCollectionChanged, IList<T>, ICollection<T>, ICollection, IReadOnlyList<T>, IReadOnlyCollection<T>, IEnumerable<T>, IEnumerable
+public class TrackableList<T> : INotifyCollectionChanged, IList<T>, ICollection<T>, ICollection, IReadOnlyList<T>, IReadOnlyCollection<T>, IEnumerable<T>, IEnumerable
 {
     List<T> items;
-    ConcreteWatchable watchable = new ConcreteWatchable();
+    ConcreteTrackable trackable = new ConcreteTrackable();
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="WatchableList{T}"/> class that
+    /// Initializes a new instance of the <see cref="TrackableList{T}"/> class that
     /// is empty and has the default initial capacity.
     /// </summary>
-    public WatchableList()
+    public TrackableList()
     {
         items = new List<T>();
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="WatchableList{T}"/> class that
+    /// Initializes a new instance of the <see cref="TrackableList{T}"/> class that
     /// is empty and has the specified initial capacity.
     /// </summary>
     /// <param name="capacity">The number of elements that the new list can initially store.</param>
-    public WatchableList(Int32 capacity)
+    public TrackableList(Int32 capacity)
     {
         items = new List<T>(capacity);
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="WatchableList{T}"/> class that
+    /// Initializes a new instance of the <see cref="TrackableList{T}"/> class that
     /// contains elements copied from the specified collection and has sufficient capacity
     /// to accommodate the number of elements copied.
     /// </summary>
     /// <param name="collection">The collection whose elements are copied to the new list.</param>
-    public WatchableList(IEnumerable<T> collection)
+    public TrackableList(IEnumerable<T> collection)
     {
         items = new List<T>(collection.Count());
         InsertRange(0, collection);
@@ -65,10 +65,10 @@ public class WatchableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     }
 
     /// <summary>
-    /// Adds the elements of the specified collection to the end of the <see cref="WatchableList{T}"/>.
+    /// Adds the elements of the specified collection to the end of the <see cref="TrackableList{T}"/>.
     /// </summary>
     /// <param name="collection">The collection whose elements should be added to the end of the
-    /// <see cref="WatchableList{T}"/>. The collection must not be null and must
+    /// <see cref="TrackableList{T}"/>. The collection must not be null and must
     /// not contain null elements, duplicates, or elements that are already in the list.</param>
     public void AddRange(IEnumerable<T> collection)
     {
@@ -85,14 +85,14 @@ public class WatchableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     }
 
     /// <summary>
-    /// Searches the entire sorted <see cref="WatchableList{T}" /> for an element using
+    /// Searches the entire sorted <see cref="TrackableList{T}" /> for an element using
     /// the default comparer and returns the zero-based index of the element.
     /// </summary>
     /// <param name="item">The object to locate.</param>
-    /// <returns>The zero-based index of item in the sorted <see cref="WatchableList{T}" />,
+    /// <returns>The zero-based index of item in the sorted <see cref="TrackableList{T}" />,
     /// if item is found; otherwise, a negative number that is the bitwise complement
     /// of the index of the next element that is larger than item or, if there is no
-    /// larger element, the bitwise complement of <see cref="WatchableList{T}.Count"/>.</returns>
+    /// larger element, the bitwise complement of <see cref="TrackableList{T}.Count"/>.</returns>
     public int BinarySearch(T item)
     {
         OnEvaluated();
@@ -100,17 +100,17 @@ public class WatchableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     }
 
     /// <summary>
-    /// Searches the entire sorted <see cref="WatchableList{T}" /> for an element using
+    /// Searches the entire sorted <see cref="TrackableList{T}" /> for an element using
     /// the specified comparer and returns the zero-based index of the element.
     /// </summary>
     /// <param name="item">The object to locate.</param>
     /// <param name="comparer">The <see cref="System.Collections.Generic.IComparer{T}" /> implementation to use when comparing
     /// elements, or null to use the default comparer <see cref="System.Collections.Generic.Comparer{T}" />.Default.</param>
     /// <returns>
-    /// The zero-based index of item in the sorted <see cref="WatchableList{T}" />,
+    /// The zero-based index of item in the sorted <see cref="TrackableList{T}" />,
     /// if item is found; otherwise, a negative number that is the bitwise complement
     /// of the index of the next element that is larger than item or, if there is no
-    /// larger element, the bitwise complement of <see cref="WatchableList{T}.Count" />.
+    /// larger element, the bitwise complement of <see cref="TrackableList{T}.Count" />.
     /// </returns>
     public int BinarySearch(T item, IComparer<T> comparer)
     {
@@ -119,7 +119,7 @@ public class WatchableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     }
 
     /// <summary>
-    /// Searches the entire sorted <see cref="WatchableList{T}" /> for an element using
+    /// Searches the entire sorted <see cref="TrackableList{T}" /> for an element using
     /// the specified comparer and returns the zero-based index of the element.
     /// </summary>
     /// <param name="index">The zero-based starting index of the range to search.</param>
@@ -128,10 +128,10 @@ public class WatchableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     /// <param name="comparer">The <see cref="System.Collections.Generic.IComparer{T}" /> implementation to use when comparing
     /// elements, or null to use the default comparer <see cref="System.Collections.Generic.Comparer{T}" />.Default.</param>
     /// <returns>
-    /// The zero-based index of item in the sorted <see cref="WatchableList{T}" />,
+    /// The zero-based index of item in the sorted <see cref="TrackableList{T}" />,
     /// if item is found; otherwise, a negative number that is the bitwise complement
     /// of the index of the next element that is larger than item or, if there is no
-    /// larger element, the bitwise complement of <see cref="WatchableList{T}.Count" />.
+    /// larger element, the bitwise complement of <see cref="TrackableList{T}.Count" />.
     /// </returns>
     public int BinarySearch(int index, int count, T item, IComparer<T> comparer)
     {
@@ -146,7 +146,7 @@ public class WatchableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     public void Clear()
     {
         items.Clear();
-        watchable.Notify();
+        trackable.Notify();
         CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
     }
 
@@ -160,47 +160,47 @@ public class WatchableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     public bool Contains(T item) { OnEvaluated(); return items.Contains(item); }
 
     /// <summary>
-    /// Copies the entire <see cref="WatchableList{T}"/> to a compatible one-dimensional
+    /// Copies the entire <see cref="TrackableList{T}"/> to a compatible one-dimensional
     /// array, starting at the beginning of the target array.
     /// </summary>
     /// <param name="array">The one-dimensional System.Array that is the destination of the elements copied
-    /// from <see cref="WatchableList{T}"/>. The System.Array must have zero-based indexing.</param>
+    /// from <see cref="TrackableList{T}"/>. The System.Array must have zero-based indexing.</param>
     public void CopyTo(T[] array) { OnEvaluated(); items.CopyTo(array); }
 
     /// <summary>
-    /// Copies the entire <see cref="WatchableList{T}" /> to a compatible one-dimensional
+    /// Copies the entire <see cref="TrackableList{T}" /> to a compatible one-dimensional
     /// array, starting at the specified index of the target array.
     /// </summary>
     /// <param name="array">The one-dimensional System.Array that is the destination of the elements copied
-    /// from <see cref="WatchableList{T}" />. The System.Array must have zero-based indexing.</param>
+    /// from <see cref="TrackableList{T}" />. The System.Array must have zero-based indexing.</param>
     /// <param name="arrayIndex">The zero-based index in <paramref name="array" /> at which copying begins.</param>
     public void CopyTo(T[] array, int arrayIndex) { OnEvaluated(); items.CopyTo(array, arrayIndex); }
 
     /// <summary>
-    /// Copies the entire <see cref="WatchableList{T}" /> to a compatible one-dimensional
+    /// Copies the entire <see cref="TrackableList{T}" /> to a compatible one-dimensional
     /// array, starting at the specified index of the target array.
     /// </summary>
-    /// <param name="index">The zero-based index in the source <see cref="WatchableList{T}" /> at which
+    /// <param name="index">The zero-based index in the source <see cref="TrackableList{T}" /> at which
     /// copying begins.</param>
     /// <param name="array">The one-dimensional System.Array that is the destination of the elements copied
-    /// from <see cref="WatchableList{T}" />. The System.Array must have zero-based indexing.</param>
+    /// from <see cref="TrackableList{T}" />. The System.Array must have zero-based indexing.</param>
     /// <param name="arrayIndex">The zero-based index in <paramref name="array" /> at which copying begins.</param>
     /// <param name="count">The number of elements to copy.</param>
     public void CopyTo(int index, T[] array, int arrayIndex, int count) { OnEvaluated(); items.CopyTo(index, array, arrayIndex, count); }
 
     /// <summary>
-    /// Determines whether the <see cref="WatchableList{T}" /> contains elements that
+    /// Determines whether the <see cref="TrackableList{T}" /> contains elements that
     /// match the conditions defined by the specified predicate.
     /// </summary>
     /// <param name="match">The <see cref="System.Predicate{T}" /> delegate that defines the conditions of the elements to
     /// search for.</param>
-    /// <returns>true if the <see cref="WatchableList{T}" /> contains one or more elements that
+    /// <returns>true if the <see cref="TrackableList{T}" /> contains one or more elements that
     /// match the conditions defined by the specified predicate; otherwise, false.</returns>
     public bool Exists(Predicate<T> match) { OnEvaluated(); return items.Exists(match); }
 
     /// <summary>
     /// Searches for an element that matches the conditions defined by the specified
-    /// predicate, and returns the first occurrence within the entire <see cref="WatchableList{T}" />.
+    /// predicate, and returns the first occurrence within the entire <see cref="TrackableList{T}" />.
     /// </summary>
     /// <param name="match">The <see cref="System.Predicate{T}" /> delegate that defines the conditions of the element to
     /// search for.</param>
@@ -222,7 +222,7 @@ public class WatchableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     /// <summary>
     /// Searches for an element that matches the conditions defined by the specified
     /// predicate, and returns the zero-based index of the first occurrence within the
-    /// entire <see cref="WatchableList{T}" />.
+    /// entire <see cref="TrackableList{T}" />.
     /// </summary>
     /// <param name="match">The <see cref="System.Predicate{T}" /> delegate that defines the conditions of the element to
     /// search for.</param>
@@ -233,7 +233,7 @@ public class WatchableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     /// <summary>
     /// Searches for an element that matches the conditions defined by the specified
     /// predicate, and returns the zero-based index of the first occurrence within the
-    /// range of elements in the <see cref="WatchableList{T}" /> that extends from
+    /// range of elements in the <see cref="TrackableList{T}" /> that extends from
     /// the specified index to the last element.
     /// </summary>
     /// <param name="startIndex">The zero-based starting index of the search.</param>
@@ -248,7 +248,7 @@ public class WatchableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     /// <summary>
     /// Searches for an element that matches the conditions defined by the specified
     /// predicate, and returns the zero-based index of the first occurrence within the
-    /// range of elements in the <see cref="WatchableList{T}" /> that extends from
+    /// range of elements in the <see cref="TrackableList{T}" /> that extends from
     /// the specified index and contains the specified number of elements.
     /// </summary>
     /// <param name="startIndex">The zero-based starting index of the search.</param>
@@ -295,7 +295,7 @@ public class WatchableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     {
         var removed = items[index];
         items.RemoveAt(index);
-        watchable.Notify();
+        trackable.Notify();
         CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removed, index));
     }
 
@@ -322,7 +322,7 @@ public class WatchableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
         {
             var removed = items[index];
             items[index] = value;
-            watchable.Notify();
+            trackable.Notify();
             CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, value, removed, index));
         }
     }
@@ -336,15 +336,15 @@ public class WatchableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     public void Insert(int index, T item)
     {
         items.Insert(index, item);
-        watchable.Notify();
+        trackable.Notify();
         CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item, index));
     }
 
     /// <summary>
-    /// Inserts the elements of a collection into the <see cref="WatchableList{T}" />
+    /// Inserts the elements of a collection into the <see cref="TrackableList{T}" />
     /// </summary>
     /// <param name="index">The zero-based index at which the new elements should be inserted.</param>
-    /// <param name="collection">The collection whose elements should be inserted into the <see cref="WatchableList{T}" />.
+    /// <param name="collection">The collection whose elements should be inserted into the <see cref="TrackableList{T}" />.
     /// The collection itself cannot be null, but it can contain elements that are null,
     /// if type T is a reference type.</param>
     public void InsertRange(int index, IEnumerable<T> collection)
@@ -360,7 +360,7 @@ public class WatchableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     public event NotifyCollectionChangedEventHandler? CollectionChanged;
 
     protected virtual void OnEvaluated() {
-        Repository.Instance.NoteEvaluation(watchable);
+        Repository.Instance.NoteEvaluation(trackable);
     }
 
     Boolean ICollection<T>.IsReadOnly { get { return true; } }

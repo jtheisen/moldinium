@@ -54,9 +54,9 @@ public interface ITrackedPropertyImplementation<
 
 public struct TrackedPropertyImplementation<Value> : ITrackedPropertyImplementation<Value, TrackedPropertyMixin>
 {
-    WatchableVariable<Value> variable;
+    TrackableVariable<Value> variable;
 
-    public void Init(Value def) => variable = new WatchableVariable<Value>(def);
+    public void Init(Value def) => variable = new TrackableVariable<Value>(def);
 
     public Value Get() => variable.Value;
 
@@ -85,21 +85,21 @@ public struct TrackedComputedPropertyImplementation<Value, Exception>
     : ITrackedComputedPropertyImplementation<Value, Exception, TrackedPropertyMixin>
     where Exception : System.Exception
 {
-    CachedBeforeAndAfterComputedWatchable<Value> watchable;
+    CachedBeforeAndAfterComputedTrackable<Value> trackable;
 
-    public void Init() => watchable = new CachedBeforeAndAfterComputedWatchable<Value>();
+    public void Init() => trackable = new CachedBeforeAndAfterComputedTrackable<Value>();
 
-    public bool BeforeGet(ref Value value, ref TrackedPropertyMixin mixin) => watchable.BeforeGet(ref value);
+    public bool BeforeGet(ref Value value, ref TrackedPropertyMixin mixin) => trackable.BeforeGet(ref value);
 
-    public void AfterGet(ref Value value, ref TrackedPropertyMixin mixin) => watchable.AfterGet(ref value);
+    public void AfterGet(ref Value value, ref TrackedPropertyMixin mixin) => trackable.AfterGet(ref value);
 
-    public void AfterSet(ref TrackedPropertyMixin mixin) => watchable.AfterSet();
+    public void AfterSet(ref TrackedPropertyMixin mixin) => trackable.AfterSet();
 
-    public bool AfterErrorGet(Exception exception, ref TrackedPropertyMixin mixin) => watchable.AfterErrorGet(exception);
+    public bool AfterErrorGet(Exception exception, ref TrackedPropertyMixin mixin) => trackable.AfterErrorGet(exception);
 
     public bool AfterErrorSet(ref TrackedPropertyMixin mixin)
     {
-        watchable.AfterErrorSet();
+        trackable.AfterErrorSet();
 
         return true;
     }
@@ -147,9 +147,9 @@ public interface ITrackedNotifyingPropertyImplementation<
 public struct TrackedNotifyingPropertyImplementation<Value, Container> : ITrackedNotifyingPropertyImplementation<Value, Container, TrackedNotifyingPropertyMixin>
     where Container : class
 {
-    WatchableVariable<Value> variable;
+    TrackableVariable<Value> variable;
 
-    public void Init(Value def) => variable = new WatchableVariable<Value>(def);
+    public void Init(Value def) => variable = new TrackableVariable<Value>(def);
 
     public Value Get() => variable.Value;
 
@@ -186,23 +186,23 @@ public struct TrackedNotifyingComputedPropertyImplementation<Value, Container, E
     where Container : class
     where Exception : System.Exception
 {
-    CachedBeforeAndAfterComputedWatchable<Value> watchable;
+    CachedBeforeAndAfterComputedTrackable<Value> trackable;
 
-    public void Init() => watchable = new CachedBeforeAndAfterComputedWatchable<Value>();
+    public void Init() => trackable = new CachedBeforeAndAfterComputedTrackable<Value>();
 
-    public bool BeforeGet(ref Value value, ref TrackedNotifyingPropertyMixin mixin) => watchable.BeforeGet(ref value);
+    public bool BeforeGet(ref Value value, ref TrackedNotifyingPropertyMixin mixin) => trackable.BeforeGet(ref value);
 
     public void AfterGet(ref Value value, Container container, ref TrackedNotifyingPropertyMixin mixin)
-        => watchable.AfterGet(ref value, () => (container as INotifyingPropertyMixin)!.NotifyPropertyChanged(container));
+        => trackable.AfterGet(ref value, () => (container as INotifyingPropertyMixin)!.NotifyPropertyChanged(container));
 
-    public void AfterSet(ref TrackedNotifyingPropertyMixin mixin) => watchable.AfterSet();
+    public void AfterSet(ref TrackedNotifyingPropertyMixin mixin) => trackable.AfterSet();
 
     public bool AfterErrorGet(Exception exception, Container container, ref TrackedNotifyingPropertyMixin mixin)
-        => watchable.AfterErrorGet(exception, () => (container as INotifyingPropertyMixin)!.NotifyPropertyChanged(container));
+        => trackable.AfterErrorGet(exception, () => (container as INotifyingPropertyMixin)!.NotifyPropertyChanged(container));
 
     public bool AfterErrorSet(ref TrackedNotifyingPropertyMixin mixin)
     {
-        watchable.AfterErrorSet();
+        trackable.AfterErrorSet();
 
         return true;
     }

@@ -9,7 +9,7 @@ public class Command : ICommand, IDisposable
 {
     DCommandImplementation action;
 
-    SerialWatchSubscription? subscriptions = null;
+    SerialTrackSubscription? subscriptions = null;
 
     public Command(DCommandImplementation action)
     {

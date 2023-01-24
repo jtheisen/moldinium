@@ -68,7 +68,7 @@ public class CombinedTests
         var changeCount = 0;
 
         {
-            using var reaction = Watchable.React(() =>
+            using var reaction = Trackable.React(() =>
             {
                 var _ = instance.Text;
 
