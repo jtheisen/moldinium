@@ -55,6 +55,8 @@ public class CodeCreation
 
         typeBuilder.DefineMethodOverride(methodBuilder, methodTemplate);
 
+        CustomAttributeCopying.CopyCustomAttributes(methodBuilder.SetCustomAttribute, methodTemplate);
+
         return methodBuilder;
     }
 

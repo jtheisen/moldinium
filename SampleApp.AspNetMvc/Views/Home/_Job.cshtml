@@ -1,0 +1,24 @@
+﻿@model SampleApp.Job
+
+@{
+    var style = $"margin-left: {1 + (Model.NestingLevel?.Level ?? 0)}em";
+}
+
+<div class="position-relative border-top">
+    <div class="status-string d-flex flex-column justify-content-center text-secondary text-uppercase" style="@style">
+        @Model.StatusString
+    </div>
+
+    @if (Model is SimpleJob simpleJob)
+    {
+        <partial name="_SimpleJob" model="@simpleJob" />
+    }
+    else if (Model is ComplexJob complexJob)
+    {
+        <partial name="_ComplexJob" model="@complexJob" />
+    }
+    else
+    {
+        <div>unknown job</div>
+    }
+</div>

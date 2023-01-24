@@ -20,7 +20,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Moldinium.Blazor", "Moldini
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Moldinium.Tests.Wpf", "Moldinium.Tests.Wpf\Moldinium.Tests.Wpf.csproj", "{D33AF4E7-8E83-429A-B4AF-F7236DCB2AD9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SampleApp.BlazorWebAssembly", "SampleApp.BlazorWebAssembly\SampleApp.BlazorWebAssembly.csproj", "{BD0F7197-0AB5-4188-8FAB-BE12109CE720}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SampleApp.BlazorWebAssembly", "SampleApp.BlazorWebAssembly\SampleApp.BlazorWebAssembly.csproj", "{BD0F7197-0AB5-4188-8FAB-BE12109CE720}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SampleApp.AspNetMvc", "SampleApp.AspNetMvc\SampleApp.AspNetMvc.csproj", "{1B26CFAC-C50D-4AFE-AB6F-0EEA394FE927}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -56,6 +58,10 @@ Global
 		{BD0F7197-0AB5-4188-8FAB-BE12109CE720}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BD0F7197-0AB5-4188-8FAB-BE12109CE720}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BD0F7197-0AB5-4188-8FAB-BE12109CE720}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1B26CFAC-C50D-4AFE-AB6F-0EEA394FE927}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1B26CFAC-C50D-4AFE-AB6F-0EEA394FE927}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1B26CFAC-C50D-4AFE-AB6F-0EEA394FE927}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1B26CFAC-C50D-4AFE-AB6F-0EEA394FE927}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

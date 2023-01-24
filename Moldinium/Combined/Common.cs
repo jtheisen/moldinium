@@ -1,4 +1,5 @@
-﻿using Moldinium.Injection;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Moldinium.Injection;
 using System;
 using System.Collections.Generic;
 
@@ -137,4 +138,13 @@ public static partial class Extensions
     /// </summary>
     public static Boolean StartsWithFollowedByCapital(this String name, String prefix)
         => name.Length > prefix.Length && name.StartsWith(prefix) && Char.IsUpper(name[prefix.Length]);
+
+
+    public static IServiceCollection AddMoldiniumRoot<T>(this IServiceCollection services, DefaultDependencyProviderConfiguration configuration)
+        where T : class => services
+        
+        .AddSingleton<Scope<T>>(sp => new Scope<T>(DependencyProvider.Create(configuration), DependencyRuntimeMaturity.InitializedInstance))
+        .AddSingleton<T>(sp => (T)sp.GetRequiredService<Scope<T>>().CreateRuntimeScope().Root)
+        
+    ;
 }

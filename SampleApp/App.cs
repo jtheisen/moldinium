@@ -1,17 +1,6 @@
 ﻿using System.Diagnostics;
-using System.Security.Cryptography;
 
 namespace SampleApp;
-
-public interface JobListApp
-{
-    Func<SimpleJobConfig, JobList> CreateJobList { get; init; }
-
-    JobList CreateDefaultJobList()
-    {
-        return CreateJobList(new SimpleJobConfig(TimeSpan.FromSeconds(3), 100));
-    }
-}
 
 public record CommandConfig(Action Execute, Boolean CanExecute = true);
 
@@ -118,15 +107,17 @@ public record SimpleJobConfig(TimeSpan Duration, Int32 Steps);
 
 public interface SimpleJob : Job
 {
-    SimpleJobConfig Config { get; init; }
+    SimpleJobConfig? Config { get; init; }
 
     Int32 Progress { get; set; }
 
     async Task Job.RunImpl()
     {
-        var n = Config.Steps;
+        var config = Config ?? new SimpleJobConfig(TimeSpan.FromSeconds(3), 50);
 
-        var ms = Config.Duration.TotalMilliseconds;
+        var n = config.Steps;
+
+        var ms = config.Duration.TotalMilliseconds;
 
         for (var i = 0; i < n; ++i)
         {

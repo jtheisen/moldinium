@@ -78,6 +78,8 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
         var propertyBuilder = typeBuilder.DefineProperty(property.Name, property.Attributes, valueType, null);
 
+        CustomAttributeCopying.CopyCustomAttributes(propertyBuilder.SetCustomAttribute, property);
+
         var codeCreator = new CodeCreation(typeBuilder, argumentKinds, fieldBuilder, mixinFieldBuilder);
 
         if (fieldBuilder is not null)

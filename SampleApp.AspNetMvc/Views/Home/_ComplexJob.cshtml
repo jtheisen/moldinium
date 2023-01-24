@@ -1,0 +1,8 @@
+﻿@model SampleApp.ComplexJob
+
+<div class="opacity-75">
+    @foreach (var subJob in Model.SubJobs)
+    {
+        <partial name="_Job" model="@subJob" />
+    }
+</div>

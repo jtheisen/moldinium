@@ -87,6 +87,8 @@ public class BuildingBakingProcessor : BakingProcessorWithComponentGenerators, I
         this.ensureAccess = ensureAccess;
         typeBuilder = moduleBuilder.DefineType(name, typeAttributes, baseType);
 
+        typeBuilder.SetCustomAttribute(TypeDefinedInNullableContext.GetAttributeBuilder());
+
         var constructorBuilder = typeBuilder.DefineConstructor(MethodAttributes.Public, CallingConventions.Standard, new Type[] { });
 
         constructorGenerator = constructorBuilder.GetILGenerator();
