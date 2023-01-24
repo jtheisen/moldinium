@@ -85,7 +85,7 @@ public class MixinBakingTests : BakingTestsBase
 
             this.value = value;
 
-            mixIn.NotifyPropertyChanged(self);
+            mixIn.NotifyPropertyChanged(self!);
         }
     }
 

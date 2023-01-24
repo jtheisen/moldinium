@@ -13,7 +13,7 @@ namespace Moldinium.Tests
 
     public class ClassType
     {
-        public RootService RootService { get; init; }
+        public RootService RootService { get; init; } = null!;
 
         public void Validate()
         {

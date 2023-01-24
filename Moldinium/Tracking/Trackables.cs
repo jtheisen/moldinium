@@ -1,9 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Collections.Specialized;
 using System.Linq;
-using System.Xml.Linq;
 
 namespace Moldinium;
 
@@ -467,6 +464,22 @@ class CachedComputedTrackable<T> : TrackableValueBase, ITrackable<T>
             Notify();
         }
     }
+}
+
+public class TrackableList<T> : LiveList<T>
+{
+    ConcreteTrackable trackable = new ConcreteTrackable();
+
+    public TrackableList() { }
+
+    public TrackableList(Int32 capacity) : base(capacity) { }
+
+    public TrackableList(IEnumerable<T> collection) : base(collection) { }
+
+    protected override void OnEvaluated() => Repository.Instance.NoteEvaluation(trackable);
+
+    protected override void OnModified() => trackable.Notify();
+
 }
 
 public interface IReaction<T> : IDisposable

@@ -471,6 +471,8 @@ public class ConcreteImplementationDependencyProvider : IDependencyProvider
 
     public DependencyResolution? Query(Dependency dep)
     {
+        isClosed = true;
+
         if (implementations.TryGetValue(dep.Type, out var implementationType))
         {
             var implementation = dep with { Type = implementationType, Maturity = dep.Maturity };

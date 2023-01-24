@@ -7,16 +7,20 @@ using System.Linq;
 
 namespace Moldinium;
 
-public class TrackableList<T> : INotifyCollectionChanged, IList<T>, ICollection<T>, ICollection, IReadOnlyList<T>, IReadOnlyCollection<T>, IEnumerable<T>, IEnumerable
+/// <summary>
+/// Meant to be a drop-in replacement for both <see cref="List{T}"/> and <see cref="ObservableCollection{T}"/> that
+/// implements both their interfaces simultaneously, in particular <see cref="IList{T}"/> and <see cref="INotifyCollectionChanged"/>,
+/// respectively. Also delegates change and evaluation info to a more derived implementation.
+/// </summary>
+public class LiveList<T> : INotifyCollectionChanged, IList<T>, ICollection<T>, ICollection, IReadOnlyList<T>, IReadOnlyCollection<T>, IEnumerable<T>, IEnumerable
 {
     List<T> items;
-    ConcreteTrackable trackable = new ConcreteTrackable();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TrackableList{T}"/> class that
     /// is empty and has the default initial capacity.
     /// </summary>
-    public TrackableList()
+    public LiveList()
     {
         items = new List<T>();
     }
@@ -26,7 +30,7 @@ public class TrackableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     /// is empty and has the specified initial capacity.
     /// </summary>
     /// <param name="capacity">The number of elements that the new list can initially store.</param>
-    public TrackableList(Int32 capacity)
+    public LiveList(int capacity)
     {
         items = new List<T>(capacity);
     }
@@ -37,7 +41,7 @@ public class TrackableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     /// to accommodate the number of elements copied.
     /// </summary>
     /// <param name="collection">The collection whose elements are copied to the new list.</param>
-    public TrackableList(IEnumerable<T> collection)
+    public LiveList(IEnumerable<T> collection)
     {
         items = new List<T>(collection.Count());
         InsertRange(0, collection);
@@ -50,14 +54,14 @@ public class TrackableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     public int Capacity { get { return items.Capacity; } set { items.Capacity = value; } }
 
     /// <summary>
-    /// Gets the number of elements contained in the <see cref="System.Collections.Generic.ICollection{T}" />.
+    /// Gets the number of elements contained in the <see cref="ICollection{T}" />.
     /// </summary>
-    public Int32 Count { get { OnEvaluated(); return items.Count; } }
+    public int Count { get { OnEvaluated(); return items.Count; } }
 
     /// <summary>
-    /// Adds an object to the end of the <see cref="System.Collections.Generic.ICollection{T}" />.
+    /// Adds an object to the end of the <see cref="ICollection{T}" />.
     /// </summary>
-    /// <param name="item">The object to add to the <see cref="System.Collections.Generic.ICollection{T}" />.
+    /// <param name="item">The object to add to the <see cref="ICollection{T}" />.
     /// The value must not be null or equal to any item already in the list.</param>
     public void Add(T item)
     {
@@ -76,9 +80,9 @@ public class TrackableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     }
 
     /// <summary>
-    /// Returns a read-only <see cref="System.Collections.Generic.IList{T}" /> wrapper for the current collection.
+    /// Returns a read-only <see cref="IList{T}" /> wrapper for the current collection.
     /// </summary>
-    /// <returns>A <see cref="System.Collections.ObjectModel.ReadOnlyCollection{T}" /> that acts as a read-only wrapper. </returns>
+    /// <returns>A <see cref="ReadOnlyCollection{T}" /> that acts as a read-only wrapper. </returns>
     public ReadOnlyCollection<T> AsReadOnly()
     {
         return items.AsReadOnly();
@@ -104,8 +108,8 @@ public class TrackableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     /// the specified comparer and returns the zero-based index of the element.
     /// </summary>
     /// <param name="item">The object to locate.</param>
-    /// <param name="comparer">The <see cref="System.Collections.Generic.IComparer{T}" /> implementation to use when comparing
-    /// elements, or null to use the default comparer <see cref="System.Collections.Generic.Comparer{T}" />.Default.</param>
+    /// <param name="comparer">The <see cref="IComparer{T}" /> implementation to use when comparing
+    /// elements, or null to use the default comparer <see cref="Comparer{T}" />.Default.</param>
     /// <returns>
     /// The zero-based index of item in the sorted <see cref="TrackableList{T}" />,
     /// if item is found; otherwise, a negative number that is the bitwise complement
@@ -125,8 +129,8 @@ public class TrackableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     /// <param name="index">The zero-based starting index of the range to search.</param>
     /// <param name="count">The length of the range to search.</param>
     /// <param name="item">The object to locate.</param>
-    /// <param name="comparer">The <see cref="System.Collections.Generic.IComparer{T}" /> implementation to use when comparing
-    /// elements, or null to use the default comparer <see cref="System.Collections.Generic.Comparer{T}" />.Default.</param>
+    /// <param name="comparer">The <see cref="IComparer{T}" /> implementation to use when comparing
+    /// elements, or null to use the default comparer <see cref="Comparer{T}" />.Default.</param>
     /// <returns>
     /// The zero-based index of item in the sorted <see cref="TrackableList{T}" />,
     /// if item is found; otherwise, a negative number that is the bitwise complement
@@ -141,21 +145,21 @@ public class TrackableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
 
     // ** Core method **        
     /// <summary>
-    /// Removes all items from the <see cref="System.Collections.Generic.ICollection{T}" />.
+    /// Removes all items from the <see cref="ICollection{T}" />.
     /// </summary>
     public void Clear()
     {
         items.Clear();
-        trackable.Notify();
+        OnModified();
         CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
     }
 
     /// <summary>
-    /// Determines whether the <see cref="System.Collections.Generic.ICollection{T}" /> contains a specific value.
+    /// Determines whether the <see cref="ICollection{T}" /> contains a specific value.
     /// </summary>
-    /// <param name="item">The object to locate in the <see cref="System.Collections.Generic.ICollection{T}" />.</param>
+    /// <param name="item">The object to locate in the <see cref="ICollection{T}" />.</param>
     /// <returns>
-    /// true if <paramref name="item" /> is found in the <see cref="System.Collections.Generic.ICollection{T}" />; otherwise, false.
+    /// true if <paramref name="item" /> is found in the <see cref="ICollection{T}" />; otherwise, false.
     /// </returns>
     public bool Contains(T item) { OnEvaluated(); return items.Contains(item); }
 
@@ -192,7 +196,7 @@ public class TrackableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     /// Determines whether the <see cref="TrackableList{T}" /> contains elements that
     /// match the conditions defined by the specified predicate.
     /// </summary>
-    /// <param name="match">The <see cref="System.Predicate{T}" /> delegate that defines the conditions of the elements to
+    /// <param name="match">The <see cref="Predicate{T}" /> delegate that defines the conditions of the elements to
     /// search for.</param>
     /// <returns>true if the <see cref="TrackableList{T}" /> contains one or more elements that
     /// match the conditions defined by the specified predicate; otherwise, false.</returns>
@@ -202,7 +206,7 @@ public class TrackableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     /// Searches for an element that matches the conditions defined by the specified
     /// predicate, and returns the first occurrence within the entire <see cref="TrackableList{T}" />.
     /// </summary>
-    /// <param name="match">The <see cref="System.Predicate{T}" /> delegate that defines the conditions of the element to
+    /// <param name="match">The <see cref="Predicate{T}" /> delegate that defines the conditions of the element to
     /// search for.</param>
     /// <returns>The first element that matches the conditions defined by the specified predicate,
     ///  if found; otherwise, the default value for type T.</returns>
@@ -212,11 +216,11 @@ public class TrackableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     /// Retrieves all the elements that match the conditions defined by the specified
     /// predicate.
     /// </summary>
-    /// <param name="match">The <see cref="System.Predicate{T}" /> delegate that defines the conditions of the element to
+    /// <param name="match">The <see cref="Predicate{T}" /> delegate that defines the conditions of the element to
     /// search for.</param>
-    /// <returns>A <see cref="System.Collections.Generic.List{T}" /> containing all the elements that match the
+    /// <returns>A <see cref="List{T}" /> containing all the elements that match the
     /// conditions defined by the specified predicate, if found; otherwise, an empty
-    /// <see cref="System.Collections.Generic.List{T}" />.</returns>
+    /// <see cref="List{T}" />.</returns>
     public List<T> FindAll(Predicate<T> match) { OnEvaluated(); return items.FindAll(match); }
 
     /// <summary>
@@ -224,7 +228,7 @@ public class TrackableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     /// predicate, and returns the zero-based index of the first occurrence within the
     /// entire <see cref="TrackableList{T}" />.
     /// </summary>
-    /// <param name="match">The <see cref="System.Predicate{T}" /> delegate that defines the conditions of the element to
+    /// <param name="match">The <see cref="Predicate{T}" /> delegate that defines the conditions of the element to
     /// search for.</param>
     /// <returns>The zero-based index of the first occurrence of an element that matches the conditions
     /// defined by match, if found; otherwise, –1.</returns>
@@ -237,7 +241,7 @@ public class TrackableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     /// the specified index to the last element.
     /// </summary>
     /// <param name="startIndex">The zero-based starting index of the search.</param>
-    /// <param name="match">The <see cref="System.Predicate{T}" /> delegate that defines the conditions of the element to
+    /// <param name="match">The <see cref="Predicate{T}" /> delegate that defines the conditions of the element to
     /// search for.</param>
     /// <returns>
     /// The zero-based index of the first occurrence of an element that matches the conditions
@@ -253,7 +257,7 @@ public class TrackableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     /// </summary>
     /// <param name="startIndex">The zero-based starting index of the search.</param>
     /// <param name="count">The number of elements in the section to search.</param>
-    /// <param name="match">The <see cref="System.Predicate{T}" /> delegate that defines the conditions of the element to
+    /// <param name="match">The <see cref="Predicate{T}" /> delegate that defines the conditions of the element to
     /// search for.</param>
     /// <returns>
     /// The zero-based index of the first occurrence of an element that matches the conditions
@@ -262,9 +266,9 @@ public class TrackableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     public int FindIndex(int startIndex, int count, Predicate<T> match) { OnEvaluated(); return items.FindIndex(startIndex, count, match); }
 
     /// <summary>
-    /// Removes the first occurrence of a specific object from the <see cref="System.Collections.Generic.ICollection{T}" />.
+    /// Removes the first occurrence of a specific object from the <see cref="ICollection{T}" />.
     /// </summary>
-    /// <param name="item">The object to remove from the <see cref="System.Collections.Generic.ICollection{T}" />.</param>
+    /// <param name="item">The object to remove from the <see cref="ICollection{T}" />.</param>
     /// <returns>
     /// true if <paramref name="item" /> was successfully removed from the <see <see cref="cref="System.Collections.Generic.ICollection{T}" />" />; otherwise, false. This method also returns false if <paramref name="item" /> is not found in the original <see cref="T:System.Collections.Generic.ICollection{T}" />.
     /// </returns>
@@ -278,9 +282,9 @@ public class TrackableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     }
 
     /// <summary>
-    /// Determines the index of a specific item in the <see cref="System.Collections.Generic.IList{T}" />.
+    /// Determines the index of a specific item in the <see cref="IList{T}" />.
     /// </summary>
-    /// <param name="item">The object to locate in the <see cref="System.Collections.Generic.IList{T}" />.</param>
+    /// <param name="item">The object to locate in the <see cref="IList{T}" />.</param>
     /// <returns>
     /// The index of <paramref name="item" /> if found in the list; otherwise, -1.
     /// </returns>
@@ -288,14 +292,14 @@ public class TrackableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
 
     // ** Core method **
     /// <summary>
-    /// Removes the <see cref="System.Collections.Generic.IList{T}" /> item at the specified index.
+    /// Removes the <see cref="IList{T}" /> item at the specified index.
     /// </summary>
     /// <param name="index">The zero-based index of the item to remove.</param>
     public void RemoveAt(int index)
     {
         var removed = items[index];
         items.RemoveAt(index);
-        trackable.Notify();
+        OnModified();
         CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removed, index));
     }
 
@@ -322,21 +326,21 @@ public class TrackableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
         {
             var removed = items[index];
             items[index] = value;
-            trackable.Notify();
+            OnModified();
             CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, value, removed, index));
         }
     }
 
     // ** Core method **        
     /// <summary>
-    /// Inserts an item to the <see cref="System.Collections.Generic.IList{T}" /> at the specified index.
+    /// Inserts an item to the <see cref="IList{T}" /> at the specified index.
     /// </summary>
     /// <param name="index">The zero-based index at which <paramref name="item" /> should be inserted.</param>
-    /// <param name="item">The object to insert into the <see cref="System.Collections.Generic.IList{T}" />.</param>
+    /// <param name="item">The object to insert into the <see cref="IList{T}" />.</param>
     public void Insert(int index, T item)
     {
         items.Insert(index, item);
-        trackable.Notify();
+        OnModified();
         CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item, index));
     }
 
@@ -359,15 +363,15 @@ public class TrackableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     /// </summary>
     public event NotifyCollectionChangedEventHandler? CollectionChanged;
 
-    protected virtual void OnEvaluated() {
-        Repository.Instance.NoteEvaluation(trackable);
-    }
+    protected virtual void OnEvaluated() { }
 
-    Boolean ICollection<T>.IsReadOnly { get { return true; } }
+    protected virtual void OnModified() { }
 
-    Int32 ICollection.Count { get { return Count; } }
+    bool ICollection<T>.IsReadOnly { get { return true; } }
 
-    Object ICollection.SyncRoot { get { return this; } }
+    int ICollection.Count { get { return Count; } }
+
+    object ICollection.SyncRoot { get { return this; } }
 
     bool ICollection.IsSynchronized { get { return false; } }
 
@@ -394,9 +398,5 @@ public class TrackableList<T> : INotifyCollectionChanged, IList<T>, ICollection<
     // Sort (4x)
     // TrimExcess
     // TrueForAll
-
-    // LastIndexOf: makes no sense here
-
-    // To correct ghost-doc-screwups: Replace ...
-    // To correct copy-pasted documentation: Replace \b([^ ]*?)`1\b with <see cref="$1{T}" />
+    // LastIndexOf
 }

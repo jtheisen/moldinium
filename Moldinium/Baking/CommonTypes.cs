@@ -55,7 +55,7 @@ public static partial class Extensions
             name = name[(lastDotAt + 1)..];
         }
 
-        return $"{member.DeclaringType.Name}.{name}";
+        return $"{member.DeclaringType?.Name ?? "?"}.{name}";
     }
 }
 
