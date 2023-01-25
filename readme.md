@@ -121,15 +121,21 @@ sample application using only interfaces and records. It comes in a
 class library that doesn't depend on anything besides .NET, not even on
 Moldinium: Dependency injection purists will rejoice.
 
-This class library is used by two different projects that each
-provide a UI for it: One for WPF and one for Blazor WebAssembly.
+This class library is used by three different projects that each
+provide a UI for it: One for WPF, one for Blazor WebAssembly and a
+stateless one using ASP.NET MVC.
 
-Both depend on Moldinium and ask it to instantiate the application.
+All depend on Moldinium and ask it to instantiate the application.
 The WPF one asks for tracking with notifying (through `INotifyPropertyChanged`),
 while the Blazor one asks only for tracking. Instead, the Blazor application
 has all its components derive indirectly from `MoldiniumComponentBase`
 which makes the magic work (see the section about dependency tracking
 below for details).
+
+The ASP.NET one is content without any notification mechanism: The entities
+will behave without any magic applied to it. This app, however, does something
+interesting with it's default collection to support its multi-threaded
+environment, see the section below.
 
 ## Collections and default values
 
@@ -137,9 +143,6 @@ The Moldinium type creator also allows to ensure defaults to non-nullable
 properties of certain types. Besides the common case of `String`s
 (which are then defaulted to the empty string), this is mostly a
 concern with collections.
-
-
-
 
 Besides `INotifyPropertChanged`, there's also `INotifyCollectionChanged`
 for collections, which xaml-based UIs want to see lest they either
@@ -151,35 +154,72 @@ but the former case still necessitates a collection type that can
 be tracked.
 
 .NET itself provides `ObservableCollection<>` which is only sufficient
-if no dependency tracking is desired.
+if no dependency tracking is desired, but, unfortunately, it doesn't
+implement `IList<>`.
 
 Moldinium provides `LiveList`, which also implements
-`INotifyCollectionChanged` but can be tracked at well.
+`INotifyCollectionChanged` but implements `IList<>` and has a
+derived implementation that can be tracked at well.
 
+The ASP.NET sample app provides its own implementation:
+`ConcurrentList`, which is a very simple implementation that should
+be thread-safe. (The sample app itself isn't really thread-safe, but it's
+good enough for demonstration purposes.)
 
+## Moldinium standard semantics for interface implenmentations
 
+Here's an overview of Moldiniums standard semantics:
+
+```c#
+interface MyInterface
+{
+    // optional dependency
+    ADependency1? OptionalDependency { get; init; }
+
+    // required dependency
+    ADependency2 RequiredDependency { get; init; }
+
+    // A potentially trackable variable, defaults to "" because not nullable
+    String Name { get; set; }
+
+    // A potentially cached computation because property and implemented
+    String UpperCaseName => Name.ToUpper();
+
+    // Also a potentially cached computation but it would also invalidate on writing
+    Int32 WritableComputation { get { /* ... */ } set { /* ... */ } }
+
+    // Methods are never cached
+    String GetUpperCaseName() => Name.ToUpper();
+}
+```
 
 ## Default configurations
 
-The entry to your Moldinium-created types is the dependency injection system.
+The entry to your Moldinium-created types are the extension methods
+`ServiceCollection.Add*MoldiniumRootModel` which take a configuration builder.
+On resolving the instance, the root will be instantiated with all the
+dependencies of the then-available `IServiceProvider` also provided.
 
-There's a helper to create configurations that allow the following options:
+The most important option of the builder is to select a mode from which
+the implementation of the created types as well as the defaults for properties
+dervies.
 
-- resolving types from an `IServiceProvider`
-- choosing the implementation style, which is one of
-
-
-- default values
-- default configurations
+There are four modes:
 
 | First Header          | Basic     | Notifying only         | Tracking only     | Notif. + Track.   |
 | --------------------- | --------- | ---------------------- | ----------------- | ----------------- |
-| ICollection<> default | List<>    | ObservableCollection<> | LiveList<>        | LiveList<>        |
-| IList<> default       | List<>    | LiveList<>             | LiveList<>        | LiveList<>        |
+| IList<> default       | List<>    | LiveList<>**           | LiveList<>        | LiveList<>        |
+| ICollection<> default | List<>    | LiveList<>**           | LiveList<>        | LiveList<>        |
 | Computations cached   | no        | no                     | yes               | yes               |
+| Thread safe           | yes*      | yes*                   | no                | no                |
+| Uerful for            | stateless work | very little       | Blazor          | XAML              |
 
+*as long as your app is thread safe and you use thread safe implementations for `IList<>` and `ICollection<>`
+**only because `ObservableCollection<>` doesn't implement `IList<>`
 
 ## Notes on the implementation
+
+
 
 ### Dependency Tracking
 
