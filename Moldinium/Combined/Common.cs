@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Moldinium.Injection;
+using Moldinium.MoldiniumImplementations;
 using System;
 using System.Collections.Generic;
 using System.Reflection.Emit;
@@ -173,8 +174,10 @@ public static class DependencyProvider
     static ComponentGenerators CreateBakeryComponentGenerators(MoldiniumDefaultMode mode) => mode switch
     {
         MoldiniumDefaultMode.Basic => ComponentGenerators.Create(
-            typeof(SimplePropertyImplementation<>),
-            typeof(GenericEventImplementation<>)),
+            typeof(SimplePropertyImplementation<>)),
+        MoldiniumDefaultMode.NotifyPropertyChanged => ComponentGenerators.Create(
+            typeof(NotifyingPropertyImplementation<,>),
+            typeof(NotifyingComputedPropertyImplementation<,>)),
         MoldiniumDefaultMode.Tracking => ComponentGenerators.Create(
             typeof(TrackedPropertyImplementation<>),
             typeof(TrackedComputedPropertyImplementation<,>)),

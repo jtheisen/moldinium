@@ -267,37 +267,69 @@ non-trivial CIL weaving.
 It takes an interface type and creates a concrete type by implementing
 and wrapping properties, events and methods with the help of
 *implementation structs* that are baked into the new type. A simple
-example is that for an unimplemented property using tracking without
-notifying:
+example is the wrapping implementation for implementing
+`INotifyPropertyChanged` without tracking:
 
 ```c#
-public struct TrackedPropertyImplementation<Value> : ITrackedPropertyImplementation<Value, TrackedPropertyMixin>
+public struct NotifyingComputedPropertyImplementation<Value, Container>
+    : INotifyingComputedPropertyImplementation<Value, Container, NotifyingPropertyMixin>
+    where Container : class
 {
-    TrackableVariable<Value> variable;
-
-    public void Init(Value def) => variable = new TrackableVariable<Value>(def);
-
-    public Value Get() => variable.Value;
-
-    public void Set(Value value) => variable.Value = value;
+    public void AfterSet(Container container, ref NotifyingPropertyMixin mixin)
+    {
+        mixin.NotifyPropertyChanged(container);
+    }
 }
 ```
 
 The newly created type get's a field of this struct for each such property
-and one field of type `TrackedPropertyMixin` (also a struct) shared by those
+and one field of type `NotifyingPropertyMixin` (also a struct) shared by those
 former fields.
 
 As you see, the bakery itself therefore does not proxy anything and
 the constructed type does not necessarily require additional heap
 allocations except the one for itself.
 
-As you also see, tracking does currently require additional allocations,
-but that can be improved upon in later versions.
+The bakery is also implemented in a way to allow much flexibility for
+further property (and method and event) implementations. The interface
+the struct above derives from is defined like this:
 
-While the bakery is designed to easily allow custom implementations and
-additional wrappers by providing such structs, it's currently not easy
-to do so in combination with the ones needed for tracking and notifying.
-This would obviously be very useful and may, again, come in a later version.
+```c#
+public interface INotifyingComputedPropertyImplementation<
+    [TypeKind(ImplementationTypeArgumentKind.Value)] Value,
+    [TypeKind(ImplementationTypeArgumentKind.Container)] Container,
+    [TypeKind(ImplementationTypeArgumentKind.Mixin)] Mixin
+> : IPropertyWrapperImplementation
+    where Container : class
+{
+    void AfterSet(Container container, ref Mixin mixin);
+}
+```
+
+When the bakery receives the struct implementation type for a property,
+it analyzes this interface first to understand what the types on
+the method are supposed to mean. In then creates code for the setter
+of the wrapped property on the created type that calls `AfterSet` with
+the given parameters according to the interface definition. The methods
+that implement the wrapping code, such as `AfterSet` must have some
+pre-defined names, but their parameters can be any, as long they are
+declared this way.
+
+When looking at this interface is also when the bakery realizes that
+`NotifyingPropertyMixin` actually is a mixin (again because of the
+type attribute) and that it's interface (`INotifyPropertyChanged`)
+should become an interface of the created type.
+
+([see here for the full code of this]())
+
+This design allows to define type creation with clear separation of
+concerns and an easy way to provide additional custom wrappers and
+implementations for properties
+
+Unfortunately multiple property wrappers implementations are not yet
+implemented, so it's currently not easy to do so in combination
+with the ones needed for tracking and notifying. This would obviously
+be very useful and may, again, come in a later version.
 
 ### Dependecy Injection
 
