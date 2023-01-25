@@ -1,9 +1,28 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System;
+﻿namespace Testing.Moldinium;
 
-namespace Moldinium.Tests.Moldinium;
+public interface RootWithoutDependency<THasDependency>
+    where THasDependency : IHasDependency
+{
+    Func<THasDependency> NewWithoutDependency { get; init; }
 
-public interface Root<THasDependency>
+    Boolean Test(Boolean passDependecy)
+    {
+        return NewWithoutDependency().DoesDependencyExist();
+    }
+}
+
+public interface RootWithDependency<THasDependency>
+    where THasDependency : IHasDependency
+{
+    Func<OurDependency, THasDependency> NewWithDependency { get; init; }
+
+    Boolean Test(OurDependency ourDependency)
+    {
+        return NewWithDependency(ourDependency).DoesDependencyExist();
+    }
+}
+
+public interface RootWithBoth<THasDependency>
     where THasDependency : IHasDependency
 {
     Func<THasDependency> NewWithoutDependency { get; init; }
@@ -53,13 +72,13 @@ public class OptionalDependenciesTests : MoldiniumTestsBase
 {
     [TestMethod]
     public void RequiredDependencyTest()
-        => Assert.IsTrue(CreateTestModel<Root<HasRequiredDependency>>().Test(new OurDependency(), true));
+        => Assert.IsTrue(CreateTestModel<RootWithDependency<HasRequiredDependency>>().Test(new OurDependency()));
 
     [TestMethod]
     public void OptionalPresentDependencyTest() =>
-        Assert.IsTrue(CreateTestModel<Root<HasOptionalDependency>>().Test(new OurDependency(), true));
+        Assert.IsTrue(CreateTestModel<RootWithBoth<HasOptionalDependency>>().Test(new OurDependency(), true));
 
     [TestMethod]
     public void OptionalMissingDependencyTest()
-        => Assert.IsFalse(CreateTestModel<Root<HasOptionalDependency>>(logReport: true).Test(new OurDependency(), false));
+        => Assert.IsFalse(CreateTestModel<RootWithBoth<HasOptionalDependency>>(logReport: true).Test(new OurDependency(), false));
 }

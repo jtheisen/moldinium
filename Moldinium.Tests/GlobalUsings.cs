@@ -1,0 +1,10 @@
+﻿global using System;
+global using System.Diagnostics.CodeAnalysis;
+global using System.ComponentModel;
+global using System.Linq;
+global using System.Reflection;
+global using System.Collections.Generic;
+global using Moldinium;
+global using Moldinium.Injection;
+global using Microsoft.VisualStudio.TestTools.UnitTesting;
+global using Microsoft.Extensions.DependencyInjection;

@@ -1,8 +1,6 @@
-﻿using System;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System.Collections.Specialized;
+﻿using System.Collections.Specialized;
 
-namespace Moldinium.Tests;
+namespace Testing.Tracking;
 
 class CollectionChangeTestListener<T>
 {

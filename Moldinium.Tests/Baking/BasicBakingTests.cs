@@ -1,8 +1,4 @@
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System;
-using System.ComponentModel;
-
-namespace Moldinium.Tests.Baking;
+namespace Testing.Baking;
 
 [TestClass]
 public class BasicBakingTests : BakingTestsBase
@@ -54,7 +50,8 @@ public class BasicBakingTests : BakingTestsBase
         public abstract String Value { get; init; }
     }
 
-    [TestMethod]
-    public void WithInitWithManualAbstractBaseTest()
-        => BakeryConfiguration.Create().CreateBakery("Concrete").Create<AHasStringPropertyWithInit>();
+    // Not supporting abstract baking for now
+    //[TestMethod]
+    //public void WithInitWithManualAbstractBaseTest()
+    //    => BakeryConfiguration.Create().CreateBakery("Concrete").Create<AHasStringPropertyWithInit>();
 }

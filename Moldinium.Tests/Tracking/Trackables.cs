@@ -1,7 +1,4 @@
-﻿using System;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-
-namespace Moldinium.Tests;
+﻿namespace Testing.Tracking;
 
 [TestClass]
 public class TrackablesTests

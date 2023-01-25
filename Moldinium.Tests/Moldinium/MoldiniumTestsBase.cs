@@ -1,8 +1,4 @@
-﻿using Moldinium.Injection;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System;
-
-namespace Moldinium.Tests.Moldinium;
+﻿namespace Testing.Moldinium;
 
 public class MoldiniumTestsBase
 {

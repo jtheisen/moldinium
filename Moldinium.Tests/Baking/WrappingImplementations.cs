@@ -1,7 +1,4 @@
-﻿using System;
-using System.Diagnostics.CodeAnalysis;
-
-namespace Moldinium.Tests.Baking;
+﻿namespace Testing.Baking;
 
 public interface IWrappingMethodImplementation<
     [TypeKind(ImplementationTypeArgumentKind.Return)] Return,

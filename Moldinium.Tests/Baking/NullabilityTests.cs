@@ -1,9 +1,6 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
-using SampleApp;
-using System;
-using System.Reflection;
+﻿using SampleApp;
 
-namespace Moldinium.Tests.Baking;
+namespace Testing.Baking;
 
 public interface INullabilityMixedTestInterface
 {

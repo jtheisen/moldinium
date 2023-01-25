@@ -1,8 +1,4 @@
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System;
-using System.ComponentModel;
-
-namespace Moldinium.Tests.Baking;
+namespace Testing.Baking;
 
 [TestClass]
 public class MixinBakingTests : BakingTestsBase

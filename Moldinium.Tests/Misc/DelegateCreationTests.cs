@@ -2,7 +2,7 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 
-namespace Moldinium.Tests;
+namespace Testing.Misc;
 
 [TestClass]
 public class DelegateCreationTests
@@ -10,9 +10,9 @@ public class DelegateCreationTests
     [TestMethod]
     public void Args0Tests()
     {
-        Object GetString(Object[] _) => "Hello!";
+        object GetString(object[] _) => "Hello!";
 
-        var getString = DelegateCreation.CreateDelegate<Func<String>>(GetString);
+        var getString = DelegateCreation.CreateDelegate<Func<string>>(GetString);
 
         Assert.AreEqual("Hello!", getString());
     }
@@ -20,9 +20,9 @@ public class DelegateCreationTests
     [TestMethod]
     public void Args1Tests()
     {
-        Object GetString(Object[] args) => $"Hello, {args[0]}";
+        object GetString(object[] args) => $"Hello, {args[0]}";
 
-        var getString = DelegateCreation.CreateDelegate<Func<String, String>>(GetString);
+        var getString = DelegateCreation.CreateDelegate<Func<string, string>>(GetString);
 
         Assert.AreEqual("Hello, you!", getString("you!"));
     }
@@ -32,9 +32,9 @@ public class DelegateCreationTests
     {
         var text = "Hello!";
 
-        Object GetString(Object[] _) => text;
+        object GetString(object[] _) => text;
 
-        var getString = DelegateCreation.CreateDelegate<Func<String>>(GetString);
+        var getString = DelegateCreation.CreateDelegate<Func<string>>(GetString);
 
         Assert.AreEqual(text, getString());
     }
@@ -44,9 +44,9 @@ public class DelegateCreationTests
     {
         var text = "Hello";
 
-        Object GetString(Object[] args) => $"{text}, {args[0]}!";
+        object GetString(object[] args) => $"{text}, {args[0]}!";
 
-        var getString = DelegateCreation.CreateDelegate<Func<String, String>>(GetString);
+        var getString = DelegateCreation.CreateDelegate<Func<string, string>>(GetString);
 
         Assert.AreEqual("Hello, you!", getString("you"));
     }
@@ -56,9 +56,9 @@ public class DelegateCreationTests
     {
         var text = "Hello";
 
-        Object GetString(Object[] args) => $"{text}, {args[0]} {args[1]}!";
+        object GetString(object[] args) => $"{text}, {args[0]} {args[1]}!";
 
-        var getString = DelegateCreation.CreateDelegate<Func<String, String, String>>(GetString);
+        var getString = DelegateCreation.CreateDelegate<Func<string, string, string>>(GetString);
 
         Assert.AreEqual("Hello, you there!", getString("you", "there"));
     }

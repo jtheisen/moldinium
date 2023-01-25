@@ -1,10 +1,6 @@
-﻿using Moldinium.Injection;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System;
-using System.ComponentModel;
+﻿using Testing.Injection;
 
-namespace Moldinium.Tests;
+namespace Testing.Moldinium;
 
 [TestClass]
 public class CombinedTests
@@ -18,7 +14,7 @@ public class CombinedTests
 
     public interface ITodoListEntry
     {
-        String Text { get; set; }
+        string Text { get; set; }
     }
 
     [TestMethod]

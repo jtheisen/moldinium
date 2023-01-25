@@ -1,22 +1,18 @@
 ﻿using Moldinium.Delegates;
 using Moldinium.Delegates.TestStuff;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System;
-using System.Linq;
-using System.Reflection;
 
-namespace Moldinium.Tests.CheekyCalling;
+namespace Testing.Misc;
 
 [TestClass]
 public class CheekyCallingTests
 {
-    public static Object DynamicInvoke<TConcrete, TTarget>(String methodName, params Object[] arguments)
+    public static object DynamicInvoke<TConcrete, TTarget>(string methodName, params object[] arguments)
         where TConcrete : TTarget, new()
     {
         return DynamicInvoke<TConcrete, TTarget>(typeof(TTarget).GetSingleMethod(methodName), arguments);
     }
 
-    public static Object DynamicInvoke<TConcrete, TTarget>(MethodInfo method, params Object[] arguments)
+    public static object DynamicInvoke<TConcrete, TTarget>(MethodInfo method, params object[] arguments)
         where TConcrete : TTarget, new()
     {
         var delegateTypeCreator = new DelegateTypeCreator();

@@ -181,26 +181,25 @@ public class AcceptingDefaultConstructiblesDependencyProvider : IDependencyProvi
 
         return new DependencyResolution(
             this,
-            dep,
-            null,
-            DependencyBag.Empty,
-            Get: _ => throw new InvalidOperationException("There is no instance")
+            dep
         );
     }
 }
 
+// FIXME: probably a bad idea - the type should be registered earlier just like the others
 public class AcceptRootTypeDependencyProvider : IDependencyProvider
 {
     public DependencyResolution? Query(Dependency dep)
     {
-        if (dep.IsRootDependency && dep.Maturity == DependencyRuntimeMaturity.TypeOnly)
-        {
-            return new DependencyResolution(this, dep);
-        }
-        else
-        {
-            return null;
-        }
+        if (!dep.IsRootDependency) return null;
+
+        if (dep.Maturity != DependencyRuntimeMaturity.TypeOnly) return null;
+
+        var traits = TypeTraits.Get(dep.Type);
+
+        if (!traits.IsDefaultConstructible) return null;
+
+        return new DependencyResolution(this, dep);
     }
 }
 
@@ -653,6 +652,8 @@ public class Scope
             }
         }
     }
+
+    public String DependencyReport => CreateDependencyReport();
 
     public String CreateDependencyReport()
     {

@@ -1,9 +1,4 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System;
-using System.Collections.Generic;
-using static Moldinium.Tests.Baking.WrappingTests;
-
-namespace Moldinium.Tests.Baking;
+﻿namespace Testing.Baking;
 
 public class BakingTestsBase
 {
