@@ -10,7 +10,7 @@
 >
     <StackPanel Orientation="Vertical">
         <Grid Margin="0,2">
-            <TextBlock Margin="{Binding NestingLevel.Level, Converter={StaticResource NestingLevelConverter}}" Text="{Binding StatusString, Converter={StaticResource UpperCaseConverter}}" Style="{StaticResource MaterialDesignButtonTextBlock}" d:Text="qwer" />
+            <TextBlock Margin="{Binding NestingLevel, Converter={StaticResource NestingLevelConverter}}" Text="{Binding StatusString, Converter={StaticResource UpperCaseConverter}}" Style="{StaticResource MaterialDesignButtonTextBlock}" d:Text="qwer" />
         </Grid>
         <ContentControl Content="{Binding}">
             <ContentControl.ContentTemplateSelector>

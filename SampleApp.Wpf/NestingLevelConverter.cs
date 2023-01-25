@@ -13,14 +13,9 @@ namespace SampleApp.Wpf
 
         public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
         {
-            if (value is Int32 nestingLevel)
-            {
-                return new Thickness(Offset + Factor * nestingLevel, 0, 0, 0);
-            }
-            else
-            {
-                return DefaultMargin;
-            }
+            var level = value is JobNestingLevel nestingLevel ? nestingLevel.Level : 0;
+
+            return new Thickness(Offset + Factor * level, 0, 0, 0);
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
