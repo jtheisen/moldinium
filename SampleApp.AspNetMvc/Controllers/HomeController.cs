@@ -13,6 +13,7 @@ namespace SampleApp.AspNetMvc.Controllers
             this.jobList = jobList;
         }
 
+        [Route("add-simple")]
         public IActionResult AddSimpleJob()
         {
             jobList.AddSimpleJobCommand.Execute(null);
@@ -20,6 +21,7 @@ namespace SampleApp.AspNetMvc.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        [Route("add-complex")]
         public IActionResult AddComplexJob()
         {
             jobList.AddComplexJobCommand.Execute(null);
@@ -27,6 +29,7 @@ namespace SampleApp.AspNetMvc.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        [Route("add-cancel")]
         public IActionResult Cancel()
         {
             jobList.CancelCommand.Execute(null);

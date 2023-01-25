@@ -98,7 +98,7 @@ public static class NullabilityAttributesHelper
 
                 if (arg is IReadOnlyCollection<CustomAttributeTypedArgument> moreArgs)
                 {
-                    arg = moreArgs.Select(a => (Byte)a.Value).ToArray();
+                    arg = moreArgs.Select(a => (Byte)a.Value!).ToArray();
                 }
 
                 var builder = new CustomAttributeBuilder(attribute.Constructor, new Object[] { arg } );

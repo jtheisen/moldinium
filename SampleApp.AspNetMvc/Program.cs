@@ -1,13 +1,13 @@
 using Moldinium;
 using Moldinium.Injection;
+using SampleApp;
 using System.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var services = builder.Services;
 
-// Add services to the container.
-services.AddControllersWithViews();
+services.AddControllersWithViews().AddRazorRuntimeCompilation();
 
 var configuration = new DefaultDependencyProviderConfiguration(
     Baking: DefaultDependencyProviderBakingMode.Basic,

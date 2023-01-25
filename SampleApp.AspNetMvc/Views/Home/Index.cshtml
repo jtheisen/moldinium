@@ -1,18 +1,21 @@
-﻿@model SampleApp.JobList
+﻿@using SampleApp
+@model JobList
 
 @{
     ViewData["Title"] = "ASP.NET MVC Job List Sample App";
 }
 
 <div class="job-list-page position-relative">
-    <div class="d-flex gap-2 align-items-center">
-        <button class="btn btn-primary" asp-action="AddSimpleJob">Add simple job</button>
-        <button class="btn btn-primary" asp-action="AddComplexJob">Add complex job</button>
+    <div class="container">
+        <div class="d-flex gap-2 align-items-center">
+            <a class="btn btn-primary" asp-action="AddSimpleJob">Add simple job</a>
+            <a class="btn btn-primary" asp-action="AddComplexJob">Add complex job</a>
 
-        <button class="btn btn-warning" asp-action="Cancel">Cancel job</button>
+            <a class="btn btn-warning" asp-action="Cancel">Cancel job</a>
+        </div>
     </div>
 
-    <div class="items mt-4">
+    <div id="update" class="update items mt-4">
         @foreach (var job in Model.Items)
         {
             <partial name="_Job" model="@job" />
