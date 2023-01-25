@@ -2,7 +2,7 @@
 
 public class MoldiniumTestsBase
 {
-    protected T CreateTestModel<T>(DefaultDependencyProviderBakingMode mode = DefaultDependencyProviderBakingMode.TrackingAndNotifyPropertyChanged, Boolean logReport = false)
+    protected T CreateTestModel<T>(MoldiniumDefaultMode mode = MoldiniumDefaultMode.TrackingAndNotifyPropertyChanged, Boolean logReport = false)
     {
         var config = new DefaultDependencyProviderConfiguration(mode) { IsMoldiniumType = t => t.IsInterface && !t.Name.StartsWithFollowedByCapital("I") };
 

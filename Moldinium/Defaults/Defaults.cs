@@ -46,11 +46,11 @@ public interface IDefaultProvider
 
 public class DefaultDefaultProvider : IDefaultProvider
 {
-    private readonly bool useTrackableList;
+    private readonly Type? genericCollectionType;
 
-    public DefaultDefaultProvider(Boolean useTrackableList = true)
+    public DefaultDefaultProvider(Type? genericCollectionType)
     {
-        this.useTrackableList = useTrackableList;
+        this.genericCollectionType = genericCollectionType;
     }
 
     public Type? GetDefaultType(Type type)
@@ -73,11 +73,11 @@ public class DefaultDefaultProvider : IDefaultProvider
 
         if (interfaces.DoesTypeImplement(typeof(ICollection<>)))
         {
-            if (useTrackableList)
+            if (genericCollectionType is not null)
             {
-                var trackableListDefaultType = GetDefaultImplementationTypeForTrackableList(type);
+                var defaultImplementationType = GetDefaultImplementationTypeForCollectionType(genericCollectionType, type);
 
-                return trackableListDefaultType;
+                return defaultImplementationType;
             }
             else if (traits.IsDefaultConstructible)
             {
@@ -88,23 +88,23 @@ public class DefaultDefaultProvider : IDefaultProvider
         return null;
     }
 
-    Type GetDefaultImplementationTypeForTrackableList(Type type)
+    Type GetDefaultImplementationTypeForCollectionType(Type genericCollectionType, Type valueType)
     {
-        var arguments = type.GetGenericArguments();
+        var arguments = valueType.GetGenericArguments();
 
         if (arguments.Length <= 1)
         {
             var typeArgument = arguments.Length == 1 ? arguments[0] : typeof(Object);
 
-            var implementationType = typeof(TrackableList<>).MakeGenericType(typeArgument);
+            var implementationType = genericCollectionType.MakeGenericType(typeArgument);
 
-            var defaultImplementationType = typeof(DefaultDefaultConstructible<,>).MakeGenericType(type, implementationType);
+            var defaultImplementationType = typeof(DefaultDefaultConstructible<,>).MakeGenericType(valueType, implementationType);
 
             return defaultImplementationType;
         }
         else
         {
-            throw new Exception($"Expected generic collection type {type} to have at most one type paramter");
+            throw new Exception($"Expected generic collection type {valueType} to have at most one type paramter");
         }
     }
 }
@@ -114,6 +114,6 @@ public static class Defaults
     public static Type CreateConcreteDefaultImplementationType(Type type, Type valueType)
         => type.IsGenericTypeDefinition ? type.MakeGenericType(valueType) : type;
 
-    public static IDefaultProvider GetDefaultDefaultProvider()
-        => new DefaultDefaultProvider();
+    public static IDefaultProvider GetDefaultDefaultProvider(Type? genericCollectionType = null)
+        => new DefaultDefaultProvider(genericCollectionType);
 }

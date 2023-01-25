@@ -20,19 +20,17 @@ namespace SampleApp.Wpf
             base.OnStartup(e);
 
             var services = new ServiceCollection();
-            services.AddSingleton<ILogger>(this);
-            var serviceProvider = services.BuildServiceProvider();
 
-            var configuration = new DefaultDependencyProviderConfiguration(
-                Baking: DefaultDependencyProviderBakingMode.TrackingAndNotifyPropertyChanged,
-                BakeAbstract: false,
-                Services: serviceProvider,
-                IsMoldiniumType: t => t.IsInterface && !t.Name.StartsWithFollowedByCapital("I")
+            services.AddSingleton<ILogger>(this);
+
+            services.AddSingletonMoldiniumRoot<SampleApp.JobList>(c => c
+                .SetMode(MoldiniumDefaultMode.TrackingAndNotifyPropertyChanged)
+                .IdentifyMoldiniumTypes(t => t.IsInterface && !t.Name.StartsWithFollowedByCapital("I"))
             );
 
-            var provider = DependencyProvider.Create(configuration);
+            var serviceProvider = services.BuildServiceProvider();
 
-            JobList = provider.CreateInstance<SampleApp.JobList>();
+            JobList = serviceProvider.GetRequiredService<SampleApp.JobList>();
         }
 
         void ILogger.Log(string message)

@@ -101,7 +101,7 @@ public static class NullabilityAttributesHelper
                     arg = moreArgs.Select(a => (Byte)a.Value!).ToArray();
                 }
 
-                var builder = new CustomAttributeBuilder(attribute.Constructor, new Object[] { arg } );
+                var builder = new CustomAttributeBuilder(attribute.Constructor, new Object[] { arg! } );
 
                 target(builder);
             }

@@ -24,7 +24,7 @@ public class CombinedTests
 
     IDependencyProvider GetProvider() => DependencyProvider.Create(
         new DefaultDependencyProviderConfiguration(
-            Baking: DefaultDependencyProviderBakingMode.Tracking
+            Mode: MoldiniumDefaultMode.Tracking
         )
     );
 

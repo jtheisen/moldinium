@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Immutable;
+using System.Threading;
 
 namespace Moldinium.Misc;
 
@@ -7,27 +8,37 @@ struct LockHelper : IDisposable
 {
     SpinLock spinLock;
 
-    Int32 checkCounter;
+    Int32 depth;
 
     public LockHelper Lock()
     {
+        if (++depth > 1)
+        {
+            if (!spinLock.IsHeldByCurrentThread) throw new Exception($"Expected to hold the lock");
+
+            return this;
+        }
+
         Boolean lockTaken = false;
 
         spinLock.Enter(ref lockTaken);
 
         if (!lockTaken) throw new Exception("Can't take lock");
 
-        if (++checkCounter != 1) throw new Exception("Unexpected log check counter");
-
         return this;
     }
 
     public void Dispose()
     {
-        if (--checkCounter != 0) throw new Exception("Unexpected log check counter");
+        if (--depth > 0) return;
 
         spinLock.Exit();
     }
+}
+
+ref struct LockHelperRef
+{
+    public ref int lockHelper;
 }
 
 /// <summary>

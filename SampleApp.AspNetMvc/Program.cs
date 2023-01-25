@@ -1,7 +1,6 @@
 using Moldinium;
-using Moldinium.Injection;
+using Moldinium.Misc;
 using SampleApp;
-using System.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,18 +8,15 @@ var services = builder.Services;
 
 services.AddControllersWithViews().AddRazorRuntimeCompilation();
 
-var configuration = new DefaultDependencyProviderConfiguration(
-    Baking: DefaultDependencyProviderBakingMode.Basic,
-    IsMoldiniumType: t => t.IsInterface && !t.Name.StartsWithFollowedByCapital("I")
+services.AddSingletonMoldiniumRoot<JobList>(c => c
+    .SetMode(MoldiniumDefaultMode.Basic)
+    .SetIListAndICollectionImplementationType(typeof(ConcurrentList<>))
+    .IdentifyMoldiniumTypes(t => t.IsInterface && !t.Name.StartsWithFollowedByCapital("I"))
 );
-
-services.AddMoldiniumRoot<JobList>(configuration);
 
 var app = builder.Build();
 
-var scope = app.Services.GetRequiredService<Scope<JobList>>();
-
-Debug.WriteLine(scope.CreateDependencyReport());
+app.Services.ValidateMoldiniumRoot<JobList>();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
