@@ -72,8 +72,8 @@ a simple *dependency injection* system that allows you to create these types:
 ```c#
 interface JobCollection
 {
-    // Calling this will get you a new Job with the
-    // passed token set to its Ct property
+    // Moldinium injects this delegate and calling it will get you a new
+    // Job with the passed token set to its Ct property
     Func<CancellationToken, Job> NewJob { get; init; }
 
     // ...
@@ -94,8 +94,9 @@ what needs updating in the presence of changing sources to a generic solution.
 However, it requires that all access to trackable variables and computations
 are wrapped by the dependency tracking framework. Without some form
 of type creation or proxying this results in ugly application code. MobX,
-for example, uses JavaScript proxies and needs React components be wrapped
-by one of its framework facilities.
+for example, can use JavaScript proxies and needs React components be wrapped
+by one of its framework facilities. KnockoutJS and VueJS hide this behind
+their templating engines.
 
 This is why I created the *dynamic type creation* part of Moldinium which
 can bake this logic into the properties for the user and allow clean and
@@ -106,12 +107,12 @@ to resolve the implementation types that are only present at runtime:
 `new` no longer works.
 
 Moldinium's dependency injection can perhaps be replaced by an existing one,
-but I had some strong opinion on dependency injection anyway - see below
-for more on that.
+but I had some strong opinion on dependency injection anyway - see the
+relevant notes on implementation below for more on that.
 
 Then, since all properties need to be virtual to allow redefining, I wondered if
-one couldn't use only interfaces to write application code right away. It
-turns out that does indeed work.
+one wouldn't be better off with using only interfaces to write application code
+right away.
 
 ## Sample application
 
@@ -129,13 +130,13 @@ All depend on Moldinium and ask it to instantiate the application.
 The WPF one asks for tracking with notifying (through `INotifyPropertyChanged`),
 while the Blazor one asks only for tracking. Instead, the Blazor application
 has all its components derive indirectly from `MoldiniumComponentBase`
-which makes the magic work (see the section about dependency tracking
+which makes the magic work (see the implementation notes about dependency tracking
 below for details).
 
 The ASP.NET one is content without any notification mechanism: The entities
-will behave without any magic applied to it. This app, however, does something
-interesting with it's default collection to support its multi-threaded
-environment, see the section below.
+will behave without any magic applied to it. This version of the sample app,
+however, does something interesting with it's default collection to support
+its multi-threaded environment, see the section below.
 
 ## Collections and default values
 
@@ -158,13 +159,40 @@ if no dependency tracking is desired, but, unfortunately, it doesn't
 implement `IList<>`.
 
 Moldinium provides `LiveList`, which also implements
-`INotifyCollectionChanged` but implements `IList<>` and has a
+`INotifyCollectionChanged` but also implements `IList<>` and has a
 derived implementation that can be tracked at well.
 
-The ASP.NET sample app provides its own implementation:
+Since the ASP.NET sample app has to expect multiple threads accessing
+the sample app concurrently, it provides its own implementation:
 `ConcurrentList`, which is a very simple implementation that should
 be thread-safe. (The sample app itself isn't really thread-safe, but it's
 good enough for demonstration purposes.)
+
+## Default configurations
+
+The entry to your Moldinium-created types are extension methods such as
+`ServiceCollection.AddSingletonMoldiniumRootModel<YourRootType>` which
+take a configuration builder. On resolving the root type instance, it will
+be instantiated with all the dependencies of the then-available
+`IServiceProvider` also provided.
+
+The most important option of the builder is to select a mode from which
+the implementation of the created types as well as the defaults for properties
+dervies.
+
+There are four modes:
+
+|                       | Basic     | Notifying only         | Tracking only     | Notif. + Track.   |
+| --------------------- | --------- | ---------------------- | ----------------- | ----------------- |
+| IList<> default       | List<>    | LiveList<>**           | LiveList<>        | LiveList<>        |
+| ICollection<> default | List<>    | LiveList<>**           | LiveList<>        | LiveList<>        |
+| Computations cached   | no        | no                     | yes               | yes               |
+| Thread safe           | yes*      | yes*                   | no                | no                |
+| Uerful for            | stateless work | very little       | Blazor          | XAML              |
+
+*as long as your app is thread safe and you use thread safe implementations for `IList<>` and `ICollection<>`
+
+**only because `ObservableCollection<>` doesn't implement `IList<>`
 
 ## Moldinium standard semantics for interface implenmentations
 
@@ -193,53 +221,31 @@ interface MyInterface
 }
 ```
 
-## Default configurations
+## Notes on implementation
 
-The entry to your Moldinium-created types are the extension methods
-`ServiceCollection.Add*MoldiniumRootModel` which take a configuration builder.
-On resolving the instance, the root will be instantiated with all the
-dependencies of the then-available `IServiceProvider` also provided.
-
-The most important option of the builder is to select a mode from which
-the implementation of the created types as well as the defaults for properties
-dervies.
-
-There are four modes:
-
-| First Header          | Basic     | Notifying only         | Tracking only     | Notif. + Track.   |
-| --------------------- | --------- | ---------------------- | ----------------- | ----------------- |
-| IList<> default       | List<>    | LiveList<>**           | LiveList<>        | LiveList<>        |
-| ICollection<> default | List<>    | LiveList<>**           | LiveList<>        | LiveList<>        |
-| Computations cached   | no        | no                     | yes               | yes               |
-| Thread safe           | yes*      | yes*                   | no                | no                |
-| Uerful for            | stateless work | very little       | Blazor          | XAML              |
-
-*as long as your app is thread safe and you use thread safe implementations for `IList<>` and `ICollection<>`
-**only because `ObservableCollection<>` doesn't implement `IList<>`
-
-## Notes on the implementation
-
-
+These sections are not at all necessary to understand the usage
+and behavior of Moldinium, but they are useful for understanding how
+separate the three components are from each other.
 
 ### Dependency Tracking
 
 Dependency tracking requires a common *tracking repository* and having
-all *evaluations* (eg. the implementation of `HaveRunningChildren`
+all *computations* (eg. the implementation of `HaveRunningChildren`
 in the introduction) executed within an *evaluation scope* in that repository.
 
-The repository executes the evaluation and when, during, the evaluation accesses a
+The repository executes the computation and when, during, the computation accesses a
 *trackable* (eg. `IsRunning`), this trackable tells the repository about
-it being read. After the evaluation is completed, the repository now
+it being read. After the computation is completed, the repository now
 does not only know the result, but also which trackables have been
-accessed - those are the ones the evaluation depends on: If one of those
-changes, the evaluation changes, ie. `HaveRunningChildren` invalidates.
+read - those are the ones the computation depends on: If one of those
+change, the computation changes, ie. `HaveRunningChildren` invalidates.
 
 In the current Moldinium implementation, the repository is a static
 singleton. This is how it's done in JavaScript and while it's not an
 issue there, in .NET it would be an issue for Blazor Server where
 multiple circuits need to be separated. A future version should do this properly.
 
-In any case, only one thread must use be evaluating anything at a time
+In any case, only one thread must be evaluating anything at a time
 for each repository and that's a conceptual limitation. A future version
 should guard against misuse here.
 
@@ -254,10 +260,6 @@ The former is mostly an optimization and the latter improves debugging.
 ### Dynamic Type Creation
 
 Moldinium's type creator is called *the bakery*.
-
-While this section is not at all necessary to understand the usage
-and behavior of Moldinium, it is useful for understanding how separate
-the bakery is from the two other major Moldinium components.
 
 The bakery creates types using `System.Reflection.Emit` and does some
 non-trivial CIL weaving.
