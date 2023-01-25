@@ -1,8 +1,6 @@
-﻿using SampleApp;
+﻿namespace Testing.Baking;
 
-namespace Testing.Baking;
-
-public interface INullabilityMixedTestInterface
+public interface INullabilityLessNullableTestInterface
 {
     String? NullableInit { get; init; }
 
@@ -42,40 +40,32 @@ public class NullabilityTests : BakingTestsBase
     [TestMethod]
     public void TestInterface()
     {
-        var type = typeof(INullabilityMixedTestInterface);
+        var type = typeof(INullabilityLessNullableTestInterface);
 
-        AssertState(NullabilityState.Nullable, type, nameof(INullabilityMixedTestInterface.Nullable));
-        AssertState(NullabilityState.NotNull, type, nameof(INullabilityMixedTestInterface.NotNullable));
-        AssertState(NullabilityState.Nullable, type, nameof(INullabilityMixedTestInterface.NullableInit));
-        AssertState(NullabilityState.NotNull, type, nameof(INullabilityMixedTestInterface.NotNullableInit));
+        AssertState(NullabilityState.Nullable, type, nameof(INullabilityLessNullableTestInterface.Nullable));
+        AssertState(NullabilityState.NotNull, type, nameof(INullabilityLessNullableTestInterface.NotNullable));
+        AssertState(NullabilityState.Nullable, type, nameof(INullabilityLessNullableTestInterface.NullableInit));
+        AssertState(NullabilityState.NotNull, type, nameof(INullabilityLessNullableTestInterface.NotNullableInit));
     }
 
     [TestMethod]
     public void TestBakedAnalyzing()
     {
-        Console.WriteLine(NullableAttributeReport.CreateReport(typeof(INullabilityMixedTestInterface)));
+        Console.WriteLine(NullableAttributeReport.CreateReport(typeof(INullabilityLessNullableTestInterface)));
         Console.WriteLine(NullableAttributeReport.CreateReport(typeof(INullabilityMoreNullableTestInterface)));
-        Console.WriteLine(NullableAttributeReport.CreateReport(CreateTestModelType<INullabilityMixedTestInterface>()));
+        Console.WriteLine(NullableAttributeReport.CreateReport(CreateTestModelType<INullabilityLessNullableTestInterface>()));
         Console.WriteLine(NullableAttributeReport.CreateReport(CreateTestModelType<INullabilityMoreNullableTestInterface>()));
     }
 
     [TestMethod]
     public void TestBaked()
     {
-        var type = CreateTestModelType<INullabilityMixedTestInterface>();
+        var type = CreateTestModelType<INullabilityLessNullableTestInterface>();
 
-        AssertState(NullabilityState.Nullable, type, nameof(INullabilityMixedTestInterface.Nullable));
-        AssertState(NullabilityState.NotNull, type, nameof(INullabilityMixedTestInterface.NotNullable));
-        AssertState(NullabilityState.Nullable, type, nameof(INullabilityMixedTestInterface.NullableInit));
-        AssertState(NullabilityState.NotNull, type, nameof(INullabilityMixedTestInterface.NotNullableInit));
-    }
-
-    [TestMethod]
-    public void TestSampleAppSimpleJob()
-    {
-        var type = CreateTestModelType<SimpleJob>();
-
-        AssertState(NullabilityState.Nullable, type, nameof(SimpleJob.Config));
+        AssertState(NullabilityState.Nullable, type, nameof(INullabilityLessNullableTestInterface.Nullable));
+        AssertState(NullabilityState.NotNull, type, nameof(INullabilityLessNullableTestInterface.NotNullable));
+        AssertState(NullabilityState.Nullable, type, nameof(INullabilityLessNullableTestInterface.NullableInit));
+        AssertState(NullabilityState.NotNull, type, nameof(INullabilityLessNullableTestInterface.NotNullableInit));
     }
 
     [TestMethod]

@@ -20,7 +20,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Moldinium\Moldinium.csproj" />
-    <ProjectReference Include="..\SampleApp\SampleApp.csproj" />
   </ItemGroup>
 
 </Project>

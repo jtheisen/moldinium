@@ -53,7 +53,12 @@ public class ImplementationMapping
                 throw new Exception($"No implementation candidate with the same unqualified name found for method {declaration}");
             }
 
-            var checkedCandidates = candidates.Where(c => declaration.MethodNameAndSignature == c.MethodNameAndSignature).ToArray();
+            var checkedCandidates = (
+                from c in candidates
+                where declaration.MethodNameAndSignature == c.MethodNameAndSignature
+                where c.Method == declaration.Method || !c.IsPublicOnInterface
+                select c
+            ).ToArray();
 
             if (checkedCandidates.Length == 1)
             {

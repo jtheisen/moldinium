@@ -13,9 +13,11 @@ public class ExtraMethodInfo
 {
     public EquatableMethodNameAndSignature MethodNameAndSignature { get; }
     public MethodInfo Method { get; }
+    public Type DeclaringType { get; }
     public String? ContainerName { get; }
     public String UnqualifiedName { get; }
     public String QualifiedName { get; }
+    public Boolean IsPublicOnInterface { get; }
     public Boolean IsPrivateImplementation { get; }
     public Boolean IsImplemented { get; }
     public Boolean IsImplementable { get; }
@@ -41,6 +43,9 @@ public class ExtraMethodInfo
         IsImplemented = method.GetMethodBody() is not null;
         IsImplementable = !method.IsPrivate && !method.IsStatic && method.IsVirtual;
         Method = method;
+        DeclaringType = method.DeclaringType ?? throw new Exception($"Method {method} has no declaring type");
+
+        IsPublicOnInterface = DeclaringType.IsInterface && method.IsPublic;
 
         if (TryParsePrivateName(method.Name, out var containerName, out var baseMethodName))
         {

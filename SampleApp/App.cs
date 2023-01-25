@@ -2,19 +2,6 @@
 
 namespace SampleApp;
 
-public record CommandConfig(Action Execute, Boolean CanExecute = true);
-
-public interface Command : System.Windows.Input.ICommand
-{
-    CommandConfig Config { get; init; }
-
-    event EventHandler? System.Windows.Input.ICommand.CanExecuteChanged { add { } remove { } }
-
-    bool System.Windows.Input.ICommand.CanExecute(object? parameter) => Config.CanExecute;
-
-    void System.Windows.Input.ICommand.Execute(object? parameter) => Config.Execute();
-}
-
 public interface ILogger
 {
     void Log(String message);
@@ -29,15 +16,20 @@ public interface JobList
 
     CancellationTokenSource? Cts { get; set; }
 
+    Boolean HaveCancellableJobs => Cts is not null;
+
     CancellationToken Ct => GetCts().Token;
 
     IList<Job> Items { get; set; }
 
     CancellationTokenSource GetCts() => Cts ?? (Cts = new CancellationTokenSource());
 
-    Command AddSimpleJobCommand => NewCommand(new CommandConfig(() => AddAndRunJob(NewSimpleJob(Ct))));
-    Command AddComplexJobCommand => NewCommand(new CommandConfig(() => AddAndRunJob(NewComplexJob(Ct))));
-    Command CancelCommand => NewCommand(new CommandConfig(() => Cancel()));
+    Command AddSimpleJobCommand => MakeCommand(() => AddAndRunJob(NewSimpleJob(Ct)));
+    Command AddComplexJobCommand => MakeCommand(() => AddAndRunJob(NewComplexJob(Ct)));
+    Command CancelCommand => MakeCommand(() => Cancel(), HaveCancellableJobs);
+
+    Command MakeCommand(Action execute, Boolean isEnabled = true)
+        => NewCommand(new CommandConfig(execute, isEnabled));
 
     async void AddAndRunJob(Job job)
     {
@@ -47,7 +39,7 @@ public interface JobList
 
         await Task.Delay(3000);
 
-        //Items.Remove(job);
+        Items.Remove(job);
     }
 
     void Cancel()
@@ -151,4 +143,19 @@ public interface ComplexJob : Job
 
         await Task.Delay(1000, Ct);
     }
+}
+
+public record CommandConfig(Action Execute, Boolean CanExecute = true);
+
+public interface Command : System.Windows.Input.ICommand
+{
+    CommandConfig Config { get; init; }
+
+    event EventHandler? System.Windows.Input.ICommand.CanExecuteChanged { add { } remove { } }
+
+    Boolean IsDisabled => !Config.CanExecute;
+
+    Boolean System.Windows.Input.ICommand.CanExecute(Object? parameter) => Config.CanExecute;
+
+    void System.Windows.Input.ICommand.Execute(Object? parameter) => Config.Execute();
 }
