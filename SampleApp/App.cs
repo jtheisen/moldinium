@@ -40,6 +40,11 @@ public interface JobList
         await Task.Delay(3000);
 
         Items.Remove(job);
+
+        if (Items.Count == 0)
+        {
+            Cts = null;
+        }
     }
 
     void Cancel()

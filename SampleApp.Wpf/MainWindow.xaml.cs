@@ -17,8 +17,6 @@ namespace SampleApp.Wpf
 
             var jobList = app.JobList;
 
-            jobList.AddSimpleJobCommand.Execute(null);
-
             JobList.DataContext = jobList;
         }
     }

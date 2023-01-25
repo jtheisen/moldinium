@@ -20,7 +20,7 @@
                     Show rerender info
                 </label>
             </div>
-            <button class="btn btn-warning" @onclick="jobList.CancelCommand.Execute">Cancel job</button>
+            <button class="btn btn-warning ms-auto" disabled="@jobList.CancelCommand.IsDisabled" @onclick="jobList.CancelCommand.Execute">Cancel job</button>
         </div>
 
         <div class="items mt-4">
