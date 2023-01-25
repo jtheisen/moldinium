@@ -15,7 +15,7 @@ namespace Moldinium.Tests.Wpf
 
             var app = (App)Application.Current;
 
-            var jobList = app.JobListApp.JobList;
+            var jobList = app.JobList;
 
             jobList.AddSimpleJobCommand.Execute(null);
 

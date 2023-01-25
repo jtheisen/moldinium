@@ -1,12 +1,11 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SampleApp;
 using System;
-using System.Linq;
 using System.Reflection;
 
 namespace Moldinium.Tests.Baking;
 
-public interface INullabilityTestInterface
+public interface INullabilityMixedTestInterface
 {
     String? NullableInit { get; init; }
 
@@ -15,19 +14,22 @@ public interface INullabilityTestInterface
     String? Nullable { get; set; }
 
     String NotNullable { get; set; }
+
+    Int32? NullableValue { get; set; }
+
+    Int32 NotNullableValue { get; set; }
+
+    String NotNullable1 { get; set; }
+    String NotNullable2 { get; set; }
+
+    Func<String?, Int32?, String, String>? Foo { get; set; }
 }
 
-public interface INullabilityTestInterface2
+public interface INullabilityMoreNullableTestInterface
 {
     String? NullableInit { get; init; }
 
-    String NotNullableInit { get; init; }
-
     String? Nullable { get; set; }
-
-    String NotNullable { get; set; }
-
-    Func<String?, Int32?, String, String> Foo { get; set; }
 }
 
 public interface LocalSimpleJob
@@ -43,35 +45,32 @@ public class NullabilityTests : BakingTestsBase
     [TestMethod]
     public void TestInterface()
     {
-        var type = typeof(INullabilityTestInterface);
+        var type = typeof(INullabilityMixedTestInterface);
 
-        AssertState(NullabilityState.Nullable, type, nameof(INullabilityTestInterface.Nullable));
-        AssertState(NullabilityState.NotNull, type, nameof(INullabilityTestInterface.NotNullable));
-        AssertState(NullabilityState.Nullable, type, nameof(INullabilityTestInterface.NullableInit));
-        AssertState(NullabilityState.NotNull, type, nameof(INullabilityTestInterface.NotNullableInit));
+        AssertState(NullabilityState.Nullable, type, nameof(INullabilityMixedTestInterface.Nullable));
+        AssertState(NullabilityState.NotNull, type, nameof(INullabilityMixedTestInterface.NotNullable));
+        AssertState(NullabilityState.Nullable, type, nameof(INullabilityMixedTestInterface.NullableInit));
+        AssertState(NullabilityState.NotNull, type, nameof(INullabilityMixedTestInterface.NotNullableInit));
     }
 
     [TestMethod]
     public void TestBakedAnalyzing()
     {
-        var model = CreateTestModel<INullabilityTestInterface>();
-
-        var type = model.GetType();
-
-        Console.WriteLine(NullableAttributeReport.CreateReport(typeof(INullabilityTestInterface)));
-
-        Console.WriteLine(NullableAttributeReport.CreateReport(typeof(INullabilityTestInterface2)));
+        Console.WriteLine(NullableAttributeReport.CreateReport(typeof(INullabilityMixedTestInterface)));
+        Console.WriteLine(NullableAttributeReport.CreateReport(typeof(INullabilityMoreNullableTestInterface)));
+        Console.WriteLine(NullableAttributeReport.CreateReport(CreateTestModelType<INullabilityMixedTestInterface>()));
+        Console.WriteLine(NullableAttributeReport.CreateReport(CreateTestModelType<INullabilityMoreNullableTestInterface>()));
     }
 
     [TestMethod]
     public void TestBaked()
     {
-        var type = CreateTestModelType<INullabilityTestInterface>();
+        var type = CreateTestModelType<INullabilityMixedTestInterface>();
 
-        AssertState(NullabilityState.Nullable, type, nameof(INullabilityTestInterface.Nullable));
-        AssertState(NullabilityState.NotNull, type, nameof(INullabilityTestInterface.NotNullable));
-        AssertState(NullabilityState.Nullable, type, nameof(INullabilityTestInterface.NullableInit));
-        AssertState(NullabilityState.NotNull, type, nameof(INullabilityTestInterface.NotNullableInit));
+        AssertState(NullabilityState.Nullable, type, nameof(INullabilityMixedTestInterface.Nullable));
+        AssertState(NullabilityState.NotNull, type, nameof(INullabilityMixedTestInterface.NotNullable));
+        AssertState(NullabilityState.Nullable, type, nameof(INullabilityMixedTestInterface.NullableInit));
+        AssertState(NullabilityState.NotNull, type, nameof(INullabilityMixedTestInterface.NotNullableInit));
     }
 
     [TestMethod]

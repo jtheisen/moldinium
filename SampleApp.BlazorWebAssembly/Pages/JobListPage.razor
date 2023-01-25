@@ -1,6 +1,6 @@
 ﻿@inherits LocalComponentBase
 
-@inject JobListApp App
+@inject JobList jobList
 
 @page "/joblist"
 
@@ -33,12 +33,5 @@
 </CascadingValue>
 
 @code {
-    JobList jobList = default!;
-
     Boolean ShowRerenderInfo { get; set; }
-
-    protected override void OnInitialized()
-    {
-        jobList = App.JobList;
-    }
 }

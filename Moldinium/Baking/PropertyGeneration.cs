@@ -74,11 +74,20 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
         if (propertyImplementation is null) return;
 
+        var declaringType = property.DeclaringType ?? throw new Exception("Unexpectedly not having a declaring type");
+
         var (fieldBuilder, (getImplementation, setImplementation)) = propertyImplementation.Value;
 
         var propertyBuilder = typeBuilder.DefineProperty(property.Name, property.Attributes, valueType, null);
 
-        CustomAttributeCopying.CopyCustomAttributes(propertyBuilder.SetCustomAttribute, property);
+        if (declaringType.IsInterface)
+        {
+            NullabilityAttributesHelper.SetNullableAttributes(
+                propertyBuilder.SetCustomAttribute,
+                property.GetCustomAttributesData(),
+                state.GetNullableFlagForInterface(declaringType)
+            );
+        }
 
         var codeCreator = new CodeCreation(typeBuilder, argumentKinds, fieldBuilder, mixinFieldBuilder);
 
@@ -88,7 +97,7 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
             if (backingInitMethod is not null)
             {
-                var info = TypeProperties.Get(property.DeclaringType ?? throw new Exception("Unexpectedly not having a declaring type"));
+                var info = TypeProperties.Get(declaringType);
 
                 var requiresDefault = !isImplementedByInterface && info.Properties.Single(p => p.info == property).requiresDefault;
 

@@ -31,41 +31,6 @@ public struct GenericEventImplementation<D> : IEventImplementation<D>
 
 public abstract class AbstractEventGenerator : AbstractGenerator
 {
-    //public virtual void GenerateEventOld(IBuildingContext state, EventInfo evt)
-    //{
-    //    var typeBuilder = state.TypeBuilder;
-
-    //    if (evt.EventHandlerType is null) throw new Exception($"Event {evt} has no handler type");
-
-    //    var eventBuilder = typeBuilder.DefineEvent(evt.Name, evt.Attributes, evt.EventHandlerType);
-
-    //    var addMethod = evt.GetAddMethod();
-    //    var removeMethod = evt.GetRemoveMethod();
-
-    //    if (addMethod is null) throw new Exception("An event must have an add method");
-    //    if (removeMethod is null) throw new Exception("An event must have a remove method");
-
-    //    var (fieldBuilder, backingAddMethodName, backingRemoveMethodName) = GetBackings(typeBuilder, evt);
-    //    var backingAddMethod = fieldBuilder.FieldType.GetMethod(backingAddMethodName);
-    //    var backingRemoveMethod = fieldBuilder.FieldType.GetMethod(backingRemoveMethodName);
-
-    //    if (backingAddMethod is null) throw new Exception($"Event implementation type must have an '{backingAddMethodName}' method");
-    //    if (backingRemoveMethod is null) throw new Exception($"Event implementation type must have a '{backingRemoveMethodName}' method");
-
-    //    {
-    //        var addMethodBuilder = Create(typeBuilder, addMethod, toRemove: MethodAttributes.Abstract);
-    //        var generator = addMethodBuilder.GetILGenerator();
-    //        GenerateWrapperCode(generator, fieldBuilder, backingAddMethod);
-    //        eventBuilder.SetAddOnMethod(addMethodBuilder);
-    //    }
-    //    {
-    //        var removeMethodBuilder = Create(typeBuilder, removeMethod, toRemove: MethodAttributes.Abstract);
-    //        var generator = removeMethodBuilder.GetILGenerator();
-    //        GenerateWrapperCode(generator, fieldBuilder, backingRemoveMethod);
-    //        eventBuilder.SetRemoveOnMethod(removeMethodBuilder);
-    //    }
-    //}
-
     public virtual void GenerateEvent(IBuildingContext state, EventInfo evt)
     {
         var typeBuilder = state.TypeBuilder;

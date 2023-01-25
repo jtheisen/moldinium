@@ -11,7 +11,7 @@ namespace Moldinium.Tests.Wpf
     /// </summary>
     public partial class App : Application, ILogger
     {
-        public JobListApp JobListApp { get; private set; } = null!;
+        public SampleApp.JobList JobList { get; private set; } = null!;
 
         public Action<String>? Log { get; set; }
 
@@ -32,7 +32,7 @@ namespace Moldinium.Tests.Wpf
 
             var provider = DependencyProvider.Create(configuration);
 
-            JobListApp = provider.CreateInstance<JobListApp>();
+            JobList = provider.CreateInstance<SampleApp.JobList>();
         }
 
         void ILogger.Log(string message)

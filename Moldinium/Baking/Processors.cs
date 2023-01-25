@@ -13,6 +13,8 @@ public interface IBuildingContext
     ILGenerator ConstructorGenerator { get; }
     IDefaultProvider DefaultProvider { get; }
 
+    NullableFlag GetNullableFlagForInterface(Type interfaceType);
+
     MethodImplementationInfo GetOuterImplementationInfo(MethodInfo? method);
 
     FieldBuilder EnsureMixin(Type type, Boolean isPrivate);
@@ -65,13 +67,16 @@ public class BuildingBakingProcessor : BakingProcessorWithComponentGenerators, I
     private readonly TypeBuilder typeBuilder;
     private readonly ILGenerator constructorGenerator;
 
+    private readonly Dictionary<Type, NullableFlag> nullableFlags = new Dictionary<Type, NullableFlag>();
     private readonly HashSet<Type> interfacesAndBases = new HashSet<Type>();
     private readonly Dictionary<Type, FieldBuilder> mixins = new Dictionary<Type, FieldBuilder>();
-    private readonly Dictionary<MethodInfo, FieldBuilder> privateMethodDelegates = new Dictionary<MethodInfo, FieldBuilder>();
+
+    private readonly NullableFlag defaultNullability = NullableFlag.NotNullable;
 
     public IDefaultProvider DefaultProvider => defaultProvider;
     public TypeBuilder TypeBuilder => typeBuilder;
     public ILGenerator ConstructorGenerator => constructorGenerator;
+    public NullableFlag GetNullableFlagForInterface(Type type) => nullableFlags[type];
 
     Type? createdType;
 
@@ -87,7 +92,7 @@ public class BuildingBakingProcessor : BakingProcessorWithComponentGenerators, I
         this.ensureAccess = ensureAccess;
         typeBuilder = moduleBuilder.DefineType(name, typeAttributes, baseType);
 
-        typeBuilder.SetCustomAttribute(TypeDefinedInNullableContext.GetAttributeBuilder());
+        typeBuilder.SetCustomAttribute(NullabilityAttributesHelper.GetNullableContextAttributeBuilder(defaultNullability));
 
         var constructorBuilder = typeBuilder.DefineConstructor(MethodAttributes.Public, CallingConventions.Standard, new Type[] { });
 
@@ -106,6 +111,8 @@ public class BuildingBakingProcessor : BakingProcessorWithComponentGenerators, I
         foreach (var ifc in interfaces)
         {
             ensureAccess(ifc.Assembly);
+
+            nullableFlags[ifc] = NullabilityAttributesHelper.GetFlag(ifc) ?? NullableFlag.Oblivious;
 
             Visit(ifc);
         }

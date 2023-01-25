@@ -93,8 +93,6 @@ public class TypeProperties
 
             return writer.ToString().TrimStart();
         }
-
-
     }
 
     public TypeProperties(Type type)
