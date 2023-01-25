@@ -115,5 +115,5 @@ public static class Defaults
         => type.IsGenericTypeDefinition ? type.MakeGenericType(valueType) : type;
 
     public static IDefaultProvider GetDefaultDefaultProvider(Type? genericCollectionType = null)
-        => new DefaultDefaultProvider(genericCollectionType);
+        => new DefaultDefaultProvider(genericCollectionType ?? typeof(List<>));
 }
