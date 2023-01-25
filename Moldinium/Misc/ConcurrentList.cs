@@ -4,7 +4,7 @@ using System.Threading;
 
 namespace Moldinium.Misc;
 
-struct LockHelper : IDisposable
+class LockHelper : IDisposable
 {
     SpinLock spinLock;
 
@@ -36,11 +36,6 @@ struct LockHelper : IDisposable
     }
 }
 
-ref struct LockHelperRef
-{
-    public ref int lockHelper;
-}
-
 /// <summary>
 /// A simple but likely quite inefficient implementation of a concurrent list that
 /// is meant only for demonstration purposes.
@@ -49,7 +44,7 @@ public class ConcurrentList<T> : IList<T>
 {
     IImmutableList<T> list = ImmutableList<T>.Empty;
 
-    LockHelper locker;
+    LockHelper locker = new LockHelper();
 	
 	public T this[int index]
     {
@@ -70,7 +65,7 @@ public class ConcurrentList<T> : IList<T>
     {
         using var _ = locker.Lock();
 
-        list.Add(item);
+        list = list.Add(item);
     }
 
     public void Clear()
