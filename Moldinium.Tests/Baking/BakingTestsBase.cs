@@ -9,6 +9,13 @@ public class BakingTestsBase
 {
     protected static readonly AbstractBakery BasicFactory = new Bakery("Basic");
 
+    protected Type CreateTestModelType<T>(params Type[] implementations)
+    {
+        return new BakeryConfiguration(ComponentGenerators.Create(implementations), Defaults.GetDefaultDefaultProvider())
+            .CreateBakery("TestBakery")
+            .GetCreatedType(typeof(T));
+    }
+
     protected T CreateTestModel<T>(params Type[] implementations)
     {
         var instance = new BakeryConfiguration(ComponentGenerators.Create(implementations), Defaults.GetDefaultDefaultProvider())
