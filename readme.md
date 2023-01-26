@@ -275,10 +275,17 @@ public struct NotifyingComputedPropertyImplementation<Value, Container>
     : INotifyingComputedPropertyImplementation<Value, Container, NotifyingPropertyMixin>
     where Container : class
 {
+    // Just to make the bakery happy
+    public Boolean BeforeGet() => true;
+
     public void AfterSet(Container container, ref NotifyingPropertyMixin mixin)
     {
         mixin.NotifyPropertyChanged(container);
     }
+
+    // Presumably the value hasn't changed if the setter threw;
+    // the return value indicates that the exception should be rethrown
+    public Boolean AfterErrorSet() => true;
 }
 ```
 
@@ -302,7 +309,10 @@ public interface INotifyingComputedPropertyImplementation<
 > : IPropertyWrapperImplementation
     where Container : class
 {
+    Boolean BeforeGet();
+
     void AfterSet(Container container, ref Mixin mixin);
+    Boolean AfterErrorSet();
 }
 ```
 
@@ -315,21 +325,21 @@ that implement the wrapping code, such as `AfterSet` must have some
 pre-defined names, but their parameters can be any, as long they are
 declared this way.
 
-When looking at this interface is also when the bakery realizes that
-`NotifyingPropertyMixin` actually is a mixin (again because of the
-type attribute) and that it's interface (`INotifyPropertyChanged`)
+The moment when looking at this interface is also when the bakery realizes
+that `NotifyingPropertyMixin` actually is a mixin (again because of the
+type attribute) and that its interface (`INotifyPropertyChanged`)
 should become an interface of the created type.
 
-([see here for the full code of this]())
+([see here for the full code of this](https://github.com/jtheisen/moldinium/blob/master/Moldinium/MoldiniumImplementations/Notifying.cs))
 
 This design allows to define type creation with clear separation of
 concerns and an easy way to provide additional custom wrappers and
-implementations for properties
+implementations for properties.
 
-Unfortunately multiple property wrappers implementations are not yet
-implemented, so it's currently not easy to do so in combination
-with the ones needed for tracking and notifying. This would obviously
-be very useful and may, again, come in a later version.
+Unfortunately multiple wrappers are not yet implemented, so it's
+currently not easy to do so in combination with the ones needed for
+tracking and notifying. This would obviously be very useful and
+may, again, come in a later version.
 
 ### Dependecy Injection
 

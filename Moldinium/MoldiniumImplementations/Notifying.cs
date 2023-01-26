@@ -59,15 +59,22 @@ public interface INotifyingComputedPropertyImplementation<
 > : IPropertyWrapperImplementation
     where Container : class
 {
+    Boolean BeforeGet();
+
     void AfterSet(Container container, ref Mixin mixin);
+    Boolean AfterErrorSet();
 }
 
 public struct NotifyingComputedPropertyImplementation<Value, Container>
     : INotifyingComputedPropertyImplementation<Value, Container, NotifyingPropertyMixin>
     where Container : class
 {
+    public Boolean BeforeGet() => true;
+
     public void AfterSet(Container container, ref NotifyingPropertyMixin mixin)
     {
         mixin.NotifyPropertyChanged(container);
     }
+
+    public Boolean AfterErrorSet() => true;
 }
