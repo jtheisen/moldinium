@@ -143,7 +143,7 @@ below for details).
 
 The ASP.NET one is content without any notification mechanism: The entities
 will behave without any magic applied to it. This version of the sample app,
-however, does something interesting with it's default collection to support
+however, does something interesting with its default collection to support
 its multi-threaded environment, see the section below.
 
 ## Collections and default values
@@ -240,8 +240,8 @@ interface MyInterface
 
 ### Separation of Concerns
 
-The three components *baking* (type creation), *tracking* and *injection*
-are do not depend on each other and could as well each have their own
+The three components *baking* (type creation), *tracking* and *injecting*
+do not depend on each other and could as well each have their own
 library. The source layout is this:
 
 - Common *-utilities usable by all three components*
@@ -373,6 +373,86 @@ tracking and notifying (unless you replicate their code in your
 implementation and wrapper). This would obviously be very useful and
 may, again, come in a later version.
 
+#### An icky part of the bakery
+
+Due to a limitation in .NET's reflection APIs I had to work around there's
+a messy part that is likely buggy and definitely unable to handle all
+desired cases.
+
+When a class method implements a base method, the reflection API allows
+to extract this information with the `MethodInfo.BaseMethod` property.
+
+Interfaces can now also implement other interface methods, although only
+privately:
+
+```c#
+public interface IBaseInterface
+{
+    public String Name { get; }
+}
+
+public interface IImplementingInterface : IBaseInterface
+{
+    String IBaseInterface.Name => "foo";
+}
+```
+
+As in the case of classes, the information appears in the disassembly
+as an `override` declaration on the method body:
+
+```
+.method private hidebysig specialname virtual final 
+        instance string  IBaseInterface.get_Name() cil managed
+{
+  .override IBaseInterface::get_Name
+  // Code size       6 (0x6)
+  .maxstack  8
+  IL_0000:  ldstr      "foo"
+  IL_0005:  ret
+} // end of method IImplementingInterface::IBaseInterface.get_Name
+
+```
+
+However, there's no way to get at this information using reflection -
+and with dynamic assemblies there's only reflection.
+
+Moldinium works around this by collecting all the methods together that
+have the same name and signature and then see if there's a unique
+implementation. Since `SignatureHelper` is also not available on Blazor
+there's a lot of code that is reproducing .NET runtime logic, which is
+probably quite buggy.
+
+The current implementation has also more limitations than it needs to, but
+I'd rather see the .NET folk fix this little oversight in the reflection
+APIs than work on this further.
+
+#### You can't implement all baked classes in C#
+
+Interestingly, the baked types can be of a form that you can't implement
+purely in C# (without again using reflection helpers that is).
+
+In the example of the previous section, the `Name` getter may have to
+be wrapped, ie. the baked type also has a `Name` getter that must call
+down to `IImplementingInterface.Name`'s getter. At the same time, the
+`Name` of the baked type must again implement `IBaseInterface.Name`.
+
+This requires that the baked type's function must call
+`IImplementingInterface.Name`'s getter *non-virtually*. (A virtual
+call would be an infinite recursion.)
+
+For classes, you can call a base's methods non-virtually in C# by using
+`base.Name`, but for interfaces there is no such thing (and there's
+no unique base, so the syntax would have to be something like
+`base(IImplementingInterface).Name` if it was to exist in C#).
+
+On the CLR level, however, you can just call the method non-virtually
+like any other.
+
+(If it wasn't private, that is. In fact, the dynamic assembly has to
+be also annotated with an undocumented `IgnoresAccessChecksToAttribute`
+to allow calling those methods; another thing that had cost me days
+to figure out.)
+
 ### Dependecy Injection
 
 #### Nested-scopes IoC Containers
@@ -462,7 +542,7 @@ it's now the *user* that creates. The user should then dispose as well.
 
 This simplifies the matter considerably: Lifetime management is far from trivial, especially when you consider `IAsyncDisposable` and exception handling during cleanup. That can now be done in the usual C# fashion using `usings` and `await usings` and debugged accordingly.
 
-#### The report
+#### The Dependency Report
 
 Moldinium can give a dependency report. For the example above that is:
 
@@ -559,12 +639,35 @@ represents the scope (and usually only one for the root scope).
 
 ## Outlook
 
+### Maturity and State of the Library
+
+This library is a proof-of-concept and not ready for production. There's
+a substantial amount of details that are not yet implemented properly
+and what's there is likely quite buggy.
+
+One example would be that while the dependency injection component
+tells apart optional depenencies from essential (required) ones, it
+does so only for init setters. A factory declaration like
+`Func<Dep1, Dep2?, Foo>` will not allow you to pass null for the
+second dependency at runtime. In order for this to work, some work
+on nullability would have to be done, as the information about
+nullability is stored in a complicated fashion and lives in unexpected
+places.
+([see here](https://github.com/dotnet/roslyn/blob/main/docs/features/nullable-metadata.md)). For example, the one for the factory above would live on the property
+where it's injected. A facility that should help with this,
+`NullabilityInfoContext`, is again not available in Blazor WebAssembly
+(strangely it is when I run it locally - I noticed the problem only
+after I deployed the sample to Azure).
+
+There there is "an icky part of the bakery" it talk about below
+in the notes on implementation.
+
 ### Internal Dependency Resolution, Entity Framework and Deserializers
 
 Besides maturity, one of the main limitations of the current implementation
 is that it can't be used with deserializers: Those do reflection themselves.
 Upon trying to create an object for a property they will complain that they
-don't know what type to use when that property is just an interface.
+don't know what type to use when that property's type is just an interface.
 
 This could be solved by making the baked type implement the interfaces privately
 and instead expose the properties with different types: The baked types.
@@ -573,13 +676,13 @@ Then, the only remaining issue is that these types need to be
 default-constructible. They technically already are, but a deserializer will
 not have their init setters initialized by using the correct dependency injection.
 
-While model types used in these scenarios may not really need proper dependency
-injection, there is one dependency that is needed: That of the tracking repository
-(once it's no longer static).
+While the model types typically used in these scenarios may not really need
+proper dependency injection, there is one dependency that is needed:
+That of the tracking repository (once it's no longer static).
 
 To make this work, I'm eyeing *ambient storage*: .NET has the wonderful ability
 to allow methods be called with an *call context* that can store stuff. It's like
-thread-local storage, but works also accross asynchronous chains of execution.
+thread-local storage, but also works accross asynchronous chains of execution.
 
 Before calling the serializer, the dependency injection system would be installed
 in ambient storage and the retrieved by the default constructor of a baked type
@@ -590,16 +693,15 @@ the correct tracking repository.
 Another issue is type hierarchies: Deserializers require a single-base
 hierarchy for polymorphic deserialization and, currently, baked types don't
 derive from other baked types at all. This could be done though, but of
-course requires the user to sometimes specify a unique base.
+course requires the user to somehow sometimes distinguish a unique base.
 
 #### Entity Framework
 
 Entity Framework is similar in that it also wants to create its entity types.
-It has two additional problems:
+It has one major additional problem: Fluent configuration.
 
-* it wants the types to be 
-The most annoying trouble arises with fluent configuration. I still think
-it can be done by doing this:
+The best solution that can be implemented with reasonable effort would
+offer the user to configure like this:
 
 ```c#
 using Outer = NamespaceWhereTheModelsLive;
@@ -625,18 +727,25 @@ public interface IMyInterfaceDbContext<
 }
 ```
 
-Moldinium could then provide an implementation for `IMyInterfaceDbContext`
+Moldinium could then provide a baked implementation for `IMyInterfaceDbContext`
 simply by providing the correct arguments to the type parameters. The
 result should be good enough for EF, but I haven't tried.
+
+This does require some repetition of type names, obviously, but at least
+it's only one place per model that is ugly.
+
+Another option would be to write a wrapper around EF's `ModelBuilder`.
+This would be very specific to EF and may require maintenance when EF's
+`ModelBuilder` changes.
+
 
 
 TODO:
 
 - the calm sea
 - gifs
-- injection
-  - show report in discussion
 - my role as maintainer
+- nullability
 - caveats / maturity
   - factory arguments always non-nullable
   - the icky part of the bakery

@@ -13,7 +13,7 @@
         TextOptions.TextRenderingMode="Auto"
         Background="{DynamicResource MaterialDesignPaper}"
         FontFamily="{DynamicResource MaterialDesignFont}"
-        Title="MainWindow" Height="450" Width="800"
+        Title="Moldinium Sample App for WPF" Height="450" Width="800"
 >
     <DockPanel>
         <Border Visibility="Collapsed" DockPanel.Dock="Right" BorderThickness="1, 0, 0, 0" BorderBrush="{StaticResource MaterialDesignDivider}">
