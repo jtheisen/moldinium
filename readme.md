@@ -1,6 +1,9 @@
 *WARNING: this is a proof-of-concept and not ready for production*
 
 # Moldinium
+
+The Blazor WebAssembly version of the sample app is [hosted here](https://red-hill-0c5d5c510.2.azurestaticapps.net/).
+
 ## Introduction
 
 Moldinium allows you to write code in interfaces such as these:
@@ -460,39 +463,39 @@ This simplifies the matter considerably: Lifetime management is far from trivial
 Moldinium can give a dependency report. For the example above that is:
 
 ```
-    - Bakery resolved fri`App
-      - InitSetter resolved frb`App
-        - Activator resolved urb`App
-          - AcceptRootType resolved trb`App
+    - Bakery resolved fei`App
+      - InitSetter resolved feb`App
+        - Activator resolved veb`App
+          - AcceptRootType resolved teb`App
         - Factory resolved foc`Func<CancellationTokenJob>
     
     - subscope for foc`Func<CancellationTokenJob>
-      - Bakery resolved fri`Job
-        - InitSetter resolved frb`Job
-          - Activator resolved urb`Job
-            - AcceptRootType resolved trb`Job
+      - Bakery resolved fei`Job
+        - InitSetter resolved feb`Job
+          - Activator resolved veb`Job
+            - AcceptRootType resolved teb`Job
           - Factory resolved foc`Func<RequestConfigRequest>
     
       - subscope for foc`Func<RequestConfigRequest>
-        - Bakery resolved fri`Request
-          - InitSetter resolved frb`Request
-            - Activator resolved urb`Request
-              - AcceptRootType resolved trb`Request
+        - Bakery resolved fei`Request
+          - InitSetter resolved feb`Request
+            - Activator resolved veb`Request
+              - AcceptRootType resolved teb`Request
             - ServiceProvider resolved foc`HttpClient
             - FactoryArguments resolved foc`RequestConfig
-            - FactoryArguments resolved frs`CancellationToken
+            - FactoryArguments resolved fes`CancellationToken
 ```
 
 You can nicely see how the subscopes nest here, and how arguments
 are used for resolving dependencies.
 
-The prefixes (`fri`, `urb`, etc.) have the following meaning:
+The prefixes (`fei`, `veb`, etc.) have the following meaning:
 
 - first character is the *runtime maturity*:
   - `t`: type without instance
-  - `u`: untouched instance
+  - `v`: uninitialized instance (virgin)
   - `f`: finished / externally initialized (init-setter set)
-- the second character can be `r` for required and `o` for optional
+- the second character can be `e` for essential (required) and `o` for optional
 - the third character is a property of the type itself:
   - `b`: baked class (taken from an attribute the bakery puts on the type)
   - `c`: class or record
