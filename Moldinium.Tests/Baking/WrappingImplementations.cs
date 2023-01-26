@@ -1,4 +1,6 @@
-﻿namespace Testing.Baking;
+﻿using Moldinium.Baking;
+
+namespace Testing.Baking;
 
 public interface IWrappingMethodImplementation<
     [TypeKind(ImplementationTypeArgumentKind.Return)] Return,

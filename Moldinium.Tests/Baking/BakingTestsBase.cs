@@ -1,4 +1,7 @@
-﻿namespace Testing.Baking;
+﻿using Moldinium.Baking;
+using Moldinium.Common.Defaulting;
+
+namespace Testing.Baking;
 
 public class BakingTestsBase
 {

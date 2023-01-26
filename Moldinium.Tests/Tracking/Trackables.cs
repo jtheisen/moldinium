@@ -1,4 +1,6 @@
-﻿namespace Testing.Tracking;
+﻿using Moldinium.Tracking;
+
+namespace Testing.Tracking;
 
 [TestClass]
 public class TrackablesTests

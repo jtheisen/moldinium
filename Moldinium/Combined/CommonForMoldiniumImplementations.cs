@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel;
 
-namespace Moldinium.Combined;
+namespace Moldinium.Internals;
 
 public interface INotifyingPropertyMixin : INotifyPropertyChanged
 {

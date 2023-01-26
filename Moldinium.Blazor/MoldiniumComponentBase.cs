@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
+using Moldinium.Tracking;
 
 namespace Moldinium.Blazor;
 

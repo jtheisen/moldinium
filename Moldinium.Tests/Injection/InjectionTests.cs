@@ -1,4 +1,7 @@
-﻿namespace Testing.Injection;
+﻿using Moldinium.Baking;
+using Moldinium.Internals;
+
+namespace Testing.Injection;
 
 public record Config(string Name);
 

@@ -74,7 +74,7 @@ First Moldinium validates the dependencies:
 - `App` needs a factory that creates `Job`s but for those
   it provides `CancellationToken`s
 - `Job` needs a factory that creates `Request`s, but for those it provides `RequestConfig`s
-- `Request` get a `CancellationToken` from two scopes up and now has all except `HttpClient`, which we assume was provided by the root setup
+- `Request` gets a `CancellationToken` from two scopes up and now has all except `HttpClient`, which we assume was provided by the root setup
 
 By making the factories be typed on the dependencies that will be provided,
 Moldinium can check all that at validation time before any instances are created.

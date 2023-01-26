@@ -142,7 +142,7 @@ its multi-threaded environment, see the section below.
 ## Collections and default values
 
 The Moldinium type creator also allows to ensure defaults to non-nullable
-properties of certain types. Besides the common case of `String`s
+properties of certain types. After the common case of `String`s
 (which are then defaulted to the empty string), this is mostly a
 concern with collections.
 
@@ -159,8 +159,8 @@ be tracked.
 if no dependency tracking is desired, but, unfortunately, it doesn't
 implement `IList<>`.
 
-Moldinium provides `LiveList`, which also implements
-`INotifyCollectionChanged` but also implements `IList<>` and has a
+Moldinium provides `LiveList`, which implements
+`INotifyCollectionChanged`, but also implements `IList<>` and has a
 derived implementation that can be tracked at well.
 
 Since the ASP.NET sample app has to expect multiple threads accessing
@@ -178,8 +178,8 @@ be instantiated with all the dependencies of the then-available
 `IServiceProvider` also provided.
 
 The most important option of the builder is to select a mode from which
-the implementation of the created types as well as the defaults for properties
-dervies.
+the implementations of the created types as well as the defaults for
+collection types derive.
 
 There are four modes:
 
@@ -194,6 +194,12 @@ There are four modes:
 *as long as your app is thread safe and you use thread safe implementations for `IList<>` and `ICollection<>`
 
 **only because `ObservableCollection<>` doesn't implement `IList<>`
+
+Moldinium gives created types the same name as their corresponding interface, but
+they live in a runtime assembly with a name that shows them to be such created
+types. For example, types from the ASP.NET Sample end up in an assembly named
+`MoldiniumTypes.Basic.ConcurrentList`, also showing what to expect from
+the types therein.
 
 ## Moldinium standard semantics for interface implementations
 
@@ -270,9 +276,8 @@ Instead of monolithically doing just what is needed for this proof-of-concept,
 the bakery is very configurable for a variety of purposes.
 
 It creates a type by looking at a number of interfaces to implement and
-separately considers properties, events and methods.
-
-Each of these can in principle be requiring an implementation (if they are
+separately considers properties, events and methods. Each of these can
+in principle be requiring an implementation (if they are
 not yet implemented by an interface) or a wrapper (if they are).
 
 The implementations and wrappers then come in the form of
@@ -307,7 +312,7 @@ and one field of type `NotifyingPropertyMixin` (also a struct) shared by those
 former fields.
 
 As you see, the bakery itself therefore does not proxy anything and
-the constructed type does not necessarily require additional heap
+the constructed type does not necessarily require heap
 allocations except the one for itself.
 
 The interface the struct above derives from is defined like this:
@@ -329,9 +334,9 @@ public interface INotifyingComputedPropertyImplementation<
 
 When the bakery receives the struct implementation or wrapper type for a property,
 it analyzes this interface first to understand what the types on
-the method are supposed to mean. In then creates code for the setter
+its methods are supposed to mean. In then creates code for the getters and setters
 of the wrapped property on the created type with CIL weaving. This code
-calls `AfterSet` with the given parameters according to the interface definition.
+calls them with the given parameters according to the interface definition.
 The methods that implement the wrapping code, such as `AfterSet` must have some
 pre-defined names, but their parameters can be any, as long they are
 declared this way.
@@ -387,13 +392,13 @@ to work in these scenarios and also make the baked type's instance have
 the correct tracking repository.
 
 Another issue is type hierarchies: Deserializers require a single-base
-hierarchy for polymorphic deserliazation and, currently, baked types don't
+hierarchy for polymorphic deserialization and, currently, baked types don't
 derive from other baked types at all. This could be done though, but of
 course requires the user to sometimes specify a unique base.
 
-### Entity Framework
+#### Entity Framework
 
-Entity Framework is similar in that it also wants to create it's entity types.
+Entity Framework is similar in that it also wants to create its entity types.
 It has two additional problems:
 
 * it wants the types to be 
@@ -429,3 +434,14 @@ simply by providing the correct arguments to the type parameters. The
 result should be good enough for EF, but I haven't tried.
 
 
+TODO:
+
+- the calm sea
+- gifs
+- injection
+  - show report in discussion
+- my role as maintainer
+- caveats / maturity
+  - factory arguments always non-nullable
+  - the icky part of the bakery
+- reconciling IEnumerables for XAML

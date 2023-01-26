@@ -1,3 +1,5 @@
+using Moldinium.Baking;
+
 namespace Testing.Baking;
 
 [TestClass]
