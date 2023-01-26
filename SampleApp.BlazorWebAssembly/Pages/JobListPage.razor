@@ -4,7 +4,7 @@
 
 @page "/"
 
-<PageTitle>Task list sample</PageTitle>
+<PageTitle>Moldinium Sample App for Blazor WebAssembly</PageTitle>
 
 <CascadingValue Value="@(new ShowRerenderInfoContext(ShowRerenderInfo))">
     <!-- MoldiniumTrackingContent is only required here because
@@ -24,7 +24,7 @@
                         Show rerender info
                     </label>
                 </div>
-                <button class="btn btn-warning ms-auto" disabled="@jobList.CancelCommand.IsDisabled" @onclick="jobList.CancelCommand.Execute">Cancel job</button>
+                <button class="btn btn-warning" disabled="@jobList.CancelCommand.IsDisabled" @onclick="jobList.CancelCommand.Execute">Cancel job</button>
             </div>
 
             <div class="items mt-4">
