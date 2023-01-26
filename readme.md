@@ -534,7 +534,7 @@ special in that it marks the returned resolution as requiring a
 subscope, which the dependency injection system handles after the
 current scope is completely resolved.
 
-The `Factory` also provides a new dependency provider for the new
+The `Factory` also provides an additional dependency provider for the new
 subscope, the `Arguments` that will provide the dependencies injected
 through the arguments of the delegate.
 
@@ -542,13 +542,13 @@ After the dependency injection system has resolved everything for
 the current scope, it goes to the recorded subscopes and recursively
 starts again.
 
-This whole logic lives in the `Scope` class the represents a scope
+This whole logic lives in the `Scope` class which represents a scope
 at validation time and also forms a tree with its subscopes.
 
 There's also `RuntimeScope`, which is the representation of an
 instantiated scope. There will be as many instances of `RuntimeScope`
 for each `Scope` as there were calls to the factory that
-represents the scope.
+represents the scope (and usually only one for the root scope).
 
 ## Outlook
 

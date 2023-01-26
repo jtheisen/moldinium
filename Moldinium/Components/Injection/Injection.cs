@@ -40,7 +40,7 @@ public record Dependency(Type Type, DependencyRuntimeMaturity Maturity, Boolean 
         var maturityChar = Char.ToLower(Maturity.ToString()[0]);
         var typeClassChar = TypeClassCharacterAttribute.GetTypeClassCharacter(Type);
 
-        return $"{maturityChar}{(IsOptional ? 'o' : 'r')}{typeClassChar}`{Type.GetNameWithGenericArguments()}";
+        return $"{maturityChar}{(IsOptional ? 'o' : 'e')}{typeClassChar}`{Type.GetNameWithGenericArguments()}";
     }
 }
 
@@ -75,7 +75,7 @@ public enum DependencyRuntimeMaturity
     TypeOnly,
 
     // We have an uninitialized instance
-    UntouchedInstance,
+    VirginInstance,
 
     // We're done
     FinishedInstance
@@ -181,7 +181,7 @@ public class ActivatorDependencyProvider : IDependencyProvider
 {
     public DependencyResolution? Query(Dependency dep)
     {
-        if (dep.Maturity != DependencyRuntimeMaturity.UntouchedInstance) return null;
+        if (dep.Maturity != DependencyRuntimeMaturity.VirginInstance) return null;
 
         var traits = TypeTraits.Get(dep.Type);
 
@@ -235,7 +235,7 @@ public class InitSetterDependencyProvider : IDependencyProvider
             select new Dependency(p.info.PropertyType, DependencyRuntimeMaturity.FinishedInstance, !p.isNotNullable, false)
         ).ToArray();
 
-        var embryoDependency = dep with { Maturity = DependencyRuntimeMaturity.UntouchedInstance };
+        var embryoDependency = dep with { Maturity = DependencyRuntimeMaturity.VirginInstance };
 
         return new DependencyResolution(
             this,
