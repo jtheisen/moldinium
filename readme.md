@@ -194,19 +194,13 @@ There are four modes:
 
 **only because `ObservableCollection<>` doesn't implement `IList<>`
 
-## Moldinium standard semantics for interface implenmentations
+## Moldinium standard semantics for interface implementations
 
 Here's an overview of Moldiniums standard semantics:
 
 ```c#
 interface MyInterface
 {
-    // optional dependency
-    ADependency1? OptionalDependency { get; init; }
-
-    // required dependency
-    ADependency2 RequiredDependency { get; init; }
-
     // A potentially trackable variable, defaults to "" because not nullable
     String Name { get; set; }
 
@@ -218,6 +212,12 @@ interface MyInterface
 
     // Methods are never cached
     String GetUpperCaseName() => Name.ToUpper();
+
+    // optional dependency
+    ADependency1? OptionalDependency { get; init; }
+
+    // required dependency, doesn't need a default either because it has an init setter
+    ADependency2 RequiredDependency { get; init; }
 }
 ```
 
@@ -343,3 +343,4 @@ may, again, come in a later version.
 
 ### Dependecy Injection
 
+[see also](https://github.com/jtheisen/moldinium/blob/master/nested-scopes-ioc-container.md)
