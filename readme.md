@@ -4,6 +4,8 @@
 
 ![Moldinium](https://user-images.githubusercontent.com/1516294/214932993-21e45611-81b0-45fb-ad26-c2a8a1cf5dba.gif)
 
+*The Moldinium Sample App against different UI technologies*
+
 The Blazor WebAssembly version of the sample app is [hosted here](https://red-hill-0c5d5c510.2.azurestaticapps.net/).
 
 ## Introduction
