@@ -1,8 +1,8 @@
-﻿using System.Reflection;
-using System.Reflection.Emit;
-using Moldinium.Common.Misc;
+﻿using System.Reflection.Emit;
 
-namespace Moldinium.Baking;
+namespace Moldinium.Common.Misc;
+
+// see https://github.com/dotnet/roslyn/blob/main/docs/features/nullable-metadata.md
 
 public enum NullableFlag
 {
@@ -12,36 +12,72 @@ public enum NullableFlag
     Complex = 3
 }
 
-public static class NullabilityAttributesHelper
+public static class NullabilityHelper
 {
     public static CustomAttributeBuilder GetNullableContextAttributeBuilder(NullableFlag flag)
         => customAttributeBuilders[(int)flag];
 
     static CustomAttributeBuilder[] customAttributeBuilders;
 
-    static NullabilityAttributesHelper()
+    static NullabilityHelper()
     {
-        var customAttributes = typeof(NullabilityAttributesHelper).GetCustomAttributesData();
+        var customAttributes = typeof(NullabilityHelper).GetCustomAttributesData();
 
         var nullableContextAttribute = customAttributes
             .Where(a => a.AttributeType.FullName == "System.Runtime.CompilerServices.NullableContextAttribute")
-            .Single($"Expected {nameof(NullabilityAttributesHelper)} to have a NullableContextAttribute");
+            .Single($"Expected {nameof(NullabilityHelper)} to have a NullableContextAttribute");
 
         customAttributeBuilders = new CustomAttributeBuilder[3];
 
         for (var i = 0; i < 3; ++i)
         {
-            customAttributeBuilders[i] = new CustomAttributeBuilder(nullableContextAttribute.Constructor, new Object[] { (Byte)i });
+            customAttributeBuilders[i] = new CustomAttributeBuilder(nullableContextAttribute.Constructor, new object[] { (byte)i });
         }
     }
 
-    public static NullableFlag? GetFlag(Type type)
-        => type.GetCustomAttributesData().GetFlag();
+    public static NullableFlag? GetNullableContextFlag(this Type type)
+        => GetOwnNullableContextFlag(type) ?? type.DeclaringType?.GetNullableContextFlag();
 
-    public static NullableFlag? GetFlag(PropertyInfo property)
-        => property.GetCustomAttributesData().GetFlag();
+    public static NullableFlag? GetOwnNullableContextFlag(this Type type)
+        => type.GetCustomAttributesData().GetNullableContextFlag();
 
-    static NullableFlag? GetFlag(this IList<CustomAttributeData> attributes)
+    public static NullableFlag? GetOwnFlag(this PropertyInfo property, NullableFlag? contextFlag)
+    {
+        var type = property.PropertyType;
+
+        if (type.IsValueType)
+        {
+            return Nullable.GetUnderlyingType(type) is not null ? NullableFlag.Nullable : NullableFlag.NotNullable;
+        }
+        else
+        {
+            var flag = property.CustomAttributes.GetOwnFlag() ?? contextFlag;
+
+            return flag;
+        }
+    }
+
+    public static Boolean? IsNullable(this NullableFlag flag) => flag switch
+    {
+        NullableFlag.Nullable => true,
+        NullableFlag.NotNullable => false,
+        _ => null
+    };
+
+    static NullableFlag? GetNullableContextFlag(this IEnumerable<CustomAttributeData> attributes)
+    {
+        foreach (var attribute in attributes)
+        {
+            if (attribute.AttributeType.FullName == NullableContextAttributeName)
+            {
+                return attribute.GetFlag();
+            }
+        }
+
+        return null;
+    }
+
+    static NullableFlag? GetOwnFlag(this IEnumerable<CustomAttributeData> attributes)
     {
         CustomAttributeData? nullableAttribute = null, nullableContextAttribute = null;
 
@@ -51,7 +87,7 @@ public static class NullabilityAttributesHelper
             {
                 nullableAttribute = attribute;
             }
-            else if(attribute.AttributeType.FullName == NullableContextAttributeName)
+            else if (attribute.AttributeType.FullName == NullableContextAttributeName)
             {
                 nullableContextAttribute = attribute;
             }
@@ -68,7 +104,7 @@ public static class NullabilityAttributesHelper
 
         if (type.IsValueType)
         {
-            return (NullableFlag)(Byte)argument.Value!;
+            return (NullableFlag)(byte)argument.Value!;
         }
         else if (type.IsArray)
         {
@@ -82,7 +118,7 @@ public static class NullabilityAttributesHelper
 
     public static void SetNullableAttributes(Action<CustomAttributeBuilder> target, IList<CustomAttributeData> attributesFromTemplate, NullableFlag flagFromInterface)
     {
-        var flagFromTemplate = attributesFromTemplate.GetFlag();
+        var flagFromTemplate = attributesFromTemplate.GetOwnFlag();
 
         if (flagFromTemplate == NullableFlag.Complex)
         {
@@ -100,10 +136,10 @@ public static class NullabilityAttributesHelper
 
                 if (arg is IReadOnlyCollection<CustomAttributeTypedArgument> moreArgs)
                 {
-                    arg = moreArgs.Select(a => (Byte)a.Value!).ToArray();
+                    arg = moreArgs.Select(a => (byte)a.Value!).ToArray();
                 }
 
-                var builder = new CustomAttributeBuilder(attribute.Constructor, new Object[] { arg! } );
+                var builder = new CustomAttributeBuilder(attribute.Constructor, new object[] { arg! });
 
                 target(builder);
             }
@@ -114,10 +150,10 @@ public static class NullabilityAttributesHelper
         }
     }
 
-    static String NullableAttributeName = "System.Runtime.CompilerServices.NullableAttribute";
-    static String NullableContextAttributeName = "System.Runtime.CompilerServices.NullableContextAttribute";
+    static string NullableAttributeName = "System.Runtime.CompilerServices.NullableAttribute";
+    static string NullableContextAttributeName = "System.Runtime.CompilerServices.NullableContextAttribute";
 
-    public static String[] NullableAttributeNames = new [] { NullableAttributeName, NullableContextAttributeName }; 
+    public static string[] NullableAttributeNames = new[] { NullableAttributeName, NullableContextAttributeName };
 }
 
 public class NullableAttributeReport
@@ -149,15 +185,15 @@ public class NullableAttributeReport
         writer.WriteLine($"    {method.Name} {GetNullabilityData(method.GetCustomAttributesData())}");
     }
 
-    String GetNullabilityData(IList<CustomAttributeData> data)
+    string GetNullabilityData(IList<CustomAttributeData> data)
     {
-        return String.Join(", ", data
-            .Where(a => NullabilityAttributesHelper.NullableAttributeNames.Contains(a.AttributeType.FullName))
+        return string.Join(", ", data
+            .Where(a => NullabilityHelper.NullableAttributeNames.Contains(a.AttributeType.FullName))
             .Select(a => $"{a.AttributeType.Name} {a.ConstructorArguments[0]}")
-        );            
+        );
     }
 
-    public static String CreateReport(Type type)
+    public static string CreateReport(Type type)
     {
         var writer = new NullableAttributeReport();
         writer.VisitType(type);

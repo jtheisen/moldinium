@@ -1,3 +1,5 @@
+using Moldinium.Common.Misc;
+
 namespace Testing.Baking;
 
 [TestClass]
@@ -23,6 +25,10 @@ public class BasicBakingTests : BakingTestsBase
     public void DefaultValueTest()
     {
         var test = BasicFactory.Create<IHasPropertyWithDefault>();
+
+        Assert.AreEqual(NullableFlag.NotNullable, typeof(IHasPropertyWithDefault).GetNullableContextFlag());
+        Console.WriteLine(NullableAttributeReport.CreateReport(typeof(BakingTestsBase)));
+        Console.WriteLine(NullableAttributeReport.CreateReport(test.GetType()));
 
         Assert.AreEqual("", test.Value);
     }

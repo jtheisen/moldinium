@@ -1,4 +1,6 @@
-﻿using System.Collections.Concurrent;
+﻿//#define CHECK_AGAINST_NULLABILITY_INFO_CONTEXT
+
+using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Moldinium.Common.Misc;
@@ -71,9 +73,14 @@ public class TypeProperties
     public struct PropertyInfoStruct
     {
         public PropertyInfo info;
-        public bool isNotNullable;
+        public NullableFlag? nullableFlag;
         public bool requiresDefault;
         public bool hasInitSetter;
+        public bool isNotNullable;
+
+#if CHECK_AGAINST_NULLABILITY_INFO_CONTEXT
+        public bool isNotNullableAccordingToNic;
+#endif
 
         public override string ToString()
         {
@@ -92,15 +99,19 @@ public class TypeProperties
 
     public TypeProperties(Type type)
     {
+#if CHECK_AGAINST_NULLABILITY_INFO_CONTEXT
         var nullabilityContext = new NullabilityInfoContext();
+#endif
+
+        var nullabilityTypeFlag = NullabilityHelper.GetNullableContextFlag(type);
 
         var props =
             from p in type.GetProperties()
             let set = p.SetMethod
             let rpcm = set?.ReturnParameter.GetRequiredCustomModifiers()
-            let nullabilityInfo = nullabilityContext.Create(p)
+            let nullableFlag = NullabilityHelper.GetOwnFlag(p, nullabilityTypeFlag)
+            let isNotNullable = !nullableFlag?.IsNullable() ?? false
             let hasInitSetter = rpcm?.Contains(typeof(System.Runtime.CompilerServices.IsExternalInit)) ?? false
-            let isNotNullable = nullabilityInfo.ReadState == NullabilityState.NotNull
             let requiresDefaultPerNullabilityInfo = isNotNullable && !hasInitSetter
             let requiresDefaultPerAttribute = p.GetCustomAttribute<RequiresDefaultAttribute>() is not null
             select new PropertyInfoStruct
@@ -108,10 +119,22 @@ public class TypeProperties
                 info = p,
                 isNotNullable = isNotNullable,
                 requiresDefault = requiresDefaultPerAttribute || requiresDefaultPerNullabilityInfo,
-                hasInitSetter = hasInitSetter
+                nullableFlag = nullableFlag,
+                hasInitSetter = hasInitSetter,
+#if CHECK_AGAINST_NULLABILITY_INFO_CONTEXT
+                isNotNullableAccordingToNic = nullabilityContext.Create(p).ReadState == NullabilityState.NotNull
+#endif
             };
 
         Properties = props.ToArray();
+
+#if CHECK_AGAINST_NULLABILITY_INFO_CONTEXT
+
+        foreach (var p in Properties)
+        {
+            if (p.isNotNullable != p.isNotNullableAccordingToNic) throw new Exception($"Have a discrepancy between NIC and our own nullability detection logic");
+        }
+#endif
 
         HasAnyInitSetters = Properties.Any(p => p.hasInitSetter);
         HasAnyDefaultRequirements = Properties.Any(p => p.requiresDefault);
