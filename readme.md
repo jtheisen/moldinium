@@ -1,5 +1,6 @@
-# Moldinium
+*WARNING: this is a proof-of-concept and not ready for production*
 
+# Moldinium
 ## Introduction
 
 Moldinium allows you to write code in interfaces such as these:
@@ -184,7 +185,7 @@ There are four modes:
 
 |                       | Basic     | Notifying only         | Tracking only     | Notif. + Track.   |
 | --------------------- | --------- | ---------------------- | ----------------- | ----------------- |
-| IList<> default       | List<>    | LiveList<>[^1]         | LiveList<>        | LiveList<>        |
+| IList<> default       | List<>    | LiveList<>**           | LiveList<>        | LiveList<>        |
 | ICollection<> default | List<>    | LiveList<>**           | LiveList<>        | LiveList<>        |
 | Computations cached   | no        | no                     | yes               | yes               |
 | Thread safe           | yes*      | yes*                   | no                | no                |
@@ -192,7 +193,7 @@ There are four modes:
 
 *as long as your app is thread safe and you use thread safe implementations for `IList<>` and `ICollection<>`
 
-[^1]only because `ObservableCollection<>` doesn't implement `IList<>`
+**only because `ObservableCollection<>` doesn't implement `IList<>`
 
 ## Moldinium standard semantics for interface implementations
 
@@ -216,7 +217,8 @@ interface MyInterface
     // optional dependency
     ADependency1? OptionalDependency { get; init; }
 
-    // required dependency, doesn't need a default either because it has an init setter
+    // required dependency, doesn't need a default either because it is
+    // expected to be initialized
     ADependency2 RequiredDependency { get; init; }
 }
 ```
@@ -264,11 +266,20 @@ Moldinium's type creator is called *the bakery*.
 The bakery creates types using `System.Reflection.Emit` and does some
 non-trivial CIL weaving.
 
-It takes an interface type and creates a concrete type by implementing
-and wrapping properties, events and methods with the help of
-*implementation structs* that are baked into the new type. A simple
-example is the wrapping implementation for implementing
-`INotifyPropertyChanged` without tracking:
+Instead of monolithically doing just what is needed for this proof-of-concept,
+the bakery is very configurable for a variety of purposes.
+
+It creates a type by looking at a number of interfaces to implement and
+separately considers properties, events and methods.
+
+Each of these can in principle be requiring an implementation (if they are
+not yet implemented by an interface) or a wrapper (if they are).
+
+The implementations and wrappers then come in the form of
+*implementation and wrapper structs* that are baked into the resulting
+type as fields. Those structs are provided for each of the modes
+talked about above. The following is a wrapper struct for wrapping
+an implemented property to implement `INotifyPropertyChanged`: 
 
 ```c#
 public struct NotifyingComputedPropertyImplementation<Value, Container>
@@ -289,7 +300,9 @@ public struct NotifyingComputedPropertyImplementation<Value, Container>
 }
 ```
 
-The newly created type get's a field of this struct for each such property
+([taken from here](https://github.com/jtheisen/moldinium/blob/master/Moldinium/MoldiniumImplementations/Notifying.cs))
+
+The newly created type gets a field of this struct for each such property
 and one field of type `NotifyingPropertyMixin` (also a struct) shared by those
 former fields.
 
@@ -297,9 +310,7 @@ As you see, the bakery itself therefore does not proxy anything and
 the constructed type does not necessarily require additional heap
 allocations except the one for itself.
 
-The bakery is also implemented in a way to allow much flexibility for
-further property (and method and event) implementations. The interface
-the struct above derives from is defined like this:
+The interface the struct above derives from is defined like this:
 
 ```c#
 public interface INotifyingComputedPropertyImplementation<
@@ -316,21 +327,20 @@ public interface INotifyingComputedPropertyImplementation<
 }
 ```
 
-When the bakery receives the struct implementation type for a property,
+When the bakery receives the struct implementation or wrapper type for a property,
 it analyzes this interface first to understand what the types on
 the method are supposed to mean. In then creates code for the setter
-of the wrapped property on the created type that calls `AfterSet` with
-the given parameters according to the interface definition. The methods
-that implement the wrapping code, such as `AfterSet` must have some
+of the wrapped property on the created type with CIL weaving. This code
+calls `AfterSet` with the given parameters according to the interface definition.
+The methods that implement the wrapping code, such as `AfterSet` must have some
 pre-defined names, but their parameters can be any, as long they are
 declared this way.
 
 The moment when looking at this interface is also when the bakery realizes
 that `NotifyingPropertyMixin` actually is a mixin (again because of the
 type attribute) and that its interface (`INotifyPropertyChanged`)
-should become an interface of the created type.
-
-([see here for the full code of this](https://github.com/jtheisen/moldinium/blob/master/Moldinium/MoldiniumImplementations/Notifying.cs))
+should become an interface of the created type and all the properties,
+event and methods of that interface also need implementing.
 
 This design allows to define type creation with clear separation of
 concerns and an easy way to provide additional custom wrappers and
@@ -338,9 +348,84 @@ implementations for properties.
 
 Unfortunately multiple wrappers are not yet implemented, so it's
 currently not easy to do so in combination with the ones needed for
-tracking and notifying. This would obviously be very useful and
+tracking and notifying (unless you replicate their code in your
+implementation and wrapper). This would obviously be very useful and
 may, again, come in a later version.
 
 ### Dependecy Injection
 
 [see also](https://github.com/jtheisen/moldinium/blob/master/nested-scopes-ioc-container.md)
+
+## Outlook
+
+### Internal Dependency Resolution, Entity Framework and Deserializers
+
+Besides maturity, one of the main limitations of the current implementation
+is that it can't be used with deserializers: Those do reflection themselves.
+Upon trying to create an object for a property they will complain that they
+don't know what type to use when that property is just an interface.
+
+This could be solved by making the baked type implement the interfaces privately
+and instead expose the properties with different types: The baked types.
+
+Then, the only remaining issue is that these types need to be
+default-constructible. They technically already are, but a deserializer will
+not have their init setters initialized by using the correct dependency injection.
+
+While model types used in these scenarios may not really need proper dependency
+injection, there is one dependency that is needed: That of the tracking repository
+(once it's no longer static).
+
+To make this work, I'm eyeing *ambient storage*: .NET has the wonderful ability
+to allow methods be called with an *call context* that can store stuff. It's like
+thread-local storage, but works also accross asynchronous chains of execution.
+
+Before calling the serializer, the dependency injection system would be installed
+in ambient storage and the retrieved by the default constructor of a baked type
+to do *internal dependency resolution*. This would allow dependency injection
+to work in these scenarios and also make the baked type's instance have
+the correct tracking repository.
+
+Another issue is type hierarchies: Deserializers require a single-base
+hierarchy for polymorphic deserliazation and, currently, baked types don't
+derive from other baked types at all. This could be done though, but of
+course requires the user to sometimes specify a unique base.
+
+### Entity Framework
+
+Entity Framework is similar in that it also wants to create it's entity types.
+It has two additional problems:
+
+* it wants the types to be 
+The most annoying trouble arises with fluent configuration. I still think
+it can be done by doing this:
+
+```c#
+using Outer = NamespaceWhereTheModelsLive;
+
+namespace NamespaceWhereTheModelsLive;
+
+// ...
+
+public interface IMyInterfaceDbContext<
+    EntityType1,
+    EntityType1
+>
+    where EntityType1 : Outer.EntityType1
+    where EntityType2 : Outer.EntityType2
+{
+    DbSet<EntityType1> Entities1 { get; set; }
+    DbSet<EntityType2> Entities2 { get; set; }
+
+    void OnModelCreating(ModelBuilder builder)
+    {
+        builder.Entity<EntityType1>(b => b.HasKey(e => e.Id));
+    }
+}
+```
+
+Moldinium could then provide an implementation for `IMyInterfaceDbContext`
+simply by providing the correct arguments to the type parameters. The
+result should be good enough for EF, but I haven't tried.
+
+
