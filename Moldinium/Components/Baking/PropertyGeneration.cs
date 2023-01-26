@@ -80,7 +80,7 @@ public abstract class AbstractPropertyGenerator : AbstractGenerator
 
         if (declaringType.IsInterface)
         {
-            NullabilityAttributesHelper.SetNullableAttributes(
+            NullabilityHelper.SetNullableAttributes(
                 propertyBuilder.SetCustomAttribute,
                 property.GetCustomAttributesData(),
                 state.GetNullableFlagForInterface(declaringType)

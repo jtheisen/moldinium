@@ -1,4 +1,4 @@
-﻿using Moldinium.Baking;
+﻿using Moldinium.Common.Misc;
 
 namespace Testing.Baking;
 
@@ -29,6 +29,13 @@ public interface INullabilityMoreNullableTestInterface
     String? Nullable { get; set; }
 }
 
+public interface INullabilityGenericTestInterface<T1, T2>
+{
+    T1 Prop1 { get; set; }
+    
+    T2 Prop2 { get; set; }
+}
+
 public interface LocalSimpleJob
 {
     String? Config { get; init; }
@@ -37,6 +44,14 @@ public interface LocalSimpleJob
 [TestClass]
 public class NullabilityTests : BakingTestsBase
 {
+    public interface INullabilityNestedTestInterface
+    {
+        String? Nullable { get; set; }
+
+        String NotNullable { get; set; }
+    }
+
+
     NullabilityInfoContext nullabilityInfoContext = new NullabilityInfoContext();
 
     [TestMethod]
@@ -53,8 +68,12 @@ public class NullabilityTests : BakingTestsBase
     [TestMethod]
     public void TestBakedAnalyzing()
     {
+        // just to see reports
+
         Console.WriteLine(NullableAttributeReport.CreateReport(typeof(INullabilityLessNullableTestInterface)));
         Console.WriteLine(NullableAttributeReport.CreateReport(typeof(INullabilityMoreNullableTestInterface)));
+        Console.WriteLine(NullableAttributeReport.CreateReport(typeof(INullabilityGenericTestInterface<String, String>)));
+        Console.WriteLine(NullableAttributeReport.CreateReport(typeof(INullabilityNestedTestInterface)));
         Console.WriteLine(NullableAttributeReport.CreateReport(CreateTestModelType<INullabilityLessNullableTestInterface>()));
         Console.WriteLine(NullableAttributeReport.CreateReport(CreateTestModelType<INullabilityMoreNullableTestInterface>()));
     }

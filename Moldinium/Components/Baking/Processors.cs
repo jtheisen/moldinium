@@ -94,7 +94,7 @@ public class BuildingBakingProcessor : BakingProcessorWithComponentGenerators, I
 
         typeBuilder.SetCustomAttribute(typeClassCharacterAttributeBuilder);
 
-        typeBuilder.SetCustomAttribute(NullabilityAttributesHelper.GetNullableContextAttributeBuilder(defaultNullability));
+        typeBuilder.SetCustomAttribute(NullabilityHelper.GetNullableContextAttributeBuilder(defaultNullability));
 
         var constructorBuilder = typeBuilder.DefineConstructor(MethodAttributes.Public, CallingConventions.Standard, new Type[] { });
 
@@ -114,7 +114,7 @@ public class BuildingBakingProcessor : BakingProcessorWithComponentGenerators, I
         {
             ensureAccess(ifc.Assembly);
 
-            nullableFlags[ifc] = NullabilityAttributesHelper.GetFlag(ifc) ?? NullableFlag.Oblivious;
+            nullableFlags[ifc] = NullabilityHelper.GetNullableContextFlag(ifc) ?? NullableFlag.Oblivious;
 
             Visit(ifc);
         }
