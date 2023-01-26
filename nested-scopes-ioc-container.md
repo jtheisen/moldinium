@@ -25,7 +25,7 @@ and provide new dependencies for them in a manner that still allows early valida
 
 Take the following example:
 
-```
+```c#
 interface App
 {
     Func<CancellationToken, Circuit> NewJob { get; init; }

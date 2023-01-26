@@ -184,7 +184,7 @@ There are four modes:
 
 |                       | Basic     | Notifying only         | Tracking only     | Notif. + Track.   |
 | --------------------- | --------- | ---------------------- | ----------------- | ----------------- |
-| IList<> default       | List<>    | LiveList<>**           | LiveList<>        | LiveList<>        |
+| IList<> default       | List<>    | LiveList<>[^1]         | LiveList<>        | LiveList<>        |
 | ICollection<> default | List<>    | LiveList<>**           | LiveList<>        | LiveList<>        |
 | Computations cached   | no        | no                     | yes               | yes               |
 | Thread safe           | yes*      | yes*                   | no                | no                |
@@ -192,7 +192,7 @@ There are four modes:
 
 *as long as your app is thread safe and you use thread safe implementations for `IList<>` and `ICollection<>`
 
-**only because `ObservableCollection<>` doesn't implement `IList<>`
+[^1]only because `ObservableCollection<>` doesn't implement `IList<>`
 
 ## Moldinium standard semantics for interface implementations
 
