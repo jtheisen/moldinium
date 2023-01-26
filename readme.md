@@ -231,9 +231,18 @@ interface MyInterface
 
 ## Notes on implementation
 
-These sections are not at all necessary to understand the usage
-and behavior of Moldinium, but they are useful for understanding how
-separate the three components are from each other.
+### Separation of Concerns
+
+The three components *baking* (type creation), *tracking* and *injection*
+are do not depend on each other and could as well each have their own
+library. The source layout is this:
+
+- Common *-utilities usable by all three components*
+- Components
+  - Baking
+  - Tracking
+  - Injection
+- Combined *-putting the three components together*
 
 ### Dependency Tracking
 
@@ -267,7 +276,7 @@ The former is mostly an optimization and the latter improves debugging.
 
 ### Dynamic Type Creation
 
-Moldinium's type creator is called *the bakery*.
+Moldinium's type creator is called *the bakery*. I really like my design here.
 
 The bakery creates types using `System.Reflection.Emit` and does some
 non-trivial CIL weaving.
@@ -337,15 +346,15 @@ it analyzes this interface first to understand what the types on
 its methods are supposed to mean. In then creates code for the getters and setters
 of the wrapped property on the created type with CIL weaving. This code
 calls them with the given parameters according to the interface definition.
-The methods that implement the wrapping code, such as `AfterSet` must have some
-pre-defined names, but their parameters can be any, as long they are
-declared this way.
+The methods that implement the wrapping code, such as `AfterSet` must have one
+of some pre-defined names that imply their purpose, but their parameters can be
+any, as long they are declared this way.
 
 The moment when looking at this interface is also when the bakery realizes
 that `NotifyingPropertyMixin` actually is a mixin (again because of the
 type attribute) and that its interface (`INotifyPropertyChanged`)
 should become an interface of the created type and all the properties,
-event and methods of that interface also need implementing.
+events and methods of that interface also need implementing.
 
 This design allows to define type creation with clear separation of
 concerns and an easy way to provide additional custom wrappers and
@@ -359,7 +368,187 @@ may, again, come in a later version.
 
 ### Dependecy Injection
 
-[see also](https://github.com/jtheisen/moldinium/blob/master/nested-scopes-ioc-container.md)
+#### Nested-scopes IoC Containers
+
+Most IoC containers have three different modes of registering types in three
+different modes: *singleton*, *scoped* and *transient*.
+
+They also do lifetime management.
+
+I think this design can be improved by thinking of these three modes as
+*nested scopes* living in a tree, the root scope containing the *singleton*s and the *transient* object living in their own leave scopes.
+
+Classical IoC containers offer those three modes mostly so that the dependencies
+for each of those modes can be checked at container *validation time*,
+which is usually when the program starts or when tests are run.
+Another reason is so that code that creates new scopes don't
+need a dependency on the IoC container. It follows that lifetime management
+must be done by the container: if it creates the instances
+on each level, it needs to dispose of them too.
+
+If those two initial issues (dependency on the container and early validation)
+are deemed irrelevant, one could just create a new container
+at the time a nested scope is needed, inject new "singletons", and resolve again there.
+
+Moldinium instead allows to resolve factories that can be used to create subscopes
+and provide new dependencies for them in a manner that still allows early validation.
+
+Take the following example:
+
+```c#
+interface App
+{
+    Func<CancellationToken, Job> NewJob { get; init; }
+
+    async Task Run(CancellationToken ct)
+    {
+        await using var job = NewJob(ct);
+
+        await job.Run();
+    }
+}
+
+interface Job : IAsyncDisposable
+{
+    Func<RequestConfig, Request> NewRequest { get; init; }
+
+    async Task Run()
+    {
+        var request = NewRequest(new RequestConfig(new Uri("...")));
+
+        await request.FetchContent();
+    }
+
+    // Our job needs this for mysterious reasons
+    async ValueTask IAsyncDisposable.DisposeAsync() { /* ... */ }
+}
+
+record RequestConfig(Uri Url);
+
+interface Request
+{
+    RequestConfig Config { get; init; }
+
+    CancellationToken Ct { get; init; }
+
+    HttpClient HttpClient { get; init; }
+
+    async Task FetchContent() { /* ... */ }
+}
+```
+
+The top scope `App` is resolved by the application setup code, eg in `Program.cs`.
+
+First Moldinium validates the dependencies:
+
+- `App` needs a factory that creates `Job`s but for those
+  it provides `CancellationToken`s
+- `Job` needs a factory that creates `Request`s, but for those it provides `RequestConfig`s
+- `Request` gets a `CancellationToken` from two scopes up and now has all except `HttpClient`, which we assume was provided by the root setup
+
+By making the factories be typed on the dependencies that will be provided,
+Moldinium can check all that at validation time before any instances are created.
+
+I also see no reason for lifetime management being part of the container with
+this design: All object creation is done only when calling factory functions, so
+it's now the *user* that creates. The user should then dispose as well.
+
+This simplifies the matter considerably: Lifetime management is far from trivial, especially when you consider `IAsyncDisposable` and exception handling during cleanup. That can now be done in the usual C# fashion using `usings` and `await usings` and debugged accordingly.
+
+#### The report
+
+Moldinium can give a dependency report. For the example above that is:
+
+```
+    - Bakery resolved fri`App
+      - InitSetter resolved frb`App
+        - Activator resolved urb`App
+          - AcceptRootType resolved trb`App
+        - Factory resolved foc`Func<CancellationTokenJob>
+    
+    - subscope for foc`Func<CancellationTokenJob>
+      - Bakery resolved fri`Job
+        - InitSetter resolved frb`Job
+          - Activator resolved urb`Job
+            - AcceptRootType resolved trb`Job
+          - Factory resolved foc`Func<RequestConfigRequest>
+    
+      - subscope for foc`Func<RequestConfigRequest>
+        - Bakery resolved fri`Request
+          - InitSetter resolved frb`Request
+            - Activator resolved urb`Request
+              - AcceptRootType resolved trb`Request
+            - ServiceProvider resolved foc`HttpClient
+            - FactoryArguments resolved foc`RequestConfig
+            - FactoryArguments resolved frs`CancellationToken
+```
+
+You can nicely see how the subscopes nest here, and how arguments
+are used for resolving dependencies.
+
+The prefixes (`fri`, `urb`, etc.) have the following meaning:
+
+- first character is the *runtime maturity*:
+  - `t`: type without instance
+  - `u`: untouched instance
+  - `f`: finished / externally initialized (init-setter set)
+- the second character can be `r` for required and `o` for optional
+- the third character is a property of the type itself:
+  - `b`: baked class (taken from an attribute the bakery puts on the type)
+  - `c`: class or record
+  - `i`: interface
+  - `s`: struct
+
+The first two of those are an additional disambiguator of the dependency.
+Something can depend on a type or a finished instance - those are not
+the same thing.
+
+The last of those is a property of the type itself and just there for the
+benefit for this report.
+
+#### Dependency providers and the resolution process
+
+The injection system resolves by going from a root dependency asking
+a number of *dependency providers* if they can resolve the dependency.
+
+The names in the report are the class names of such providers, minus
+the `DependencyProvider` suffix. So, `Bakery` is the
+`BakeryDependencyProvider` and it's configured provide a `f*i*` for
+any `f*b*` that counts as a *molidinum type* (you configure that
+with `IdentifyMoldiniumTypes` on the configuration builder).
+
+The `InitSetter` is then says it's able to provide a finished instance
+if it has a untouched instance and some further dependencies coming
+from the properties that need to be set.
+
+The `Activator` can provide such an untouched instance provided the
+type itself is know, which we assume for the root types of all scopes
+and is provided by `AcceptRootType`.
+
+The root types are those you explicitly hooked up with one of the
+`Add*MoldiniumRoot` and also those returned by factories (they are
+the roots of subscopes).
+
+The `Factory` is responsible for resolving factory delegates. It's
+special in that it marks the returned resolution as requiring a
+subscope, which the dependency injection system handles after the
+current scope is completely resolved.
+
+The `Factory` also provides a new dependency provider for the new
+subscope, the `Arguments` that will provide the dependencies injected
+through the arguments of the delegate.
+
+After the dependency injection system has resolved everything for
+the current scope, it goes to the recorded subscopes and recursively
+starts again.
+
+This whole logic lives in the `Scope` class the represents a scope
+at validation time and also forms a tree with its subscopes.
+
+There's also `RuntimeScope`, which is the representation of an
+instantiated scope. There will be as many instances of `RuntimeScope`
+for each `Scope` as there were calls to the factory that
+represents the scope.
 
 ## Outlook
 

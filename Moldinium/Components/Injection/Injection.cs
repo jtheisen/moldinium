@@ -1,6 +1,7 @@
 ﻿using Moldinium.Delegates;
 using Moldinium.Common.Misc;
 using System.Collections.Immutable;
+using Moldinium.Baking;
 
 namespace Moldinium.Injection;
 
@@ -36,7 +37,10 @@ public record Dependency(Type Type, DependencyRuntimeMaturity Maturity, Boolean 
 {
     public override string ToString()
     {
-        return $"{Char.ToLower(Maturity.ToString()[0])}{(IsOptional ? 'o' : 'r')}`{Type.Name}";
+        var maturityChar = Char.ToLower(Maturity.ToString()[0]);
+        var typeClassChar = TypeClassCharacterAttribute.GetTypeClassCharacter(Type);
+
+        return $"{maturityChar}{(IsOptional ? 'o' : 'r')}{typeClassChar}`{Type.GetNameWithGenericArguments()}";
     }
 }
 
@@ -74,7 +78,7 @@ public enum DependencyRuntimeMaturity
     UntouchedInstance,
 
     // We're done
-    InitializedInstance,
+    FinishedInstance
 }
 
 public class DependencyBag
@@ -127,7 +131,9 @@ public class ServiceProviderDependencyProvider : IDependencyProvider
 
     public DependencyResolution? Query(Dependency dep)
     {
-        if (dep.Maturity != DependencyRuntimeMaturity.UntouchedInstance) return null;
+        if (dep.IsRootDependency) return null;
+
+        if (dep.Maturity != DependencyRuntimeMaturity.FinishedInstance) return null;
 
         var service = provider.GetService(dep.Type);
 
@@ -219,14 +225,14 @@ public class InitSetterDependencyProvider : IDependencyProvider
 {
     public DependencyResolution? Query(Dependency dep)
     {
-        if (dep.Maturity != DependencyRuntimeMaturity.InitializedInstance) return null;
+        if (dep.Maturity != DependencyRuntimeMaturity.FinishedInstance) return null;
 
         var reflection = TypeProperties.Get(dep.Type);
 
         var dependencies = (
             from p in reflection.Properties
             where p.hasInitSetter
-            select new Dependency(p.info.PropertyType, DependencyRuntimeMaturity.InitializedInstance, !p.isNotNullable, false)
+            select new Dependency(p.info.PropertyType, DependencyRuntimeMaturity.FinishedInstance, !p.isNotNullable, false)
         ).ToArray();
 
         var embryoDependency = dep with { Maturity = DependencyRuntimeMaturity.UntouchedInstance };
@@ -249,7 +255,7 @@ public class InitSetterDependencyProvider : IDependencyProvider
                 {
                     if (!p.hasInitSetter) continue;
 
-                    var runtimeResolution = scope.Get(new Dependency(p.info.PropertyType, DependencyRuntimeMaturity.InitializedInstance, !p.isNotNullable, false));
+                    var runtimeResolution = scope.Get(new Dependency(p.info.PropertyType, DependencyRuntimeMaturity.FinishedInstance, !p.isNotNullable, false));
 
                     var instance = runtimeResolution.Instance;
 
@@ -278,7 +284,7 @@ public class FactoryDependencyProvider : IDependencyProvider
 
         public FactoryArgumentsDependencyProvider(Type[] types)
         {
-            dependencies = types.Select(t => new Dependency(t, DependencyRuntimeMaturity.InitializedInstance, false, false))
+            dependencies = types.Select(t => new Dependency(t, DependencyRuntimeMaturity.FinishedInstance, false, false))
                 .ToHashSet();
         }
 
@@ -319,7 +325,7 @@ public class FactoryDependencyProvider : IDependencyProvider
 
         var factoryArgumentsProvider = new FactoryArgumentsDependencyProvider(parameterTypes);
 
-        var subScopeDependency = new Dependency(returnType, DependencyRuntimeMaturity.InitializedInstance, false, true);
+        var subScopeDependency = new Dependency(returnType, DependencyRuntimeMaturity.FinishedInstance, false, true);
 
         Scope MakeSubscope(Scope parent)
         {
@@ -345,7 +351,7 @@ public class FactoryDependencyProvider : IDependencyProvider
             {
                 factoryArgumentsProvider.Arguments = parameterTypes
                     .Select((type, i) => (type, instance: args[i]))
-                    .ToDictionary(d => new Dependency(d.type, DependencyRuntimeMaturity.InitializedInstance, false, false), d => d.instance);
+                    .ToDictionary(d => new Dependency(d.type, DependencyRuntimeMaturity.FinishedInstance, false, false), d => d.instance);
 
                 var runtimeScope = subScope.CreateRuntimeScope();
 
@@ -411,7 +417,7 @@ public class ConcreteDependencyProvider : IDependencyProvider
 
     public Boolean IsEmpty => dependencies.Count == 0;
 
-    public ConcreteDependencyProvider AddInstance(Type type, Object instance) => Add(type, DependencyRuntimeMaturity.InitializedInstance, _ => new RuntimeResolution(instance));
+    public ConcreteDependencyProvider AddInstance(Type type, Object instance) => Add(type, DependencyRuntimeMaturity.FinishedInstance, _ => new RuntimeResolution(instance));
     public ConcreteDependencyProvider Accept(Type type) => Add(type, DependencyRuntimeMaturity.TypeOnly, null);
 
     public ConcreteDependencyProvider Add(Type type, DependencyRuntimeMaturity maturity, InstanceGetter? get)
@@ -644,8 +650,9 @@ public class Scope
 
             foreach (var (subScopeDependency, subScope) in scope.subscopes)
             {
+                writer.WriteLine();
                 AddNesting(nesting);
-                writer.WriteLine($"\n- subscope for {subScopeDependency}");
+                writer.WriteLine($"- subscope for {subScopeDependency}");
                 WriteDependencyReport(subScope, subScope.root, nesting + 1);
             }
         }
@@ -818,12 +825,12 @@ public static class Extensions
     public static IDependencyProvider Prepend(this IDependencyProvider provider, IDependencyProvider other)
         => new CombinedDependencyProvider(other, provider);
 
-    public static String CreateReport(this IDependencyProvider provider, Type type, DependencyRuntimeMaturity maturity = DependencyRuntimeMaturity.InitializedInstance)
+    public static String CreateReport(this IDependencyProvider provider, Type type, DependencyRuntimeMaturity maturity = DependencyRuntimeMaturity.FinishedInstance)
         => new Scope(provider, new Dependency(type, maturity, false, true)).CreateDependencyReport();
 
-    public static Object CreateInstance(this IDependencyProvider provider, Type type, DependencyRuntimeMaturity maturity = DependencyRuntimeMaturity.InitializedInstance)
+    public static Object CreateInstance(this IDependencyProvider provider, Type type, DependencyRuntimeMaturity maturity = DependencyRuntimeMaturity.FinishedInstance)
         => new Scope(provider, new Dependency(type, maturity, false, true)).CreateRuntimeScope().Root;
 
-    public static T CreateInstance<T>(this IDependencyProvider provider, DependencyRuntimeMaturity maturity = DependencyRuntimeMaturity.InitializedInstance)
+    public static T CreateInstance<T>(this IDependencyProvider provider, DependencyRuntimeMaturity maturity = DependencyRuntimeMaturity.FinishedInstance)
         => (T)provider.CreateInstance(typeof(T), maturity);
 }

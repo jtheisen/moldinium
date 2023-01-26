@@ -58,6 +58,7 @@ public class DependencyProviderBuilder
 
 public class MoldiniumConfigurationBuilder
 {
+    List<IServiceProvider> serviceProviders = new List<IServiceProvider>();
     MoldiniumDefaultMode mode;
     Type? defaultIListAndICollationType;
     Predicate<Type>? isModliniumType;
@@ -70,6 +71,19 @@ public class MoldiniumConfigurationBuilder
 
     public MoldiniumConfigurationBuilder IdentifyMoldiniumTypes(Predicate<Type> isModliniumType)
         => Modify(() => this.isModliniumType = isModliniumType);
+
+    public MoldiniumConfigurationBuilder AddServices(IServiceProvider services)
+        => Modify(() => this.serviceProviders.Add(services));
+
+    public MoldiniumConfigurationBuilder AddServices(Action<IServiceCollection> services)
+        => Modify(() => this.serviceProviders.Add(BuildServiceProvider(services)));
+
+    IServiceProvider BuildServiceProvider(Action<IServiceCollection> services)
+    {
+        var collection = new ServiceCollection();
+        services(collection);
+        return collection.BuildServiceProvider();
+    }
 
     MoldiniumConfigurationBuilder Modify(Action action)
     {
@@ -92,23 +106,29 @@ public record DefaultDependencyProviderConfiguration(
     Boolean EnableFactories = true,
     Boolean AcceptDefaultConstructibles = false,
     Type? DefaultIListAndICollationType = null,
-    Action<DependencyProviderBuilder>? Build = null,
     IServiceProvider? Services = null,
     Predicate<Type>? IsMoldiniumType = null
 );
+
+public static class MoldiniumServices
+{
+    public static IServiceProvider Create<T>(Action<MoldiniumConfigurationBuilder> build, Action<IServiceCollection>? services = null)
+        where T : class
+    {
+        var collection = new ServiceCollection();
+        if (services is not null) services(collection);
+        collection.AddSingletonMoldiniumRoot<T>(build);
+        var serviceProvider = collection.BuildServiceProvider();
+        serviceProvider.ValidateMoldiniumRoot<T>();
+        return serviceProvider;
+    }
+}
 
 public static class DependencyProvider
 {
     public static IDependencyProvider Create(DefaultDependencyProviderConfiguration config)
     {
         var providers = new List<IDependencyProvider>();
-
-        if (config.Build is Action<DependencyProviderBuilder> build)
-        {
-            var builder = new DependencyProviderBuilder();
-            build(builder);
-            providers.Add(builder.Build());
-        }
 
         if (config.Services is IServiceProvider services)
         {
@@ -215,7 +235,7 @@ public static partial class Extensions
     public static IServiceCollection AddSingletonMoldiniumRoot<T>(this IServiceCollection services, Action<MoldiniumConfigurationBuilder> build)
         where T : class => services
         
-        .AddSingleton<Scope<T>>(sp => new Scope<T>(build.GetProvider(sp), DependencyRuntimeMaturity.InitializedInstance))
+        .AddSingleton<Scope<T>>(sp => new Scope<T>(build.GetProvider(sp), DependencyRuntimeMaturity.FinishedInstance))
         .AddSingleton<T>(sp => (T)sp.GetRequiredService<Scope<T>>().CreateRuntimeScope().Root)
         
     ;
@@ -227,7 +247,7 @@ public static partial class Extensions
     public static IServiceCollection AddScopedMoldiniumRoot<T>(this IServiceCollection services, Action<MoldiniumConfigurationBuilder> build)
         where T : class => services
 
-        .AddSingleton<Scope<T>>(sp => new Scope<T>(build.GetProvider(sp), DependencyRuntimeMaturity.InitializedInstance))
+        .AddSingleton<Scope<T>>(sp => new Scope<T>(build.GetProvider(sp), DependencyRuntimeMaturity.FinishedInstance))
         .AddScoped<T>(sp => (T)sp.GetRequiredService<Scope<T>>().CreateRuntimeScope().Root)
 
     ;
@@ -239,14 +259,20 @@ public static partial class Extensions
     public static IServiceCollection AddTransientMoldiniumRoot<T>(this IServiceCollection services, Action<MoldiniumConfigurationBuilder> build)
         where T : class => services
 
-        .AddSingleton<Scope<T>>(sp => new Scope<T>(build.GetProvider(sp), DependencyRuntimeMaturity.InitializedInstance))
+        .AddSingleton<Scope<T>>(sp => new Scope<T>(build.GetProvider(sp), DependencyRuntimeMaturity.FinishedInstance))
         .AddTransient<T>(sp => (T)sp.GetRequiredService<Scope<T>>().CreateRuntimeScope().Root)
 
     ;
 
     /// <summary>
+    /// Validates dependencies early
+    /// </summary>
+    public static void ValidateMoldiniumRoot<T>(this IServiceProvider services)
+        => services.GetRequiredService<Scope<T>>();
+
+    /// <summary>
     /// Validates dependencies early and gives a dependency report
     /// </summary>
-    public static String ValidateMoldiniumRoot<T>(this IServiceProvider services)
-        => services.GetRequiredService<Scope<T>>().CreateDependencyReport();
+    public static void ValidateMoldiniumRoot<T>(this IServiceProvider services, out String dependencyReport)
+        => dependencyReport = services.GetRequiredService<Scope<T>>().DependencyReport;
 }

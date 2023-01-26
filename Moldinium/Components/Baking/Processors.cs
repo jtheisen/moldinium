@@ -1,6 +1,7 @@
 ﻿using System.Reflection.Emit;
 using System.Reflection;
 using Moldinium.Common.Defaulting;
+using Moldinium.Common.Misc;
 
 namespace Moldinium.Baking;
 
@@ -70,6 +71,8 @@ public class BuildingBakingProcessor : BakingProcessorWithComponentGenerators, I
 
     private readonly NullableFlag defaultNullability = NullableFlag.NotNullable;
 
+    private static readonly CustomAttributeBuilder typeClassCharacterAttributeBuilder = TypeClassCharacterAttribute.MakeBuilder('b');
+
     public IDefaultProvider DefaultProvider => defaultProvider;
     public TypeBuilder TypeBuilder => typeBuilder;
     public ILGenerator ConstructorGenerator => constructorGenerator;
@@ -88,6 +91,8 @@ public class BuildingBakingProcessor : BakingProcessorWithComponentGenerators, I
         this.generators = generators;
         this.ensureAccess = ensureAccess;
         typeBuilder = moduleBuilder.DefineType(name, typeAttributes, baseType);
+
+        typeBuilder.SetCustomAttribute(typeClassCharacterAttributeBuilder);
 
         typeBuilder.SetCustomAttribute(NullabilityAttributesHelper.GetNullableContextAttributeBuilder(defaultNullability));
 

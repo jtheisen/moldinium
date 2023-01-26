@@ -56,24 +56,7 @@ public abstract class AbstractlyBakery : AbstractBakery
         moduleBuilder = assemblyBuilder.DefineDynamicModule(name);
     }
 
-    protected virtual String GetTypeName(Type interfaceOrBaseType)
-        => $"{GetTypePrefix()}{interfaceOrBaseType.Name}";
-
-    String GetTypePrefix()
-    {
-        if (typeAttributes.HasFlag(TypeAttributes.Abstract))
-        {
-            return "A";
-        }
-        else if (typeAttributes.HasFlag(TypeAttributes.SequentialLayout))
-        {
-            return "S";
-        }
-        else
-        {
-            return "C";
-        }
-    }
+    protected virtual String GetTypeName(Type interfaceOrBaseType) => interfaceOrBaseType.Name;
 
     public override Type GetCreatedType(Type interfaceOrBaseType)
     {
