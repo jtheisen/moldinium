@@ -56,7 +56,10 @@ public abstract class AbstractlyBakery : AbstractBakery
         moduleBuilder = assemblyBuilder.DefineDynamicModule(name);
     }
 
-    protected virtual String GetTypeName(Type interfaceOrBaseType) => interfaceOrBaseType.Name;
+    /** FullName is of the form [namespace].[parent-class-name]+[type-name]^[parameters] and that is almost the form
+     * the TypeBuilder expects - just the '+' is something it rejects (escapes) which is sensible given the type isn't
+     * going to actually be a nested type. The next best thing is to just replace the '+' with a '.'. */
+    protected virtual String GetTypeName(Type interfaceOrBaseType) => interfaceOrBaseType.FullName?.Replace('+', '.') ?? "";
 
     public override Type GetCreatedType(Type interfaceOrBaseType)
     {

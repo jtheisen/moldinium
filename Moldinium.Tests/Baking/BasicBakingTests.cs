@@ -34,15 +34,6 @@ public class BasicBakingTests : BakingTestsBase
     }
 
     [TestMethod]
-    public void DefaultCollectionsTest()
-    {
-        var test = BasicFactory.Create<IHasPropertiesWithCollection>();
-
-        Assert.IsTrue(test.StringList.GetType() == typeof(List<String>));
-        Assert.IsTrue(test.StringCollection.GetType() == typeof(List<String>));
-    }
-
-    [TestMethod]
     public void EventTypeCreationTest() => BasicFactory.Create<IHasEvent>();
 
 

@@ -193,7 +193,7 @@ There are four modes:
 |                       | Basic     | Notifying only         | Tracking only     | Notif. + Track.   |
 | --------------------- | --------- | ---------------------- | ----------------- | ----------------- |
 | IList<> default       | List<>    | LiveList<>**           | LiveList<>        | LiveList<>        |
-| ICollection<> default | List<>    | LiveList<>**           | LiveList<>        | LiveList<>        |
+| ICollection<> default | List<>    | ObservableCollction<>  | LiveList<>        | LiveList<>        |
 | Computations cached   | no        | no                     | yes               | yes               |
 | Thread safe           | yes*      | yes*                   | no                | no                |
 | Uerful for            | stateless work | very little       | Blazor          | XAML              |
@@ -745,8 +745,5 @@ TODO:
 - the calm sea
 - gifs
 - my role as maintainer
-- nullability
+- mono cecil
 - caveats / maturity
-  - factory arguments always non-nullable
-  - the icky part of the bakery
-- reconciling IEnumerables for XAML

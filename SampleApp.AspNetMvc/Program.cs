@@ -10,7 +10,7 @@ services.AddControllersWithViews().AddRazorRuntimeCompilation();
 
 services.AddSingletonMoldiniumRoot<JobList>(c => c
     .SetMode(MoldiniumDefaultMode.Basic)
-    .SetIListAndICollectionImplementationType(typeof(ConcurrentList<>))
+    .SetDefaultIListAndICollectionTypes(typeof(ConcurrentList<>), typeof(ConcurrentList<>))
     .IdentifyMoldiniumTypes(t => t.IsInterface && !t.Name.StartsWithFollowedByCapital("I"))
 );
 

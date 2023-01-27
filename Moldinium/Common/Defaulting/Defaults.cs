@@ -1,4 +1,5 @@
-﻿using Moldinium.Common.Misc;
+﻿using Microsoft.VisualBasic;
+using Moldinium.Common.Misc;
 
 namespace Moldinium.Common.Defaulting;
 
@@ -36,11 +37,11 @@ public interface IDefaultProvider
 
 public class DefaultDefaultProvider : IDefaultProvider
 {
-    private readonly Type? genericCollectionType;
+    private readonly (Type, Type)? genericListAndCollectionTypes;
 
-    public DefaultDefaultProvider(Type? genericCollectionType)
+    public DefaultDefaultProvider((Type, Type)? genericListAndCollectionTypes)
     {
-        this.genericCollectionType = genericCollectionType;
+        this.genericListAndCollectionTypes = genericListAndCollectionTypes;
     }
 
     public Type? GetDefaultType(Type type)
@@ -63,11 +64,19 @@ public class DefaultDefaultProvider : IDefaultProvider
 
         if (interfaces.DoesTypeImplement(typeof(ICollection<>)))
         {
-            if (genericCollectionType is not null)
+            if (type.IsInterface)
             {
-                var defaultImplementationType = GetDefaultImplementationTypeForCollectionType(genericCollectionType, type);
+                if (genericListAndCollectionTypes is (Type genericListType, Type genericCollectionType))
+                {
+                    Type genericType = interfaces.DoesTypeImplement(typeof(IList<>)) ? genericListType : genericCollectionType;
 
-                return defaultImplementationType;
+                    if (genericType is not null)
+                    {
+                        var defaultImplementationType = GetDefaultImplementationTypeForCollectionType(genericType, type);
+
+                        return defaultImplementationType;
+                    }
+                }
             }
             else if (traits.IsDefaultConstructible)
             {
@@ -104,6 +113,6 @@ public static class Defaults
     public static Type CreateConcreteDefaultImplementationType(Type type, Type valueType)
         => type.IsGenericTypeDefinition ? type.MakeGenericType(valueType) : type;
 
-    public static IDefaultProvider GetDefaultDefaultProvider(Type? genericCollectionType = null)
-        => new DefaultDefaultProvider(genericCollectionType ?? typeof(List<>));
+    public static IDefaultProvider GetDefaultDefaultProvider((Type genericListType, Type genericCollectionType)? genericListAndCollectionTypes = null)
+        => new DefaultDefaultProvider(genericListAndCollectionTypes);
 }
