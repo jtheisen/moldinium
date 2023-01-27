@@ -4,7 +4,7 @@
 
 ![Moldinium2](https://user-images.githubusercontent.com/1516294/215169320-0a0f0008-d694-43e9-8aec-dd440109eab5.gif)
 
-*The Moldinium Sample App against different UI technologies*
+*--- the Moldinium Sample App bound against different UI technologies*
 
 The Blazor WebAssembly version of the sample app is [hosted here](https://red-hill-0c5d5c510.2.azurestaticapps.net/).
 
@@ -32,7 +32,7 @@ For xaml consumption, those can have `INotifyPropertyChanged` automatically
 implemented, eg. to fire when `Progress` is set to a new value.
 
 For Blazor consumption, those can have a different notification mechanism
-implemented that allows Blazor components be written like this:
+implemented that allows Blazor components to be written like this:
 
 ```c#
 @inherits LocalComponentBase
@@ -47,8 +47,8 @@ implemented that allows Blazor components be written like this:
 }
 ```
 
-And again, every time `Progress` changes, this Blazor component rerenders.
-Take out the reference to `Progress` and it will no longer rerender.
+And again, every time `Progress` changes, this Blazor component re-renders.
+Take out the reference to `Progress` and it will no longer re-render.
 
 The same magic that makes this possible is also improving on usage in the xaml
 world: A job collection may be dependent on all the `IsRunning` fields of its
@@ -64,7 +64,7 @@ interface JobCollection
 ```
 
 In a xaml environment, the created class that implements `INotifyPropertyChanged`
-will fire it for `HaveRunningChildren` the moment it needs to be reevaluated
+will fire it for `HaveRunningChildren` the moment it needs to be re-evaluated
 due to changes of `IsRunning` in one of its children. In fact, the value of
 `HaveRunningChildren` will be cached and multiple reads will retrieve the
 cached value until a dependent value change invalidates this cache.
@@ -102,7 +102,7 @@ what needs updating in the presence of changing sources to a generic solution.
 However, it requires that all access to trackable variables and computations
 are wrapped by the dependency tracking framework. Without some form
 of type creation or proxying this results in ugly application code. MobX,
-for example, can use JavaScript proxies and needs React components be wrapped
+for example, can use JavaScript proxies and needs React components to be wrapped
 by one of its framework facilities. KnockoutJS and VueJS hide this behind
 their templating engines.
 
@@ -115,11 +115,11 @@ to resolve the implementation types that are only present at runtime:
 `new` no longer works.
 
 Moldinium's dependency injection can perhaps be replaced by an existing one,
-but I had some strong opinion on dependency injection anyway - see the
+but I had some strong opinions on dependency injection anyway - see the
 relevant notes on implementation below for more on that.
 
 Then, since all properties need to be virtual to allow redefining, I wondered if
-one wouldn't be better off with using only interfaces to write application code
+one wouldn't be better off using only interfaces to write application code
 right away.
 
 ## Sample application
@@ -130,7 +130,7 @@ sample application using only interfaces and records. It comes in a
 class library that doesn't depend on anything besides .NET, not even on
 Moldinium: Dependency injection purists will rejoice.
 
-This class library is used by three different projects that each
+This class library is used by three different projects which each
 provide a UI for it: One for WPF, one for Blazor WebAssembly and a
 stateless one using ASP.NET MVC.
 
@@ -142,13 +142,13 @@ which makes the magic work (see the implementation notes about dependency tracki
 below for details).
 
 The ASP.NET one is content without any notification mechanism: The entities
-will behave without any magic applied to it. This version of the sample app,
+will behave without any magic applied to them. This version of the sample app,
 however, does something interesting with its default collection to support
 its multi-threaded environment, see the section below.
 
 ## Collections and default values
 
-The Moldinium type creator also allows to ensure defaults to non-nullable
+The Moldinium type creator also allows ensuring defaults to non-nullable
 properties of certain types. After the common case of `String`s
 (which are then defaulted to the empty string), this is mostly a
 concern with collections.
@@ -195,17 +195,17 @@ There are four modes:
 | IList<> default       | List<>    | LiveList<>**           | LiveList<>        | LiveList<>        |
 | ICollection<> default | List<>    | ObservableCollction<>  | LiveList<>        | LiveList<>        |
 | Computations cached   | no        | no                     | yes               | yes               |
-| Thread safe           | yes*      | yes*                   | no                | no                |
+| Thread-safe           | yes*      | yes*                   | no                | no                |
 | Uerful for            | stateless work | very little       | Blazor          | XAML              |
 
-*as long as your app is thread safe and you use thread safe implementations for `IList<>` and `ICollection<>`
+*as long as your app is thread-safe and you use thread-safe implementations for `IList<>` and `ICollection<>`
 
 **only because `ObservableCollection<>` doesn't implement `IList<>`
 
 Moldinium gives created types the same name as their corresponding interface, but
 they live in a runtime assembly with a name that shows them to be such created
 types. For example, types from the ASP.NET Sample end up in an assembly named
-`MoldiniumTypes.Basic.ConcurrentList`, also showing what to expect from
+`MoldiniumTypes.Basic.ConcurrentList`, showing what to expect from
 the types therein.
 
 ## Moldinium standard semantics for interface implementations
@@ -239,25 +239,25 @@ interface MyInterface
 ```
 
 Note that we assume that this is the interface to create a type from,
-ie. the *moldinium type". Of course a base interface can declare the
+ie. the *moldinium type". Of course, a base interface can declare the
 `Unimplemented` property and a derived interface can still have a class
 type created if it implements this property.
 
 ## A new language?
 
 One could interpret this new style of coding as being a "new language"
-that has been "discovered within C#", somwehat like JSON was
+that has been "discovered within C#", somewhat like JSON was
 discovered within JavaScript. The analogy isn't perfect as JSON
 throws away the vast majority of JavaScript whereas this new language
 throws away only a very small part (the classes and their constructors).
 
-I couldn't think of a great name name yet. Contenders are "c minus"
-(which may already been taken) and "calm c".
+I couldn't think of a great name yet. Contenders are "c minus"
+(which may already be taken) and "calm c".
 
 The "new language" perspective gives some justification for breaking the
 C# style guide of naming interfaces only with a prefixed "I". Instead,
 we're prefixing interfaces with an "I" if they still play the role
-of interfaces. If they play the role of concrete types, the lose the "I".
+of interfaces. If they play the role of concrete types, they lose the "I".
 
 ## Outlook
 
@@ -268,10 +268,10 @@ a substantial amount of details that are not yet implemented properly
 and what's there is likely quite buggy.
 
 One example would be that while the dependency injection component
-tells apart optional depenencies from essential (required) ones, it
+tells apart optional dependencies from essential (required) ones, it
 does so only for init setters. A factory declaration like
 `Func<Dep1, Dep2?, Foo>` will not allow you to pass null for the
-second dependency at runtime. In order for this to work, some work
+second dependency at runtime. For this to work, some work
 on nullability would have to be done, as the information about
 nullability is stored in a complicated fashion and lives in unexpected
 places
@@ -291,7 +291,7 @@ let alone maintain it after that. Unless Microsoft hires me I likely
 work on more financially rewarding things and this proof-of-concept
 is the most my temporary obsession with this topic could yield.
 
-I document the in my opinion quite elegant design more below in part
+I document the in my opinion quite elegant design below in part
 so that someone with more free time has something to build on in the
 following sections.
 
@@ -324,7 +324,7 @@ The repository executes the computation and when, during, the computation access
 it being read. After the computation is completed, the repository now
 does not only know the result, but also which trackables have been
 read - those are the ones the computation depends on: If one of those
-change, the computation changes, ie. `HaveRunningChildren` invalidates.
+changes, the computation changes, ie. `HaveRunningChildren` invalidates.
 
 In the current Moldinium implementation, the repository is a static
 singleton. This is how it's done in JavaScript and while it's not an
@@ -414,7 +414,7 @@ public interface INotifyingComputedPropertyImplementation<
 
 When the bakery receives the struct implementation or wrapper type for a property,
 it analyzes this interface first to understand what the types on
-its methods are supposed to mean. In then creates code for the getters and setters
+its methods are supposed to mean. It then creates code for the getters and setters
 of the wrapped property on the created type with CIL weaving. This code
 calls them with the given parameters according to the interface definition.
 The methods that implement the wrapping code, such as `AfterSet`, must have one
@@ -427,11 +427,11 @@ type attribute) and that its interface (`INotifyPropertyChanged`)
 should become an interface of the created type and all the properties,
 events and methods of that interface also need implementing.
 
-This design allows to define type creation with clear separation of
+This design allows defining type creation with clear separation of
 concerns and an easy way to provide additional custom wrappers and
 implementations for properties.
 
-Unfortunately multiple wrappers are not yet implemented, so it's
+Unfortunately, multiple wrappers are not yet implemented, so it's
 currently not easy to do so in combination with the ones needed for
 tracking and notifying (unless you replicate their code in your
 implementation and wrapper). This would obviously be very useful and
@@ -452,7 +452,7 @@ struct MyPropertyImplementation<..., T, ...> : ...
 }
 ```
 
-The init method is used to set default values and are called from the
+The init method is used to set default values and is called from the
 created type's constructor. Wrappers are more complex:
 
 ```c#
@@ -464,13 +464,13 @@ struct MyPropertyWrapper<...> : ...
     // same for the setter
 ```
 
-The return value for `Before` methods indicate whether the wrapped method
-should be called. A cache, for instance, may chose not to.
+The return value for `Before` methods indicates whether the wrapped method
+should be called. A cache, for instance, may choose not to.
 
-The return value for `AfterError` methods indicate whether the exception
+The return value for `AfterError` methods indicates whether the exception
 should be rethrown.
 
-For events the picture is analogous, with `Add` and `Remove` instead of
+For events, the picture is analogous, with `Add` and `Remove` instead of
 `Get` and `Set`. For non-special methods there are only wrappers and the
 methods are only called `Before`, `After` and `AfterErrror`.
 
@@ -481,7 +481,7 @@ the interface definition the implementation or wrapper derives from. The
 * `Value`: Property type (only property structs)
 * `Handler`: Event handler type (only event structs)
 * `Return`: Method return type (only method structs)
-* `Exception`: Exception type for the `AfterError*` methods, should be constraint to `Sytem.Exception`
+* `Exception`: Exception type for the `AfterError*` methods, should be constrained to `Sytem.Exception`
 * `Container`: The baked type
 * `Mixin`: A mixin
 
@@ -492,7 +492,7 @@ Although this design would also allow multiple mixins to be used, this
 isn't currently allowed.
 
 While you can't debug the generated IL code, you can debug those implementation
-and wrapper structs when they live your own assemblies or you
+and wrapper structs when they live in your own assemblies or you
 disable "just my code".
 
 #### An icky part of the bakery
@@ -560,7 +560,7 @@ This requires that the baked type's function must call
 call would be an infinite recursion.)
 
 For classes, you can call a base's methods non-virtually in C# by using
-`base.Name`, but for interfaces there is no such thing (and there's
+`base.Name`, but for interfaces, there is no such thing (and there's
 no unique base, so the syntax would have to be something like
 `base(IImplementingInterface).Name` if it was to exist in C#).
 
@@ -572,7 +572,7 @@ be also annotated with an undocumented `IgnoresAccessChecksToAttribute`
 to allow calling those methods; another thing that had cost me days
 to figure out.)
 
-### Dependecy Injection
+### Dependency Injection
 
 #### Nested-scopes IoC Containers
 
@@ -596,7 +596,7 @@ If those two initial issues (dependency on the container and early validation)
 are deemed irrelevant, one could just create a new container
 at the time a nested scope is needed, inject new "singletons", and resolve again there.
 
-Moldinium instead allows to resolve factories that can be used to create subscopes
+Moldinium instead allows resolving factories that can be used to create subscopes
 and provide new dependencies for them in a manner that still allows early validation.
 
 Take the following example:
@@ -655,7 +655,7 @@ First Moldinium validates the dependencies:
 By making the factories be typed on the dependencies that will be provided,
 Moldinium can check all that at validation time before any instances are created.
 
-I also see no reason for lifetime management being part of the container with
+I also see no reason for lifetime management to be part of the container with
 this design: All object creation is done only when calling factory functions, so
 it's now the *user* that creates. The user should then dispose as well.
 
@@ -709,7 +709,7 @@ The first two of those are an additional disambiguator of the dependency.
 Something can depend on a type or a finished instance - those are not
 the same thing.
 
-The last of those is a property of the type itself and just there for the
+The last of those is a property of the type itself and is just there for the
 benefit for this report.
 
 #### Dependency providers and the resolution process
@@ -719,16 +719,16 @@ a number of *dependency providers* if they can resolve the dependency.
 
 The names in the report are the class names of such providers, minus
 the `DependencyProvider` suffix. So, `Bakery` is the
-`BakeryDependencyProvider` and it's configured provide a `f*i*` for
+`BakeryDependencyProvider` and it's configured to provide a `f*i*` for
 any `f*b*` that counts as a *molidinum type* (you configure that
 with `IdentifyMoldiniumTypes` on the configuration builder).
 
 The `InitSetter` then says it's able to provide a finished instance
-if it has a untouched instance and some further dependencies coming
+if it has a freshly created instance and some further dependencies coming
 from the properties that need to be set.
 
-The `Activator` can provide such an untouched instance provided the
-type itself is know, which we assume for the root types of all scopes
+The `Activator` can provide such a virgin instance provided the
+type itself is known, which we assume for the root types of all scopes
 and is provided by `AcceptRootType`.
 
 The root types are those you explicitly hooked up with one of the
@@ -777,11 +777,11 @@ proper dependency injection, there is one dependency that is needed:
 That of the tracking repository (once it's no longer static).
 
 To make this work, I'm eyeing *ambient storage*: .NET has the wonderful ability
-to allow methods be called with an *call context* that can store stuff. It's like
-thread-local storage, but also works accross asynchronous chains of execution.
+to allow methods to be called with a *call context* that can store stuff. It's like
+thread-local storage, but also works across asynchronous chains of execution.
 
-Before calling the serializer, the dependency injection system would be installed
-in ambient storage and the retrieved by the default constructor of a baked type
+Before calling the deserializer, the dependency injection system would be installed
+in ambient storage and then retrieved by the constructor of a baked type
 to do *internal dependency resolution*. This would allow dependency injection
 to work in these scenarios and also make the baked type's instance have
 the correct tracking repository.
@@ -839,9 +839,53 @@ Another option would be to write a wrapper around EF's `ModelBuilder`.
 This would be very specific to EF and may require maintenance when EF's
 `ModelBuilder` changes.
 
-TODO:
-- talk about IdentifyMoldiniumTypes
-- roadmap: Blazor WebAssembly
-- access control
-- better tracking (logging, heap allocations)
-- globally defined scope dependencies
+### Access control
+
+Interfaces can't have private members (except private method implementations),
+but they can have protected members.
+
+Moldinium should allow that. I'm thinking about using protected init
+setters to mark internal dependency resolution (see the section above).
+
+### Dependency Tracking
+
+I already mentioned supporting Blazor Server by making the repository non-static
+and have it injected.
+
+The tracking system is also quite wasteful as it needs each trackable to have
+its own object. This can lead to an explosion of heap allocations in a complex
+application. It would be better if all trackables on a single moldinium model
+share a single heap instance to communicate with the repository.
+
+The tracking system could also do with a lot more tools guarding against misuse
+and diagnostic facilities, such as a dependency report similar to that the
+dependency injection system has.
+
+### Dependency Injection
+
+Already mentioned is the weakness regarding nullable types for factories.
+
+There's another issue that users likely desire: To globally define
+additional dependencies provided for the created type of a specific factory
+without having to specify those as argument types or passing them at
+the factory call.
+
+This is the way scoped dependencies are set up in most IoC containers, and
+it should be an option here as well.
+
+The user can declare a factory type explicitly as a delegate:
+
+```c#
+public delegate MySubscopRootType MySubscope( /* ... */ );
+
+public interface SomeType
+{
+    MySubscope CreateMySubscopeRootType { get; init; }
+
+    // ...
+}
+```
+
+Then, it should be allowed to register additional dependencies on the
+application root identifying the subscope with this delegate type in the
+same way other IoC containers allow it.
