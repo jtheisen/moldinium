@@ -1,14 +1,13 @@
-﻿using System.Diagnostics;
+﻿namespace SampleApp;
 
-namespace SampleApp;
-
-public interface ILogger
-{
-    void Log(String message);
-}
-
+/* The root of our application
+ * 
+ * The interface has no "I" prefix as it's conceptually no longer an "interface".
+ */
 public interface JobList
 {
+    ILogger? Logger { get; init; }
+
     Func<CommandConfig, Command> NewCommand { get; init; }
 
     Func<CancellationToken, SimpleJob> NewSimpleJob { get; init; }
@@ -20,7 +19,7 @@ public interface JobList
 
     CancellationToken Ct => GetCts().Token;
 
-    IList<Job> Items { get; set; }
+    IList<IJob> Items { get; set; }
 
     CancellationTokenSource GetCts() => Cts ?? (Cts = new CancellationTokenSource());
 
@@ -31,7 +30,7 @@ public interface JobList
     Command MakeCommand(Action execute, Boolean isEnabled = true)
         => NewCommand(new CommandConfig(execute, isEnabled));
 
-    async void AddAndRunJob(Job job)
+    async void AddAndRunJob(IJob job)
     {
         Items.Add(job);
 
@@ -51,15 +50,19 @@ public interface JobList
     {
         Cts?.Cancel();
 
-        Debug.WriteLine($"Cancelled at {DateTime.Now}");
+        Logger?.Log($"Cancelled at {DateTime.Now}");
 
         Cts = null;
     }
 }
 
+/* We can still use polymorphism, and this type is indeed an
+ * interface semantically, hence the "I" in "IJob".
+ */
+
 public record JobNestingLevel(Int32 Level);
 
-public interface Job
+public interface IJob
 {
     CancellationToken Ct { get; init; }
 
@@ -100,15 +103,18 @@ public interface Job
     Task RunImpl();
 }
 
+/* "SimpleJob"s are the first implementation.
+ */
+
 public record SimpleJobConfig(TimeSpan Duration, Int32 Steps);
 
-public interface SimpleJob : Job
+public interface SimpleJob : IJob
 {
     SimpleJobConfig? Config { get; init; }
 
     Int32 Progress { get; set; }
 
-    async Task Job.RunImpl()
+    async Task IJob.RunImpl()
     {
         var config = Config ?? new SimpleJobConfig(TimeSpan.FromSeconds(3), 50);
 
@@ -129,13 +135,16 @@ public interface SimpleJob : Job
     }
 }
 
-public interface ComplexJob : Job
+/* "ComplexJob"s are the second implementation and use nested "SimpleJob"s.
+ */
+
+public interface ComplexJob : IJob
 {
     Func<JobNestingLevel, SimpleJob> CreateSimpleJob { get; init; }
 
-    IList<Job> SubJobs { get; set; }
+    IList<IJob> SubJobs { get; set; }
 
-    async Task Job.RunImpl()
+    async Task IJob.RunImpl()
     {
         for (var i = 0; i < 3; ++i)
         {
@@ -150,6 +159,13 @@ public interface ComplexJob : Job
     }
 }
 
+/* Commands are usually not used anywhere but in the XAML world, but they can
+ * be, and we want to one app to be nicely bindable to all UI frameworks.
+ * 
+ * It also could as well be a class here, but that I could no longer claim that
+ * this sample app only uses interfaces and records.
+ */
+
 public record CommandConfig(Action Execute, Boolean CanExecute = true);
 
 public interface Command : System.Windows.Input.ICommand
@@ -163,4 +179,13 @@ public interface Command : System.Windows.Input.ICommand
     Boolean System.Windows.Input.ICommand.CanExecute(Object? parameter) => Config.CanExecute;
 
     void System.Windows.Input.ICommand.Execute(Object? parameter) => Config.Execute();
+}
+
+/* This is to demonstrate how a concrete implementation can be injected
+ * from outside this application.
+ */
+
+public interface ILogger
+{
+    void Log(String message);
 }

@@ -224,6 +224,8 @@ interface MyInterface
     // Also a potentially cached computation but it would also invalidate on writing
     Int32 WritableComputation { get { /* ... */ } set { /* ... */ } }
 
+    String Unimplemented { get; } // error: not implementation
+
     // Methods are never cached
     String GetUpperCaseName() => Name.ToUpper();
 
@@ -235,6 +237,66 @@ interface MyInterface
     ADependency2 RequiredDependency { get; init; }
 }
 ```
+
+Note that we assume that this is the interface to create a type from,
+ie. the *moldinium type". Of course a base interface can declare the
+`Unimplemented` property and a derived interface can still have a class
+type created if it implements this property.
+
+## A new language?
+
+One could interpret this new style of coding as being a "new language"
+that has been "discovered within C#", somwehat like JSON was
+discovered within JavaScript. The analogy isn't perfect as JSON
+throws away the vast majority of JavaScript whereas this new language
+throws away only a very small part (the classes and their constructors).
+
+I couldn't think of a great name name yet. Contenders are "c minus"
+(which may already been taken) and "calm c".
+
+The "new language" perspective gives some justification for breaking the
+C# style guide of naming interfaces only with a prefixed "I". instead
+we're prefixing interfaces with an "I" if they still play the role
+of interfaces. If they play the role of concrete types, the lose the "I".
+
+## Outlook
+
+### Maturity and State of the Library
+
+This library is a proof-of-concept and not ready for production. There's
+a substantial amount of details that are not yet implemented properly
+and what's there is likely quite buggy.
+
+One example would be that while the dependency injection component
+tells apart optional depenencies from essential (required) ones, it
+does so only for init setters. A factory declaration like
+`Func<Dep1, Dep2?, Foo>` will not allow you to pass null for the
+second dependency at runtime. In order for this to work, some work
+on nullability would have to be done, as the information about
+nullability is stored in a complicated fashion and lives in unexpected
+places.
+([see here](https://github.com/dotnet/roslyn/blob/main/docs/features/nullable-metadata.md)). For example, the one for the factory above would live on the property
+where it's injected. A facility that should help with this,
+`NullabilityInfoContext`, is again not available in Blazor WebAssembly
+(strangely it is when I run it locally - I noticed the problem only
+after I deployed the sample to Azure).
+
+Then there is "an icky part of the bakery" I talk about below
+in the notes on implementation.
+
+### What to expect
+
+It's unlikely I can afford to bring this library to a mature state,
+let alone maintain it after that. Unless Microsoft hires me I likely
+work on more financially rewarding things and this proof-of-concept
+is the most my temporary obsession with this topic could yield.
+
+I document the in my opinion quite elegant design more below in part
+so that someone with more stamina has something to build on in the
+following sections.
+
+Also note that after those, there are some notes on further features
+I would regard as essential for practical use.
 
 ## Notes on implementation
 
@@ -286,18 +348,20 @@ The former is mostly an optimization and the latter improves debugging.
 Moldinium's type creator is called *the bakery*. I really like my design here.
 
 The bakery creates types using `System.Reflection.Emit` and does some
-non-trivial CIL weaving.
+CIL weaving.
 
 Instead of monolithically doing just what is needed for this proof-of-concept,
-the bakery is very configurable for a variety of purposes.
+the bakery is very configurable for a variety of purposes. In particular, it
+does not know about the *mode* (basic, notifying, etc.) discussed above and
+instead is configured by getting a default provider as well as a number
+of *implementation and wrapper structs*.
 
 It creates a type by looking at a number of interfaces to implement and
 separately considers properties, events and methods. Each of these can
 in principle be requiring an implementation (if they are
 not yet implemented by an interface) or a wrapper (if they are).
 
-The implementations and wrappers then come in the form of
-*implementation and wrapper structs* that are baked into the resulting
+The implementation and wrapper structs are then baked into the resulting
 type as fields. Those structs are provided for each of the modes
 talked about above. The following is a wrapper struct for wrapping
 an implemented property to implement `INotifyPropertyChanged`: 
@@ -373,6 +437,58 @@ tracking and notifying (unless you replicate their code in your
 implementation and wrapper). This would obviously be very useful and
 may, again, come in a later version.
 
+#### Details about the implementation and wrapper structs
+
+The structs are expected to have a certain set of expected names. For
+properties, an implementation is expected to have a single one for
+each property method:
+
+```c#
+struct MyPropertyImplementation<..., T, ...> : ...
+{
+    public T Get(...);
+    public void Set(...);
+}
+```
+
+Wrappers are more complex:
+
+```c#
+struct MyPropertyWrapper<...> : ...
+    public Boolean BeforeGet(...);
+    public void AfterGet(...);
+    public Boolean AfterErrorGet(...);
+
+    // same for the setter
+```
+
+The return value for `Before` methods indicate whether the wrapped method
+should be called. A cache, for instance, may chose not to.
+
+The return value for `AfterError` methods indicate whether the exception
+should be rethrown.
+
+For events the picture is analogous, with `Add` adn `Remove` instead of
+`Get` and `Set`. For non-special methods there are only wrappers and the
+methods are only called `Before`, `After` and `AfterErrror`.
+
+Again, the method parameters themselves can be configured freely with
+the interface definition the implementation or wrapper derives from. The
+`ImplementationTypeArgumentKind`s that are supported are:
+
+* `Value`: Property type (only property structs)
+* `Handler`: Event handler type (only event structs)
+* `Return`: Method return type (only method structs)
+* `Exception`: Exception type for the `AfterError*` methods
+* `Container`: The baked type
+* `Mixin`: A mixin
+
+The first three are conceptually similar and must be taken by value
+in implementations and by ref in wrappers.
+
+Although this design would also allows multiple mixins to be used, this
+isn't currently allowed.
+
 #### An icky part of the bakery
 
 Due to a limitation in .NET's reflection APIs I had to work around there's
@@ -382,8 +498,7 @@ desired cases.
 When a class method implements a base method, the reflection API allows
 to extract this information with the `MethodInfo.BaseMethod` property.
 
-Interfaces can now also implement other interface methods, although only
-privately:
+Interfaces can now also implement other interface methods:
 
 ```c#
 public interface IBaseInterface
@@ -413,14 +528,13 @@ as an `override` declaration on the method body:
 
 ```
 
-However, there's no way to get at this information using reflection -
-and with dynamic assemblies there's only reflection.
+However, there's no way to get at this information using reflection.
 
 Moldinium works around this by collecting all the methods together that
 have the same name and signature and then see if there's a unique
 implementation. Since `SignatureHelper` is also not available on Blazor
-there's a lot of code that is reproducing .NET runtime logic, which is
-probably quite buggy.
+WebAssembly there's a lot of code that is reproducing .NET runtime logic,
+which is probably quite buggy.
 
 The current implementation has also more limitations than it needs to, but
 I'd rather see the .NET folk fix this little oversight in the reflection
@@ -637,30 +751,7 @@ instantiated scope. There will be as many instances of `RuntimeScope`
 for each `Scope` as there were calls to the factory that
 represents the scope (and usually only one for the root scope).
 
-## Outlook
-
-### Maturity and State of the Library
-
-This library is a proof-of-concept and not ready for production. There's
-a substantial amount of details that are not yet implemented properly
-and what's there is likely quite buggy.
-
-One example would be that while the dependency injection component
-tells apart optional depenencies from essential (required) ones, it
-does so only for init setters. A factory declaration like
-`Func<Dep1, Dep2?, Foo>` will not allow you to pass null for the
-second dependency at runtime. In order for this to work, some work
-on nullability would have to be done, as the information about
-nullability is stored in a complicated fashion and lives in unexpected
-places.
-([see here](https://github.com/dotnet/roslyn/blob/main/docs/features/nullable-metadata.md)). For example, the one for the factory above would live on the property
-where it's injected. A facility that should help with this,
-`NullabilityInfoContext`, is again not available in Blazor WebAssembly
-(strangely it is when I run it locally - I noticed the problem only
-after I deployed the sample to Azure).
-
-There there is "an icky part of the bakery" it talk about below
-in the notes on implementation.
+## Further essential features not yet implemented
 
 ### Internal Dependency Resolution, Entity Framework and Deserializers
 
@@ -695,10 +786,15 @@ hierarchy for polymorphic deserialization and, currently, baked types don't
 derive from other baked types at all. This could be done though, but of
 course requires the user to somehow sometimes distinguish a unique base.
 
+On the plus side, such libraries are generally willing to use an existing
+collection instance in properties typed as `IList<>` or `ICollection<>` so,
+that there's no additional trouble on that front.
+
 #### Entity Framework
 
-Entity Framework is similar in that it also wants to create its entity types.
-It has one major additional problem: Fluent configuration.
+Entity Framework is even more important than deserializers as entities are
+more often bound against in UIs. It's similar in that it also wants to create
+its entity types. It has one major additional problem: Fluent configuration.
 
 The best solution that can be implemented with reasonable effort would
 offer the user to configure like this:
@@ -737,13 +833,3 @@ it's only one place per model that is ugly.
 Another option would be to write a wrapper around EF's `ModelBuilder`.
 This would be very specific to EF and may require maintenance when EF's
 `ModelBuilder` changes.
-
-
-
-TODO:
-
-- the calm sea
-- gifs
-- my role as maintainer
-- mono cecil
-- caveats / maturity
