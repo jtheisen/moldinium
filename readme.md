@@ -2,7 +2,7 @@
 
 # Moldinium
 
-![Moldinium](https://user-images.githubusercontent.com/1516294/214932993-21e45611-81b0-45fb-ad26-c2a8a1cf5dba.gif)
+![Moldinium2](https://user-images.githubusercontent.com/1516294/215169320-0a0f0008-d694-43e9-8aec-dd440109eab5.gif)
 
 *The Moldinium Sample App against different UI technologies*
 
