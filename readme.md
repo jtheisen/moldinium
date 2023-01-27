@@ -224,7 +224,7 @@ interface MyInterface
     // Also a potentially cached computation but it would also invalidate on writing
     Int32 WritableComputation { get { /* ... */ } set { /* ... */ } }
 
-    String Unimplemented { get; } // error: not implementation
+    String Unimplemented { get; } // error: no implementation
 
     // Methods are never cached
     String GetUpperCaseName() => Name.ToUpper();
@@ -232,7 +232,7 @@ interface MyInterface
     // optional dependency
     ADependency1? OptionalDependency { get; init; }
 
-    // required dependency, doesn't need a default either because it is
+    // essential dependency, doesn't need a default either because it is
     // expected to be initialized
     ADependency2 RequiredDependency { get; init; }
 }
@@ -255,7 +255,7 @@ I couldn't think of a great name name yet. Contenders are "c minus"
 (which may already been taken) and "calm c".
 
 The "new language" perspective gives some justification for breaking the
-C# style guide of naming interfaces only with a prefixed "I". instead
+C# style guide of naming interfaces only with a prefixed "I". Instead,
 we're prefixing interfaces with an "I" if they still play the role
 of interfaces. If they play the role of concrete types, the lose the "I".
 
@@ -274,10 +274,10 @@ does so only for init setters. A factory declaration like
 second dependency at runtime. In order for this to work, some work
 on nullability would have to be done, as the information about
 nullability is stored in a complicated fashion and lives in unexpected
-places.
+places
 ([see here](https://github.com/dotnet/roslyn/blob/main/docs/features/nullable-metadata.md)). For example, the one for the factory above would live on the property
 where it's injected. A facility that should help with this,
-`NullabilityInfoContext`, is again not available in Blazor WebAssembly
+`NullabilityInfoContext`, is not available in Blazor WebAssembly
 (strangely it is when I run it locally - I noticed the problem only
 after I deployed the sample to Azure).
 
@@ -286,13 +286,13 @@ in the notes on implementation.
 
 ### What to expect
 
-It's unlikely I can afford to bring this library to a mature state,
+It's unlikely I can afford to bring this library to a really mature state,
 let alone maintain it after that. Unless Microsoft hires me I likely
 work on more financially rewarding things and this proof-of-concept
 is the most my temporary obsession with this topic could yield.
 
 I document the in my opinion quite elegant design more below in part
-so that someone with more stamina has something to build on in the
+so that someone with more free time has something to build on in the
 following sections.
 
 Also note that after those, there are some notes on further features
@@ -345,7 +345,7 @@ The former is mostly an optimization and the latter improves debugging.
 
 ### Dynamic Type Creation
 
-Moldinium's type creator is called *the bakery*. I really like my design here.
+Moldinium's type creator is called *the bakery*.
 
 The bakery creates types using `System.Reflection.Emit` and does some
 CIL weaving.
@@ -417,7 +417,7 @@ it analyzes this interface first to understand what the types on
 its methods are supposed to mean. In then creates code for the getters and setters
 of the wrapped property on the created type with CIL weaving. This code
 calls them with the given parameters according to the interface definition.
-The methods that implement the wrapping code, such as `AfterSet` must have one
+The methods that implement the wrapping code, such as `AfterSet`, must have one
 of some pre-defined names that imply their purpose, but their parameters can be
 any, as long they are declared this way.
 
@@ -446,12 +446,14 @@ each property method:
 ```c#
 struct MyPropertyImplementation<..., T, ...> : ...
 {
+    public void Init(...);
     public T Get(...);
     public void Set(...);
 }
 ```
 
-Wrappers are more complex:
+The init method is used to set default values and are called from the
+created type's constructor. Wrappers are more complex:
 
 ```c#
 struct MyPropertyWrapper<...> : ...
@@ -468,7 +470,7 @@ should be called. A cache, for instance, may chose not to.
 The return value for `AfterError` methods indicate whether the exception
 should be rethrown.
 
-For events the picture is analogous, with `Add` adn `Remove` instead of
+For events the picture is analogous, with `Add` and `Remove` instead of
 `Get` and `Set`. For non-special methods there are only wrappers and the
 methods are only called `Before`, `After` and `AfterErrror`.
 
@@ -479,25 +481,28 @@ the interface definition the implementation or wrapper derives from. The
 * `Value`: Property type (only property structs)
 * `Handler`: Event handler type (only event structs)
 * `Return`: Method return type (only method structs)
-* `Exception`: Exception type for the `AfterError*` methods
+* `Exception`: Exception type for the `AfterError*` methods, should be constraint to `Sytem.Exception`
 * `Container`: The baked type
 * `Mixin`: A mixin
 
 The first three are conceptually similar and must be taken by value
 in implementations and by ref in wrappers.
 
-Although this design would also allows multiple mixins to be used, this
+Although this design would also allow multiple mixins to be used, this
 isn't currently allowed.
+
+While you can't debug the generated IL code, you can debug those implementation
+and wrapper structs when they live your own assemblies or you
+disable "just my code".
 
 #### An icky part of the bakery
 
-Due to a limitation in .NET's reflection APIs I had to work around there's
+Due to a limitation in .NET's reflection APIs I had to work around, there's
 a messy part that is likely buggy and definitely unable to handle all
 desired cases.
 
 When a class method implements a base method, the reflection API allows
 to extract this information with the `MethodInfo.BaseMethod` property.
-
 Interfaces can now also implement other interface methods:
 
 ```c#
@@ -543,7 +548,7 @@ APIs than work on this further.
 #### You can't implement all baked classes in C#
 
 Interestingly, the baked types can be of a form that you can't implement
-purely in C# (without again using reflection helpers that is).
+purely in C# (without again using reflection helpers anyway).
 
 In the example of the previous section, the `Name` getter may have to
 be wrapped, ie. the baked type also has a `Name` getter that must call
@@ -638,7 +643,7 @@ interface Request
 }
 ```
 
-The top scope `App` is resolved by the application setup code, eg in `Program.cs`.
+The top scope `App` is resolved by the application setup code, likely in `Program.cs`.
 
 First Moldinium validates the dependencies:
 
@@ -692,7 +697,7 @@ The prefixes (`fei`, `veb`, etc.) have the following meaning:
 - first character is the *runtime maturity*:
   - `t`: type without instance
   - `v`: uninitialized instance (virgin)
-  - `f`: finished / externally initialized (init-setter set)
+  - `f`: finished / externally initialized (init-setters set)
 - the second character can be `e` for essential (required) and `o` for optional
 - the third character is a property of the type itself:
   - `b`: baked class (taken from an attribute the bakery puts on the type)
@@ -718,7 +723,7 @@ the `DependencyProvider` suffix. So, `Bakery` is the
 any `f*b*` that counts as a *molidinum type* (you configure that
 with `IdentifyMoldiniumTypes` on the configuration builder).
 
-The `InitSetter` is then says it's able to provide a finished instance
+The `InitSetter` then says it's able to provide a finished instance
 if it has a untouched instance and some further dependencies coming
 from the properties that need to be set.
 
@@ -787,8 +792,8 @@ derive from other baked types at all. This could be done though, but of
 course requires the user to somehow sometimes distinguish a unique base.
 
 On the plus side, such libraries are generally willing to use an existing
-collection instance in properties typed as `IList<>` or `ICollection<>` so,
-that there's no additional trouble on that front.
+collection instance in properties typed as `IList<>` or `ICollection<>`. So,
+at least there is no additional trouble on that front.
 
 #### Entity Framework
 
@@ -828,8 +833,15 @@ simply by providing the correct arguments to the type parameters. The
 result should be good enough for EF, but I haven't tried.
 
 This does require some repetition of type names, obviously, but at least
-it's only one place per model that is ugly.
+it's only one place per context that is ugly.
 
 Another option would be to write a wrapper around EF's `ModelBuilder`.
 This would be very specific to EF and may require maintenance when EF's
 `ModelBuilder` changes.
+
+TODO:
+- talk about IdentifyMoldiniumTypes
+- roadmap: Blazor WebAssembly
+- access control
+- better tracking (logging, heap allocations)
+- globally defined scope dependencies
