@@ -287,9 +287,7 @@ in the notes on implementation.
 ### What to expect
 
 It's unlikely I can afford to bring this library to a really mature state,
-let alone maintain it after that. Unless Microsoft hires me I likely
-work on more financially rewarding things and this proof-of-concept
-is the most my temporary obsession with this topic could yield.
+let alone maintain it after that.
 
 I document the in my opinion quite elegant design below in part
 so that someone with more free time has something to build on in the
