@@ -229,17 +229,17 @@ interface MyInterface
     // Methods are never cached
     String GetUpperCaseName() => Name.ToUpper();
 
-    // optional dependency
+    // Optional dependency
     ADependency1? OptionalDependency { get; init; }
 
-    // essential dependency, doesn't need a default either because it is
-    // expected to be initialized
+    // Essential dependency, doesn't need a default either because it
+    // is expected to be initialized
     ADependency2 RequiredDependency { get; init; }
 }
 ```
 
 Note that we assume that this is the interface to create a type from,
-ie. the *moldinium type". Of course, a base interface can declare the
+ie. the *moldinium type*. Of course, a base interface can declare the
 `Unimplemented` property and a derived interface can still have a class
 type created if it implements this property.
 
